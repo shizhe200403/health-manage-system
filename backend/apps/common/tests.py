@@ -156,28 +156,30 @@ class ProductApiSmokeTests(APITestCase):
         self.assertEqual(items[0]["audit_status"], "approved")
         self.assertIsNotNone(items[0]["nutrition_summary"])
 
-    def test_import_external_recipe_flow(self):
+    def test_user_can_create_recipe_with_freeform_ingredients(self):
         self._create_user()
         self._login("alice")
 
         response = self.client.post(
-            "/api/v1/recipes/import-external/",
+            "/api/v1/recipes/",
             {
-                "title": "Imported Chicken Salad",
-                "description": "External recipe import",
+                "title": "自制鸡胸沙拉",
+                "description": "用户自己上传的工作日晚餐",
                 "meal_type": "lunch",
+                "difficulty": "easy",
+                "portion_size": "1 份",
+                "servings": 1,
                 "cook_time_minutes": 12,
-                "source_name": "edamam",
-                "source_url": "https://example.com/recipe",
+                "prep_time_minutes": 8,
                 "ingredients": [
-                    {"name": "chicken breast", "amount": 1, "unit": "serving", "is_main": True},
-                    {"name": "lettuce", "amount": 1, "unit": "serving", "is_main": False},
+                    {"ingredient_name": "鸡胸肉", "amount": 150, "unit": "g", "is_main": True},
+                    {"ingredient_name": "生菜", "amount": 80, "unit": "g", "is_main": False},
                 ],
                 "steps": [
-                    {"content": "Mix ingredients."},
-                    {"content": "Serve immediately."},
+                    {"step_no": 1, "content": "鸡胸肉煎熟切片。"},
+                    {"step_no": 2, "content": "和生菜拌匀后装盘。"},
                 ],
-                "nutrition_summary": {
+                "nutrition_input": {
                     "per_serving_energy": 320,
                     "per_serving_protein": 28,
                     "per_serving_fat": 9,
@@ -188,10 +190,15 @@ class ProductApiSmokeTests(APITestCase):
         )
         self.assertEqual(response.status_code, 201)
         recipe_id = response.data["data"]["id"]
-        self.assertTrue(Recipe.objects.filter(id=recipe_id, created_by__username="alice", source_type="external").exists())
+        recipe = Recipe.objects.get(id=recipe_id)
+        self.assertEqual(recipe.created_by.username, "alice")
+        self.assertEqual(recipe.source_type, "user_upload")
+        self.assertEqual(recipe.status, "published")
+        self.assertEqual(recipe.audit_status, "approved")
         self.assertTrue(RecipeNutritionSummary.objects.filter(recipe_id=recipe_id).exists())
         self.assertEqual(RecipeStep.objects.filter(recipe_id=recipe_id).count(), 2)
-        self.assertGreaterEqual(Recipe.objects.filter(created_by__username="alice").count(), 1)
+        self.assertEqual(recipe.recipe_ingredients.count(), 2)
+        self.assertTrue(Ingredient.objects.filter(canonical_name="鸡胸肉").exists())
 
     def test_meal_record_statistics_and_report_generation(self):
         user = self._create_user()
@@ -266,7 +273,7 @@ class ProductApiSmokeTests(APITestCase):
         self.assertEqual(list_response.status_code, 200)
         self.assertEqual(len(list_response.data["data"]), 1)
 
-    def test_community_and_external_proxy_flow(self):
+    def test_community_flow(self):
         self._create_user()
         self._login("alice")
 
@@ -302,15 +309,3 @@ class ProductApiSmokeTests(APITestCase):
         listed_post = (post_list_response.data["data"].get("items") or post_list_response.data["data"])[0]
         self.assertEqual(listed_post["user_info"]["display_name"], "alice")
         self.assertEqual(listed_post["comments"], [])
-
-        usda_response = self.client.get("/api/v1/external/usda/search/?q=rice")
-        self.assertEqual(usda_response.status_code, 200)
-        self.assertTrue(usda_response.data["data"]["degraded"])
-
-        nutritionix_response = self.client.get("/api/v1/external/nutritionix/search/?q=banana")
-        self.assertEqual(nutritionix_response.status_code, 200)
-        self.assertTrue(nutritionix_response.data["data"]["degraded"])
-
-        barcode_response = self.client.get("/api/v1/external/openfoodfacts/barcode/0000000000000/")
-        self.assertEqual(barcode_response.status_code, 200)
-        self.assertTrue(barcode_response.data["data"]["degraded"])

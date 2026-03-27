@@ -40,7 +40,7 @@ export async function explainRecommendation(recipeId: number) {
   return data;
 }
 
-export async function importExternalRecipe(payload: Record<string, unknown>) {
-  const { data } = await http.post("/recipes/import-external/", payload);
+export async function createRecipe(payload: Record<string, unknown>) {
+  const { data } = await http.post("/recipes/", payload);
   return data;
 }

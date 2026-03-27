@@ -7,6 +7,7 @@
         <p class="desc">按餐次、准备时间和营养重点筛选菜谱，尽快找到今天更适合的一餐。</p>
       </div>
       <div class="head-actions">
+        <el-button type="primary" @click="openCreator">上传菜谱</el-button>
         <el-button @click="loadRecipes">刷新</el-button>
         <el-button plain @click="router.push('/favorites')">进入收藏中心</el-button>
       </div>
@@ -45,44 +46,20 @@
       <el-button v-if="goalSuggestedFilter !== 'all'" plain @click="sceneFilter = goalSuggestedFilter">应用目标筛选</el-button>
     </div>
 
-    <div class="external-strip">
-      <div class="external-copy">
-        <strong>外部菜谱灵感</strong>
-        <p>当本地菜谱还不够丰富时，可以从外部菜谱库搜索灵感，并直接带入记录页。</p>
+    <div class="creator-strip">
+      <div class="creator-copy">
+        <strong>先把自己的菜谱沉淀进系统</strong>
+        <p>当前已去掉外部菜谱与外部食物依赖。常吃什么就先上传什么，后面的记录、收藏和报表会更稳定。</p>
       </div>
-      <div class="external-actions">
-        <el-input v-model.trim="externalRecipeQuery" placeholder="搜索外部菜谱，例如：chicken salad" clearable @keyup.enter="searchExternalIdeas" />
-        <el-button :loading="loadingExternalRecipes" @click="searchExternalIdeas">搜索外部菜谱</el-button>
+      <div class="creator-actions">
+        <el-button type="primary" @click="openCreator">上传我的菜谱</el-button>
       </div>
     </div>
 
-    <div v-if="externalRecipeIdeas.length" class="external-grid">
-      <article v-for="recipe in externalRecipeIdeas" :key="recipe.id">
-        <div class="card-head">
-          <strong>{{ recipe.title }}</strong>
-          <span class="pick-badge">外部来源</span>
-        </div>
-        <p>{{ externalRecipeSummary(recipe) }}</p>
-        <div class="nutrition">
-          <span>{{ formatMetric(recipe.energy, "kcal") }} / 份</span>
-          <span>{{ formatMetric(recipe.protein, "g") }} 蛋白</span>
-          <span v-if="recipe.cookTimeMinutes">{{ recipe.cookTimeMinutes }} 分钟</span>
-        </div>
-        <div v-if="recipe.ingredientLines.length" class="external-ingredients">
-          {{ recipe.ingredientLines.slice(0, 3).join(" · ") }}
-        </div>
-        <div class="footer-actions">
-          <el-button v-if="recipe.url" text @click="window.open(recipe.url, '_blank', 'noopener,noreferrer')">打开原文</el-button>
-          <el-button plain :loading="importingExternalId === recipe.id" @click="saveExternalRecipe(recipe)">保存到菜谱库</el-button>
-          <el-button type="primary" plain @click="importExternalRecipe(recipe)">带入记录</el-button>
-        </div>
-      </article>
-    </div>
     <PageStateBlock
-      v-else-if="externalRecipeSearched"
       tone="info"
-      :title="externalRecipeEmptyTitle"
-      :description="externalRecipeEmptyDescription"
+      title="AI 图片识别会在后续版本接入"
+      description="后续会支持上传食物照片，由 AI 助手识别食材、份量与营养估算。本轮先把手动上传菜谱链路做顺。"
       compact
     />
 
@@ -180,20 +157,121 @@
       @favorite-change="handleFavoriteChange"
       @add-to-record="addToRecord"
     />
+    <el-dialog v-model="creatorVisible" width="760px" title="上传菜谱">
+      <el-form label-position="top" class="creator-form">
+        <el-row :gutter="16">
+          <el-col :span="24" :md="12">
+            <el-form-item label="菜谱名称">
+              <el-input v-model.trim="creatorForm.title" placeholder="例如：香煎鸡胸沙拉" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24" :md="12">
+            <el-form-item label="餐次">
+              <el-select v-model="creatorForm.meal_type" style="width: 100%">
+                <el-option label="早餐" value="breakfast" />
+                <el-option label="午餐" value="lunch" />
+                <el-option label="晚餐" value="dinner" />
+                <el-option label="加餐" value="snack" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-form-item label="描述">
+          <el-input v-model.trim="creatorForm.description" type="textarea" :rows="2" placeholder="例如：适合工作日晚餐，准备时间短，蛋白更高。" />
+        </el-form-item>
+
+        <el-row :gutter="16">
+          <el-col :span="12" :md="6">
+            <el-form-item label="份数">
+              <el-input-number v-model="creatorForm.servings" :min="1" :max="20" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12" :md="6">
+            <el-form-item label="每份说明">
+              <el-input v-model.trim="creatorForm.portion_size" placeholder="1 份 / 1 碗" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12" :md="6">
+            <el-form-item label="准备时间">
+              <el-input-number v-model="creatorForm.prep_time_minutes" :min="0" :max="300" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12" :md="6">
+            <el-form-item label="烹饪时间">
+              <el-input-number v-model="creatorForm.cook_time_minutes" :min="0" :max="300" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-form-item label="难度">
+          <el-radio-group v-model="creatorForm.difficulty">
+            <el-radio-button label="easy">简单</el-radio-button>
+            <el-radio-button label="medium">适中</el-radio-button>
+            <el-radio-button label="hard">复杂</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+
+        <div class="creator-section">
+          <div class="section-head">
+            <strong>食材清单</strong>
+            <el-button plain @click="addCreatorIngredient">新增食材</el-button>
+          </div>
+          <div v-for="(ingredient, index) in creatorForm.ingredients" :key="`ingredient-${index}`" class="creator-row">
+            <el-input v-model.trim="ingredient.ingredient_name" placeholder="食材名称，例如：鸡胸肉" />
+            <el-input-number v-model="ingredient.amount" :min="0" :max="9999" :precision="1" />
+            <el-input v-model.trim="ingredient.unit" placeholder="单位，例如：g / 个 / 份" />
+            <el-switch v-model="ingredient.is_main" active-text="主食材" />
+            <el-button text type="danger" :disabled="creatorForm.ingredients.length === 1" @click="removeCreatorIngredient(index)">删除</el-button>
+          </div>
+        </div>
+
+        <div class="creator-section">
+          <div class="section-head">
+            <strong>做法步骤</strong>
+            <el-button plain @click="addCreatorStep">新增步骤</el-button>
+          </div>
+          <div v-for="(step, index) in creatorForm.steps" :key="`step-${index}`" class="creator-step-row">
+            <span class="step-index">步骤 {{ index + 1 }}</span>
+            <el-input v-model.trim="step.content" type="textarea" :rows="2" placeholder="描述这一步怎么做" />
+            <el-button text type="danger" :disabled="creatorForm.steps.length === 1" @click="removeCreatorStep(index)">删除</el-button>
+          </div>
+        </div>
+
+        <div class="creator-section">
+          <div class="section-head">
+            <strong>营养信息</strong>
+            <span>可以先手动填写；如果暂时不确定，可以留空，等后续 AI 助手补全。</span>
+          </div>
+          <div class="nutrition-editor">
+            <el-input-number v-model="creatorForm.nutrition.energy" :min="0" :max="5000" :precision="1" placeholder="热量" />
+            <el-input-number v-model="creatorForm.nutrition.protein" :min="0" :max="500" :precision="1" placeholder="蛋白质" />
+            <el-input-number v-model="creatorForm.nutrition.fat" :min="0" :max="500" :precision="1" placeholder="脂肪" />
+            <el-input-number v-model="creatorForm.nutrition.carbohydrate" :min="0" :max="500" :precision="1" placeholder="碳水" />
+          </div>
+        </div>
+      </el-form>
+
+      <template #footer>
+        <div class="dialog-actions">
+          <el-button @click="creatorVisible = false">取消</el-button>
+          <el-button type="primary" :loading="creatingRecipe" @click="submitCreatorRecipe">保存菜谱</el-button>
+        </div>
+      </template>
+    </el-dialog>
     </RefreshFrame>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import CollectionSkeleton from "../components/CollectionSkeleton.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
-import { notifyActionError, notifyActionSuccess, notifyLoadError } from "../lib/feedback";
+import { notifyActionError, notifyActionSuccess, notifyLoadError, notifyWarning } from "../lib/feedback";
 import { useRouter } from "vue-router";
 import RecipeDetailDialog from "../components/RecipeDetailDialog.vue";
-import { searchExternalRecipeIdeas, type ExternalRecipeIdea } from "../api/external";
-import { explainRecommendation, favoriteRecipe, importExternalRecipe as importExternalRecipeApi, listFavoriteRecipes, listRecipes, unfavoriteRecipe } from "../api/recipes";
+import { createRecipe, explainRecommendation, favoriteRecipe, listFavoriteRecipes, listRecipes, unfavoriteRecipe } from "../api/recipes";
 import { trackEvent } from "../api/behavior";
 import { listHealthGoals } from "../api/goals";
 
@@ -212,11 +290,26 @@ const selectedRecipe = ref<Record<string, any> | null>(null);
 const selectedRecipeId = ref<number | null>(null);
 const selectedReasonText = ref("");
 const activeGoal = ref<Record<string, any> | null>(null);
-const externalRecipeQuery = ref("");
-const externalRecipeIdeas = ref<ExternalRecipeIdea[]>([]);
-const loadingExternalRecipes = ref(false);
-const externalRecipeSearched = ref(false);
-const importingExternalId = ref<string | null>(null);
+const creatorVisible = ref(false);
+const creatingRecipe = ref(false);
+const creatorForm = reactive({
+  title: "",
+  description: "",
+  meal_type: "lunch",
+  servings: 1,
+  portion_size: "1 份",
+  difficulty: "easy",
+  prep_time_minutes: 10,
+  cook_time_minutes: 15,
+  ingredients: [{ ingredient_name: "", amount: 1, unit: "份", is_main: true }],
+  steps: [{ content: "" }],
+  nutrition: {
+    energy: null as number | null,
+    protein: null as number | null,
+    fat: null as number | null,
+    carbohydrate: null as number | null,
+  },
+});
 
 const goalSuggestedFilter = computed(() => {
   const goalType = activeGoal.value?.goal_type;
@@ -282,22 +375,15 @@ const emptyDescription = computed(() => {
     return "先收藏几个常用菜谱，后续每天记录会明显更顺手。";
   }
   if (!recipes.value.length) {
-    return "可以稍后刷新，或者先完善目标与档案，让系统逐步补充更适合的内容。";
+    return "先上传一两个你常吃的菜谱，后面的记录、收藏和报表都会更顺手。";
   }
   return "试试切换场景、放宽关键词，或回到“全部”。";
 });
-const emptyActionLabel = computed(() => (hasActiveFilters.value ? "重置筛选" : "刷新菜谱"));
-const externalRecipeEmptyTitle = computed(() => {
-  if (!externalRecipeQuery.value) {
-    return "输入关键词后可以搜索外部菜谱";
+const emptyActionLabel = computed(() => {
+  if (!recipes.value.length && !hasActiveFilters.value) {
+    return "上传第一道菜谱";
   }
-  return "没有找到匹配的外部菜谱";
-});
-const externalRecipeEmptyDescription = computed(() => {
-  if (!externalRecipeQuery.value) {
-    return "适合在本地菜谱不够时，临时补充灵感来源。";
-  }
-  return "可能是外部数据源未配置，或者当前关键词结果较少，可以换个英文食材名试试。";
+  return hasActiveFilters.value ? "重置筛选" : "刷新菜谱";
 });
 
 function numericValue(value: unknown) {
@@ -414,12 +500,6 @@ function footerCopy(recipe: Record<string, any>) {
   return "适合作为日常均衡饮食的一部分。";
 }
 
-function externalRecipeSummary(recipe: ExternalRecipeIdea) {
-  const parts = [recipe.mealType ? mealTypeLabel(recipe.mealType) : "外部菜谱", recipe.servings ? `${recipe.servings} 份` : "", recipe.source === "edamam" ? "Edamam" : ""]
-    .filter(Boolean);
-  return parts.join(" · ");
-}
-
 async function loadRecipes() {
   try {
     loadingRecipes.value = true;
@@ -436,27 +516,6 @@ async function loadRecipes() {
     notifyLoadError("菜谱");
   } finally {
     loadingRecipes.value = false;
-  }
-}
-
-async function searchExternalIdeas() {
-  if (!externalRecipeQuery.value) {
-    externalRecipeIdeas.value = [];
-    externalRecipeSearched.value = true;
-    return;
-  }
-
-  try {
-    loadingExternalRecipes.value = true;
-    const result = await searchExternalRecipeIdeas(externalRecipeQuery.value);
-    externalRecipeIdeas.value = result.items.slice(0, 6);
-    externalRecipeSearched.value = true;
-  } catch {
-    externalRecipeIdeas.value = [];
-    externalRecipeSearched.value = true;
-    notifyLoadError("外部菜谱");
-  } finally {
-    loadingExternalRecipes.value = false;
   }
 }
 
@@ -481,6 +540,10 @@ async function toggleFavorite(recipe: Record<string, any>) {
 
 function resetFilters() {
   if (!hasActiveFilters.value) {
+    if (!recipes.value.length) {
+      openCreator();
+      return;
+    }
     loadRecipes();
     return;
   }
@@ -502,65 +565,110 @@ function addToRecord(recipe: Record<string, any>) {
   });
 }
 
-function importExternalRecipe(recipe: ExternalRecipeIdea) {
-  router.push({
-    path: "/records",
-    query: {
-      meal_type: recipe.mealType || "lunch",
-      note: recipe.title,
-      external_title: recipe.title,
-      external_source: recipe.source,
-      external_energy: String(recipe.energy || 0),
-      external_protein: String(recipe.protein || 0),
-      external_fat: String(recipe.fat || 0),
-      external_carbohydrate: String(recipe.carbohydrate || 0),
-      external_unit: "serving",
-    },
-  });
+function resetCreatorForm() {
+  creatorForm.title = "";
+  creatorForm.description = "";
+  creatorForm.meal_type = "lunch";
+  creatorForm.servings = 1;
+  creatorForm.portion_size = "1 份";
+  creatorForm.difficulty = "easy";
+  creatorForm.prep_time_minutes = 10;
+  creatorForm.cook_time_minutes = 15;
+  creatorForm.ingredients = [{ ingredient_name: "", amount: 1, unit: "份", is_main: true }];
+  creatorForm.steps = [{ content: "" }];
+  creatorForm.nutrition.energy = null;
+  creatorForm.nutrition.protein = null;
+  creatorForm.nutrition.fat = null;
+  creatorForm.nutrition.carbohydrate = null;
 }
 
-async function saveExternalRecipe(recipe: ExternalRecipeIdea) {
+function openCreator() {
+  resetCreatorForm();
+  creatorVisible.value = true;
+}
+
+function addCreatorIngredient() {
+  creatorForm.ingredients.push({ ingredient_name: "", amount: 1, unit: "份", is_main: false });
+}
+
+function removeCreatorIngredient(index: number) {
+  if (creatorForm.ingredients.length === 1) {
+    return;
+  }
+  creatorForm.ingredients.splice(index, 1);
+}
+
+function addCreatorStep() {
+  creatorForm.steps.push({ content: "" });
+}
+
+function removeCreatorStep(index: number) {
+  if (creatorForm.steps.length === 1) {
+    return;
+  }
+  creatorForm.steps.splice(index, 1);
+}
+
+async function submitCreatorRecipe() {
+  if (!creatorForm.title.trim()) {
+    notifyWarning("请先填写菜谱名称");
+    return;
+  }
+
+  const ingredients = creatorForm.ingredients
+    .map((item) => ({
+      ingredient_name: item.ingredient_name.trim(),
+      amount: Number(item.amount || 0),
+      unit: item.unit.trim() || "份",
+      is_main: Boolean(item.is_main),
+    }))
+    .filter((item) => item.ingredient_name);
+
+  const steps = creatorForm.steps
+    .map((item, index) => ({ step_no: index + 1, content: item.content.trim() }))
+    .filter((item) => item.content);
+
+  if (!ingredients.length) {
+    notifyWarning("请至少填写一个食材");
+    return;
+  }
+  if (!steps.length) {
+    notifyWarning("请至少填写一个步骤");
+    return;
+  }
+
+  const nutritionSummary = [creatorForm.nutrition.energy, creatorForm.nutrition.protein, creatorForm.nutrition.fat, creatorForm.nutrition.carbohydrate].some((value) => value != null)
+    ? {
+        per_serving_energy: creatorForm.nutrition.energy,
+        per_serving_protein: creatorForm.nutrition.protein,
+        per_serving_fat: creatorForm.nutrition.fat,
+        per_serving_carbohydrate: creatorForm.nutrition.carbohydrate,
+      }
+    : undefined;
+
   try {
-    importingExternalId.value = recipe.id;
-    const response = await importExternalRecipeApi({
-      title: recipe.title,
-      description: recipe.ingredientLines.slice(0, 4).join("；"),
-      cover_image_url: recipe.image,
-      portion_size: "1 份",
-      servings: recipe.servings || 1,
-      difficulty: recipe.cookTimeMinutes > 35 ? "medium" : "easy",
-      cook_time_minutes: recipe.cookTimeMinutes || null,
-      meal_type: recipe.mealType || "lunch",
-      taste_tags: recipe.protein >= 18 ? ["high_protein"] : [],
-      cuisine_tags: ["外部导入"],
-      source_name: recipe.source,
-      source_url: recipe.url,
-      ingredients: recipe.ingredientLines.map((line, index) => ({
-        name: line,
-        amount: 1,
-        unit: "serving",
-        is_main: index < 2,
-      })),
-      steps: [
-        { content: "查看原始菜谱链接，按自己的食材和口味完成制作。" },
-        { content: recipe.url ? `原始来源：${recipe.url}` : "可根据食材清单自行调整做法。" },
-      ],
-      nutrition_summary: {
-        per_serving_energy: recipe.energy,
-        per_serving_protein: recipe.protein,
-        per_serving_fat: recipe.fat,
-        per_serving_carbohydrate: recipe.carbohydrate,
-      },
+    creatingRecipe.value = true;
+    await createRecipe({
+      title: creatorForm.title.trim(),
+      description: creatorForm.description.trim(),
+      meal_type: creatorForm.meal_type,
+      servings: creatorForm.servings || 1,
+      portion_size: creatorForm.portion_size.trim() || "1 份",
+      difficulty: creatorForm.difficulty,
+      prep_time_minutes: creatorForm.prep_time_minutes,
+      cook_time_minutes: creatorForm.cook_time_minutes,
+      ingredients,
+      steps,
+      nutrition_input: nutritionSummary,
+      cuisine_tags: ["用户上传"],
     });
-    const imported = response?.data ?? response;
-    if (imported?.id && !recipes.value.some((item) => Number(item.id) === Number(imported.id))) {
-      recipes.value = [imported, ...recipes.value];
-    }
-    notifyActionSuccess("已保存到菜谱库");
+    creatorVisible.value = false;
+    notifyActionSuccess("菜谱已上传");
+    await loadRecipes();
   } catch {
-    notifyActionError("保存外部菜谱");
+    notifyActionError("上传菜谱");
   } finally {
-    importingExternalId.value = null;
+    creatingRecipe.value = false;
   }
 }
 
@@ -604,8 +712,10 @@ onMounted(loadRecipes);
 .scene-row,
 .focus-strip,
 .tag-row,
-.external-strip,
-.external-actions {
+.creator-strip,
+.creator-actions,
+.section-head,
+.dialog-actions {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -630,7 +740,8 @@ h2 {
 .empty-state p,
 .summary-grid p,
 .focus-strip p,
-.quick-picks p {
+.quick-picks p,
+.creator-strip p {
   margin: 8px 0 0;
   color: #476072;
   line-height: 1.65;
@@ -638,8 +749,7 @@ h2 {
 
 .summary-grid,
 .quick-picks,
-.grid,
-.external-grid {
+.grid {
   display: grid;
   gap: 14px;
 }
@@ -650,9 +760,8 @@ h2 {
 
 .summary-grid article,
 .focus-strip,
-.external-strip,
+.creator-strip,
 .quick-picks article,
-.external-grid article,
 .grid article,
 .empty-state {
   padding: 20px;
@@ -691,28 +800,12 @@ h2 {
   align-items: center;
 }
 
-.external-strip {
-  align-items: center;
-}
-
-.external-copy {
-  flex: 1;
-}
-
-.external-actions {
-  width: min(100%, 520px);
-}
-
-.external-actions :deep(.el-input) {
+.creator-copy {
   flex: 1;
 }
 
 .quick-picks {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.external-grid {
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
 }
 
 .grid {
@@ -729,13 +822,6 @@ h2 {
 
 .tag-row {
   margin-top: 14px;
-}
-
-.external-ingredients {
-  margin-top: 14px;
-  color: #5a7a8a;
-  line-height: 1.6;
-  font-size: 13px;
 }
 
 .feature-tag {
@@ -778,6 +864,57 @@ h2 {
   flex: 1;
 }
 
+.creator-form {
+  display: grid;
+  gap: 16px;
+}
+
+.creator-section {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(247, 251, 255, 0.92);
+  border: 1px solid rgba(16, 34, 42, 0.06);
+}
+
+.section-head strong {
+  font-size: 16px;
+}
+
+.section-head span {
+  color: #5a7a8a;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.creator-row,
+.creator-step-row,
+.nutrition-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.creator-row {
+  grid-template-columns: minmax(0, 2fr) 120px 120px 100px auto;
+  align-items: center;
+}
+
+.creator-step-row {
+  grid-template-columns: 88px minmax(0, 1fr) auto;
+  align-items: flex-start;
+}
+
+.nutrition-editor {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.step-index {
+  padding-top: 10px;
+  color: #476072;
+  font-size: 13px;
+}
+
 @media (max-width: 960px) {
   .quick-picks {
     grid-template-columns: 1fr;
@@ -793,10 +930,18 @@ h2 {
   .footer-actions,
   .scene-row,
   .focus-strip,
-  .external-strip,
-  .external-actions {
+  .creator-strip,
+  .creator-actions,
+  .section-head,
+  .dialog-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .creator-row,
+  .creator-step-row,
+  .nutrition-editor {
+    grid-template-columns: 1fr;
   }
 }
 </style>

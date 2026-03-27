@@ -38,7 +38,6 @@ INSTALLED_APPS = [
     "apps.recommendation.apps.RecommendationConfig",
     "apps.nutrition.apps.NutritionConfig",
     "apps.community.apps.CommunityConfig",
-    "apps.external.apps.ExternalConfig",
     "apps.reports.apps.ReportsConfig",
 ]
 

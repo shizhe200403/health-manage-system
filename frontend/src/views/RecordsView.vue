@@ -139,48 +139,12 @@
           <el-button v-if="yesterdaySameMealRecord" plain @click="copyYesterdayMeal">复制昨天同餐</el-button>
         </div>
 
-        <div class="external-panel">
-          <div class="external-head">
-            <div>
-              <strong>外部食物数据</strong>
-              <p>可从外部食物库或条码商品库带入营养值，适合本地菜谱里暂时没有的数据。</p>
-            </div>
-            <el-button v-if="selectedExternalFood" text @click="clearExternalSelection">清除外部选择</el-button>
+        <div class="helper-panel">
+          <div>
+            <strong>没有合适的菜谱？</strong>
+            <p>现在先通过“上传菜谱”补齐你常吃的餐食。热量和营养可以先手动填写，后续再结合 AI 助手补全。</p>
           </div>
-
-          <div class="external-toolbar">
-            <el-input v-model.trim="externalFoodQuery" clearable placeholder="搜索食物，例如：oatmeal、banana、chicken breast" @keyup.enter="searchExternalFoodItems" />
-            <el-button :loading="loadingExternalFoods" @click="searchExternalFoodItems">搜索外部食物</el-button>
-          </div>
-
-          <div class="external-toolbar">
-            <el-input v-model.trim="barcodeQuery" clearable placeholder="输入商品条码，例如：6925303714850" @keyup.enter="lookupBarcodeItem" />
-            <el-button :loading="loadingBarcode" plain @click="lookupBarcodeItem">查条码</el-button>
-          </div>
-
-          <div v-if="externalFoodResults.length" class="external-result-list">
-            <article v-for="item in externalFoodResults" :key="item.id" class="external-result-item">
-              <div>
-                <strong>{{ item.title }}</strong>
-                <p>{{ item.subtitle }}</p>
-                <div class="preview-metrics">
-                  <span>热量 {{ formatMetric(item.energy, "kcal") }}</span>
-                  <span>蛋白 {{ formatMetric(item.protein, "g") }}</span>
-                  <span>脂肪 {{ formatMetric(item.fat, "g") }}</span>
-                  <span>碳水 {{ formatMetric(item.carbohydrate, "g") }}</span>
-                </div>
-              </div>
-              <el-button plain @click="applyExternalFood(item)">带入本次记录</el-button>
-            </article>
-          </div>
-
-          <PageStateBlock
-            v-else-if="externalSearchTouched"
-            tone="info"
-            :title="externalSearchTitle"
-            :description="externalSearchDescription"
-            compact
-          />
+          <el-button plain @click="router.push('/recipes')">去上传菜谱</el-button>
         </div>
 
         <div v-if="recentRecipeShortcuts.length || frequentRecipeShortcuts.length" class="shortcut-panel">
@@ -227,22 +191,6 @@
             <span>碳水 {{ formatMetric(selectedRecipe.nutrition_summary?.per_serving_carbohydrate, "g") }}</span>
           </div>
         </div>
-        <div v-else-if="selectedExternalFood" class="recipe-preview">
-          <div class="preview-head">
-            <div>
-              <strong>{{ selectedExternalFood.title }}</strong>
-              <p>{{ selectedExternalFood.subtitle }}</p>
-            </div>
-            <span>{{ externalFoodSourceLabel(selectedExternalFood.source) }}</span>
-          </div>
-          <div class="preview-metrics">
-            <span>热量 {{ formatMetric(selectedExternalFood.energy, "kcal") }}</span>
-            <span>蛋白 {{ formatMetric(selectedExternalFood.protein, "g") }}</span>
-            <span>脂肪 {{ formatMetric(selectedExternalFood.fat, "g") }}</span>
-            <span>碳水 {{ formatMetric(selectedExternalFood.carbohydrate, "g") }}</span>
-          </div>
-        </div>
-
         <FormActionBar
           :tone="saving ? 'saving' : recordFormTone"
           :title="recordFormTitle"
@@ -362,7 +310,6 @@ import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import TrendMiniBars from "../components/TrendMiniBars.vue";
 import { ElMessageBox, notifyActionError, notifyActionSuccess, notifyLoadError, notifyWarning } from "../lib/feedback";
-import { lookupBarcodeFood, searchExternalFoods, type ExternalFoodItem } from "../api/external";
 import { createMealRecord, deleteMealRecord, listMealRecords, mealStatistics, updateMealRecord } from "../api/tracking";
 import { listRecipes } from "../api/recipes";
 import { trackEvent } from "../api/behavior";
@@ -378,13 +325,6 @@ const editingRecordId = ref<number | null>(null);
 const loadingRecords = ref(false);
 const records = ref<any[]>([]);
 const recipeOptions = ref<Array<Record<string, any>>>([]);
-const externalFoodResults = ref<ExternalFoodItem[]>([]);
-const selectedExternalFood = ref<ExternalFoodItem | null>(null);
-const loadingExternalFoods = ref(false);
-const loadingBarcode = ref(false);
-const externalSearchTouched = ref(false);
-const externalFoodQuery = ref("");
-const barcodeQuery = ref("");
 const stats = reactive({
   summary: null as null | Record<string, any>,
   trend: [] as any[],
@@ -422,22 +362,7 @@ const recordFormDescription = computed(() => {
   if (selectedRecipe.value) {
     return "已关联菜谱，保存后会自动计入热量和营养统计。";
   }
-  if (selectedExternalFood.value) {
-    return "已带入外部食物营养值，保存后会进入今日统计和趋势。";
-  }
   return "如果暂时没有匹配菜谱，也可以先记备注，后续再慢慢补细。";
-});
-const externalSearchTitle = computed(() => {
-  if (!externalFoodQuery.value && !barcodeQuery.value) {
-    return "输入食物名或商品条码后可查询外部数据";
-  }
-  return "没有找到匹配的外部数据";
-});
-const externalSearchDescription = computed(() => {
-  if (!externalFoodQuery.value && !barcodeQuery.value) {
-    return "适合在本地菜谱暂时没有对应食物时，临时补充营养值。";
-  }
-  return "可能是当前关键词结果较少，或者服务器还未配置对应外部数据源。";
 });
 const recipeShortcutSource = computed(() => {
   const map = new Map<number, { recipe_id: number; title: string; meal_type: string; last_used_date: string; count: number }>();
@@ -586,7 +511,6 @@ function resetForm() {
   form.meal_type = "lunch";
   form.recipe_id = null;
   form.note = "";
-  selectedExternalFood.value = null;
 }
 
 function applyToday() {
@@ -598,7 +522,6 @@ function applyQuickMeal(mealType: "breakfast" | "lunch" | "dinner" | "snack") {
   form.record_date = todayString();
   form.meal_type = mealType;
   form.recipe_id = null;
-  selectedExternalFood.value = null;
   if (!form.note) {
     form.note = {
       breakfast: "今天的早餐",
@@ -613,39 +536,14 @@ function applyPrefillFromQuery() {
   const recipeId = Number(route.query.recipe_id || 0);
   const mealType = String(route.query.meal_type || "");
   const note = String(route.query.note || "");
-  const externalTitle = String(route.query.external_title || "");
-
   if (recipeId) {
     form.recipe_id = recipeId;
-    selectedExternalFood.value = null;
   }
   if (mealType && ["breakfast", "lunch", "dinner", "snack"].includes(mealType)) {
     form.meal_type = mealType;
   }
   if (note) {
     form.note = note;
-  }
-  if (externalTitle) {
-    form.recipe_id = null;
-    const externalSource = String(route.query.external_source || "nutritionix");
-    selectedExternalFood.value = {
-      id: `prefill-${externalTitle}`,
-      title: externalTitle,
-      subtitle: "来自外部菜谱/食物数据",
-      source:
-        externalSource === "openfoodfacts"
-          ? "openfoodfacts"
-          : externalSource === "edamam"
-            ? "edamam"
-            : externalSource === "usda"
-              ? "usda"
-              : "nutritionix",
-      unit: String(route.query.external_unit || "serving"),
-      energy: numericValue(route.query.external_energy),
-      protein: numericValue(route.query.external_protein),
-      fat: numericValue(route.query.external_fat),
-      carbohydrate: numericValue(route.query.external_carbohydrate),
-    };
   }
   if (!form.record_date) {
     form.record_date = todayString();
@@ -659,15 +557,6 @@ function mealTypeLabel(mealType: string) {
     dinner: "晚餐",
     snack: "加餐",
   }[mealType] || mealType;
-}
-
-function externalFoodSourceLabel(source: ExternalFoodItem["source"]) {
-  return {
-    nutritionix: "Nutritionix",
-    usda: "USDA",
-    openfoodfacts: "条码商品",
-    edamam: "外部菜谱",
-  }[source] || source;
 }
 
 function numericValue(value: unknown) {
@@ -735,21 +624,10 @@ function syncTodaySummary() {
   todaySummary.carbohydrate = todayRecords.reduce((total, record) => total + recordMetric(record, "carbohydrate"), 0);
 }
 
-function clearExternalSelection() {
-  selectedExternalFood.value = null;
-}
-
-function applyExternalFood(item: ExternalFoodItem) {
-  selectedExternalFood.value = item;
-  form.recipe_id = null;
-  form.note = item.title;
-}
-
 function applyRecipeShortcut(item: { recipe_id: number; title: string; meal_type?: string }) {
   form.recipe_id = item.recipe_id;
   form.note = item.title;
   form.meal_type = item.meal_type || form.meal_type;
-  selectedExternalFood.value = null;
   if (!form.record_date) {
     form.record_date = todayString();
   }
@@ -803,49 +681,6 @@ async function loadRecipes() {
   }
 }
 
-async function searchExternalFoodItems() {
-  externalSearchTouched.value = true;
-  barcodeQuery.value = "";
-  if (!externalFoodQuery.value) {
-    externalFoodResults.value = [];
-    return;
-  }
-
-  try {
-    loadingExternalFoods.value = true;
-    const result = await searchExternalFoods(externalFoodQuery.value);
-    externalFoodResults.value = result.items.filter((item) => item.energy > 0 || item.protein > 0 || item.fat > 0 || item.carbohydrate > 0).slice(0, 8);
-  } catch {
-    externalFoodResults.value = [];
-    notifyLoadError("外部食物数据");
-  } finally {
-    loadingExternalFoods.value = false;
-  }
-}
-
-async function lookupBarcodeItem() {
-  externalSearchTouched.value = true;
-  externalFoodQuery.value = "";
-  if (!barcodeQuery.value) {
-    externalFoodResults.value = [];
-    return;
-  }
-
-  try {
-    loadingBarcode.value = true;
-    const result = await lookupBarcodeFood(barcodeQuery.value);
-    externalFoodResults.value = result.item ? [result.item] : [];
-    if (!result.item) {
-      notifyWarning("未找到对应条码商品");
-    }
-  } catch {
-    externalFoodResults.value = [];
-    notifyLoadError("条码商品数据");
-  } finally {
-    loadingBarcode.value = false;
-  }
-}
-
 async function createRecord() {
   try {
     if (!form.record_date) {
@@ -866,16 +701,6 @@ async function createRecord() {
       items: [
         form.recipe_id
           ? { recipe_id: form.recipe_id, amount: 1, unit: "serving" }
-          : selectedExternalFood.value
-            ? {
-                ingredient_name_snapshot: selectedExternalFood.value.title,
-                amount: 1,
-                unit: selectedExternalFood.value.unit || "serving",
-                energy: selectedExternalFood.value.energy,
-                protein: selectedExternalFood.value.protein,
-                fat: selectedExternalFood.value.fat,
-                carbohydrate: selectedExternalFood.value.carbohydrate,
-              }
           : { ingredient_name_snapshot: form.note.trim() || "manual entry", amount: 1, unit: "serving" },
       ],
     });
@@ -920,16 +745,6 @@ async function updateRecord() {
       items: [
         form.recipe_id
           ? { recipe_id: form.recipe_id, amount: 1, unit: "serving" }
-          : selectedExternalFood.value
-            ? {
-                ingredient_name_snapshot: selectedExternalFood.value.title,
-                amount: 1,
-                unit: selectedExternalFood.value.unit || "serving",
-                energy: selectedExternalFood.value.energy,
-                protein: selectedExternalFood.value.protein,
-                fat: selectedExternalFood.value.fat,
-                carbohydrate: selectedExternalFood.value.carbohydrate,
-              }
           : { ingredient_name_snapshot: form.note.trim() || "manual entry", amount: 1, unit: "serving" },
       ],
     });
@@ -950,21 +765,6 @@ function editRecord(record: Record<string, any>) {
   form.note = record.note || "";
   const recipeId = Number(record.items?.[0]?.recipe_id || 0);
   form.recipe_id = recipeId || null;
-  const firstItem = record.items?.[0];
-  selectedExternalFood.value =
-    !recipeId && firstItem && (numericValue(firstItem.energy) > 0 || numericValue(firstItem.protein) > 0 || numericValue(firstItem.fat) > 0 || numericValue(firstItem.carbohydrate) > 0)
-      ? {
-          id: `record-${record.id}`,
-          title: firstItem.recipe_title || firstItem.ingredient_name_snapshot || record.note || "外部条目",
-          subtitle: "已保存的外部营养条目",
-          source: "usda",
-          unit: firstItem.unit || "serving",
-          energy: numericValue(firstItem.energy),
-          protein: numericValue(firstItem.protein),
-          fat: numericValue(firstItem.fat),
-          carbohydrate: numericValue(firstItem.carbohydrate),
-        }
-      : null;
 }
 
 function reuseRecord(record: Record<string, any>) {
@@ -974,21 +774,6 @@ function reuseRecord(record: Record<string, any>) {
   form.note = record.note || "";
   const recipeId = Number(record.items?.[0]?.recipe_id || 0);
   form.recipe_id = recipeId || null;
-  const firstItem = record.items?.[0];
-  selectedExternalFood.value =
-    !recipeId && firstItem && (numericValue(firstItem.energy) > 0 || numericValue(firstItem.protein) > 0 || numericValue(firstItem.fat) > 0 || numericValue(firstItem.carbohydrate) > 0)
-      ? {
-          id: `reuse-${record.id}`,
-          title: firstItem.recipe_title || firstItem.ingredient_name_snapshot || record.note || "外部条目",
-          subtitle: "从上一餐带入的营养条目",
-          source: "usda",
-          unit: firstItem.unit || "serving",
-          energy: numericValue(firstItem.energy),
-          protein: numericValue(firstItem.protein),
-          fat: numericValue(firstItem.fat),
-          carbohydrate: numericValue(firstItem.carbohydrate),
-        }
-      : null;
   notifyActionSuccess("已带入上一餐内容，请确认后保存");
 }
 
@@ -1028,15 +813,6 @@ watch(
     applyPrefillFromQuery();
   },
 );
-
-watch(
-  () => form.recipe_id,
-  (value) => {
-    if (value) {
-      selectedExternalFood.value = null;
-    }
-  },
-);
 </script>
 
 <style scoped>
@@ -1056,9 +832,7 @@ watch(
 .preview-head,
 .progress-top,
 .quick-helpers,
-.external-head,
-.external-toolbar,
-.external-result-item {
+.helper-panel {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -1181,7 +955,7 @@ h2 {
   margin-bottom: 16px;
 }
 
-.external-panel {
+.helper-panel {
   margin-bottom: 16px;
   padding: 16px;
   border-radius: 18px;
@@ -1189,39 +963,14 @@ h2 {
   border: 1px solid rgba(16, 34, 42, 0.06);
 }
 
-.external-panel strong {
+.helper-panel strong {
   font-size: 18px;
 }
 
-.external-head p,
-.external-result-item p {
+.helper-panel p {
   margin: 8px 0 0;
   color: #476072;
   line-height: 1.6;
-}
-
-.external-toolbar {
-  margin-top: 12px;
-}
-
-.external-toolbar :deep(.el-input) {
-  flex: 1;
-}
-
-.external-result-list {
-  display: grid;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.external-result-item {
-  padding-top: 12px;
-  border-top: 1px solid rgba(16, 34, 42, 0.08);
-}
-
-.external-result-item:first-child {
-  padding-top: 0;
-  border-top: 0;
 }
 
 .shortcut-panel {
@@ -1414,9 +1163,7 @@ h2 {
   .preview-head,
   .progress-top,
   .quick-helpers,
-  .external-head,
-  .external-toolbar,
-  .external-result-item {
+  .helper-panel {
     flex-direction: column;
   }
 

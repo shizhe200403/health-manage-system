@@ -35,12 +35,18 @@ class RecipeStepSerializer(serializers.ModelSerializer):
 class RecipeIngredientSerializer(serializers.ModelSerializer):
     ingredient = IngredientSerializer(read_only=True)
     ingredient_id = serializers.PrimaryKeyRelatedField(
-        source="ingredient", queryset=Ingredient.objects.all(), write_only=True
+        source="ingredient", queryset=Ingredient.objects.all(), write_only=True, required=False, allow_null=True
     )
+    ingredient_name = serializers.CharField(write_only=True, required=False, allow_blank=False)
 
     class Meta:
         model = RecipeIngredient
-        fields = ["id", "ingredient", "ingredient_id", "amount", "unit", "is_main", "remark"]
+        fields = ["id", "ingredient", "ingredient_id", "ingredient_name", "amount", "unit", "is_main", "remark"]
+
+    def validate(self, attrs):
+        if not attrs.get("ingredient") and not attrs.get("ingredient_name"):
+            raise serializers.ValidationError("请至少填写食材名称")
+        return attrs
 
 
 class RecipeNutritionSummarySerializer(serializers.ModelSerializer):
@@ -49,40 +55,11 @@ class RecipeNutritionSummarySerializer(serializers.ModelSerializer):
         exclude = ["recipe"]
 
 
-class ExternalImportStepSerializer(serializers.Serializer):
-    content = serializers.CharField()
-
-
-class ExternalImportIngredientSerializer(serializers.Serializer):
-    name = serializers.CharField()
-    amount = serializers.DecimalField(max_digits=12, decimal_places=4, required=False)
-    unit = serializers.CharField(required=False, allow_blank=True, default="serving")
-    is_main = serializers.BooleanField(required=False, default=False)
-
-
-class ImportExternalRecipeSerializer(serializers.Serializer):
-    title = serializers.CharField()
-    description = serializers.CharField(required=False, allow_blank=True, default="")
-    cover_image_url = serializers.CharField(required=False, allow_blank=True, default="")
-    portion_size = serializers.CharField(required=False, allow_blank=True, default="1 份")
-    servings = serializers.IntegerField(required=False, default=1)
-    difficulty = serializers.CharField(required=False, allow_blank=True, default="easy")
-    cook_time_minutes = serializers.IntegerField(required=False, allow_null=True)
-    prep_time_minutes = serializers.IntegerField(required=False, allow_null=True)
-    meal_type = serializers.CharField(required=False, allow_blank=True, default="")
-    taste_tags = serializers.ListField(child=serializers.CharField(), required=False, default=list)
-    cuisine_tags = serializers.ListField(child=serializers.CharField(), required=False, default=list)
-    source_name = serializers.CharField(required=False, allow_blank=True, default="external")
-    source_url = serializers.CharField(required=False, allow_blank=True, default="")
-    ingredients = ExternalImportIngredientSerializer(many=True, required=False, default=list)
-    steps = ExternalImportStepSerializer(many=True, required=False, default=list)
-    nutrition_summary = RecipeNutritionSummarySerializer(required=False, allow_null=True)
-
-
 class RecipeSerializer(serializers.ModelSerializer):
     steps = RecipeStepSerializer(many=True, required=False)
     ingredients = RecipeIngredientSerializer(source="recipe_ingredients", many=True, required=False)
     nutrition_summary = serializers.SerializerMethodField()
+    nutrition_input = RecipeNutritionSummarySerializer(write_only=True, required=False, allow_null=True)
 
     class Meta:
         model = Recipe
@@ -109,6 +86,7 @@ class RecipeSerializer(serializers.ModelSerializer):
             "steps",
             "ingredients",
             "nutrition_summary",
+            "nutrition_input",
         ]
         read_only_fields = ["created_by", "created_at", "updated_at"]
 
@@ -123,13 +101,21 @@ class RecipeSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         steps_data = validated_data.pop("steps", [])
         ingredients_data = validated_data.pop("recipe_ingredients", [])
-        nutrition_data = validated_data.pop("nutrition_summary", None)
+        nutrition_data = validated_data.pop("nutrition_input", None)
         recipe = Recipe.objects.create(**validated_data)
 
         for step_data in steps_data:
             RecipeStep.objects.create(recipe=recipe, **step_data)
 
         for ingredient_data in ingredients_data:
+            ingredient_name = ingredient_data.pop("ingredient_name", "").strip()
+            ingredient = ingredient_data.get("ingredient")
+            if ingredient is None and ingredient_name:
+                ingredient, _ = Ingredient.objects.get_or_create(
+                    canonical_name=ingredient_name[:128],
+                    defaults={"category": "user_upload", "default_unit": ingredient_data.get("unit", "份")},
+                )
+                ingredient_data["ingredient"] = ingredient
             RecipeIngredient.objects.create(recipe=recipe, **ingredient_data)
 
         if nutrition_data:
@@ -141,7 +127,7 @@ class RecipeSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         steps_data = validated_data.pop("steps", None)
         ingredients_data = validated_data.pop("recipe_ingredients", None)
-        nutrition_data = validated_data.pop("nutrition_summary", None)
+        nutrition_data = validated_data.pop("nutrition_input", None)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -155,6 +141,14 @@ class RecipeSerializer(serializers.ModelSerializer):
         if ingredients_data is not None:
             instance.recipe_ingredients.all().delete()
             for ingredient_data in ingredients_data:
+                ingredient_name = ingredient_data.pop("ingredient_name", "").strip()
+                ingredient = ingredient_data.get("ingredient")
+                if ingredient is None and ingredient_name:
+                    ingredient, _ = Ingredient.objects.get_or_create(
+                        canonical_name=ingredient_name[:128],
+                        defaults={"category": "user_upload", "default_unit": ingredient_data.get("unit", "份")},
+                    )
+                    ingredient_data["ingredient"] = ingredient
                 RecipeIngredient.objects.create(recipe=instance, **ingredient_data)
 
         if nutrition_data is not None:
