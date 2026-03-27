@@ -35,7 +35,7 @@ export const useAuthStore = defineStore("auth", {
     async fetchMe() {
       if (!this.accessToken) return;
       const response = await getMe();
-      this.user = response.data?.data ?? null;
+      this.user = response.data ?? null;
       this.ready = true;
     },
   },

@@ -49,7 +49,7 @@ const reportState = reactive({
 async function loadWeekly() {
   try {
     const response = await weeklyReport();
-    const data = response.data?.data;
+    const data = response.data;
     currentFileUrl.value = data.file_url || "";
     currentReportType.value = "weekly";
     reportState.task_id = data.task_id || "";
@@ -66,7 +66,7 @@ async function loadWeekly() {
 async function loadMonthly() {
   try {
     const response = await monthlyReport();
-    const data = response.data?.data;
+    const data = response.data;
     currentFileUrl.value = data.file_url || "";
     currentReportType.value = "monthly";
     reportState.task_id = data.task_id || "";

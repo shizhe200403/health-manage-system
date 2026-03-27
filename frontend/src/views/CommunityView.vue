@@ -59,7 +59,7 @@ const form = reactive({
 async function loadPosts() {
   try {
     const response = await listPosts();
-    posts.value = response.data?.results ?? response.data?.data?.items ?? response.data?.data ?? [];
+    posts.value = response.data?.items ?? response.data ?? [];
     trackEvent({ behavior_type: "view", context_scene: "community" }).catch(() => undefined);
   } catch (error) {
     ElMessage.error("加载社区失败");

@@ -145,9 +145,9 @@ async function loadRecords() {
       throw new Error("records load failed");
     }
 
-    records.value = recordsResponse?.data?.results ?? recordsResponse?.data?.data?.items ?? recordsResponse?.data?.data ?? [];
-    stats.summary = statsResponse?.data?.data?.summary ?? null;
-    stats.trend = statsResponse?.data?.data?.trend ?? [];
+    records.value = recordsResponse?.data?.items ?? recordsResponse?.data ?? [];
+    stats.summary = statsResponse?.data?.summary ?? null;
+    stats.trend = statsResponse?.data?.trend ?? [];
     trackEvent({ behavior_type: "view", context_scene: "records" }).catch(() => undefined);
   } catch (error) {
     ElMessage.error("加载记录失败");
@@ -157,7 +157,7 @@ async function loadRecords() {
 async function loadRecipes() {
   try {
     const response = await listRecipes();
-    recipeOptions.value = response.data?.results ?? response.data?.data?.items ?? response.data?.data ?? [];
+    recipeOptions.value = response.data?.items ?? response.data ?? [];
   } catch (error) {
     recipeOptions.value = [];
   }

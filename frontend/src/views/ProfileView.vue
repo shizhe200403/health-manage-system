@@ -138,7 +138,7 @@ const health = reactive({
 async function loadProfile() {
   try {
     const response = await getMe();
-    const user = response.data?.data;
+    const user = response.data;
     if (!user) return;
 
     Object.assign(account, {
@@ -186,7 +186,7 @@ async function saveAll() {
         notes: health.notes,
       },
     });
-    auth.user = response.data?.data?.account ?? auth.user;
+    auth.user = response.data?.account ?? auth.user;
     ElMessage.success("保存成功");
   } catch (error) {
     ElMessage.error("保存失败");

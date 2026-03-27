@@ -85,16 +85,16 @@ async function loadDashboard() {
       throw new Error("dashboard load failed");
     }
 
-    auth.user = meResponse?.data?.data ?? null;
+    auth.user = meResponse?.data ?? null;
 
-    const profile = meResponse?.data?.data?.profile;
+    const profile = meResponse?.data?.profile;
     const height = profile?.height_cm ? Number(profile.height_cm) : 0;
     const weight = profile?.weight_kg ? Number(profile.weight_kg) : 0;
     if (height > 0 && weight > 0) {
       nutritionSummary.bmi = (weight / ((height / 100) * (height / 100))).toFixed(1);
     }
 
-    const health = meResponse?.data?.data?.health_condition;
+    const health = meResponse?.data?.health_condition;
     if (health?.has_diabetes) {
       nutritionSummary.goal_hint = "优先控制碳水与添加糖";
     } else if (health?.has_hypertension) {
@@ -105,11 +105,11 @@ async function loadDashboard() {
       nutritionSummary.goal_hint = "保持均衡饮食";
     }
 
-    const nutritionData = nutritionResponse?.data?.data;
+    const nutritionData = nutritionResponse?.data;
     nutritionSummary.calorie_target = nutritionData?.calorie_target ?? "-";
     nutritionSummary.protein_target = nutritionData?.protein_target ?? "-";
 
-    recommendations.value = recommendationResponse?.data?.data || [];
+    recommendations.value = recommendationResponse?.data || [];
     trackEvent({ behavior_type: "view", context_scene: "home" }).catch(() => undefined);
   } catch (error) {
     ElMessage.error("加载首页数据失败");
@@ -121,7 +121,7 @@ onMounted(loadDashboard);
 async function showReason(recipeId: number) {
   try {
     const response = await explainRecommendation(recipeId);
-    ElMessage.info(response.data?.data?.reason_text || "暂无推荐理由");
+    ElMessage.info(response.data?.reason_text || "暂无推荐理由");
   } catch (error) {
     ElMessage.error("获取推荐理由失败");
   }
