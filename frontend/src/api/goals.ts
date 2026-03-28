@@ -15,6 +15,11 @@ export async function updateHealthGoal(goalId: number, payload: Record<string, u
   return data;
 }
 
+export async function deleteHealthGoal(goalId: number) {
+  const { data } = await http.delete(`/health-goals/${goalId}/`);
+  return data;
+}
+
 export async function listGoalProgress(goalId: number) {
   const { data } = await http.get(`/health-goals/${goalId}/progress/`);
   return data;

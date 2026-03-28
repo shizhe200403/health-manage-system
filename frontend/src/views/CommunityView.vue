@@ -145,6 +145,7 @@
             <div class="comment-head">
               <strong>{{ comment.user_info?.display_name || "用户" }}</strong>
               <span>{{ formatDateTime(comment.created_at) }}</span>
+              <el-button v-if="isMyComment(comment)" text type="danger" size="small" :loading="deletingCommentId === comment.id" @click="removeComment(comment.id)">删除</el-button>
             </div>
             <p>{{ comment.content }}</p>
           </div>
@@ -171,7 +172,7 @@ import CollectionSkeleton from "../components/CollectionSkeleton.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import { ElMessageBox, notifyActionError, notifyActionSuccess, notifyLoadError, notifyWarning } from "../lib/feedback";
-import { createComment, createPost, deletePost, listPosts, reportPost, updatePost } from "../api/community";
+import { createComment, createPost, deleteComment, deletePost, listPosts, reportPost, updatePost } from "../api/community";
 import { trackEvent } from "../api/behavior";
 import { useAuthStore } from "../stores/auth";
 
@@ -184,6 +185,7 @@ const keyword = ref("");
 const posting = ref(false);
 const editingPostId = ref<number | null>(null);
 const deletingPostId = ref<number | null>(null);
+const deletingCommentId = ref<number | null>(null);
 const commentSubmittingId = ref<number | null>(null);
 const commentDrafts = reactive<Record<number, string>>({});
 const form = reactive({
@@ -245,6 +247,10 @@ const emptyActionLabel = computed(() => {
 
 function isMine(post: Record<string, any>) {
   return Number(post.user) === Number(auth.user?.id);
+}
+
+function isMyComment(comment: Record<string, any>) {
+  return Number(comment.user) === Number(auth.user?.id);
 }
 
 function authorLabel(post: Record<string, any>) {
@@ -343,6 +349,19 @@ async function submitComment(postId: number) {
     notifyActionError("发表评论");
   } finally {
     commentSubmittingId.value = null;
+  }
+}
+
+async function removeComment(commentId: number) {
+  try {
+    deletingCommentId.value = commentId;
+    await deleteComment(commentId);
+    notifyActionSuccess("评论已删除");
+    await loadPosts();
+  } catch {
+    notifyActionError("删除评论");
+  } finally {
+    deletingCommentId.value = null;
   }
 }
 

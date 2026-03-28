@@ -25,6 +25,11 @@ export async function createComment(postId: number, payload: Record<string, unkn
   return data;
 }
 
+export async function deleteComment(commentId: number) {
+  const { data } = await http.delete(`/comments/${commentId}/`);
+  return data;
+}
+
 export async function reportPost(postId: number, payload: Record<string, unknown>) {
   const { data } = await http.post(`/posts/${postId}/report/`, payload);
   return data;

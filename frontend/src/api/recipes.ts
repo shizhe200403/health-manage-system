@@ -44,3 +44,23 @@ export async function createRecipe(payload: Record<string, unknown>) {
   const { data } = await http.post("/recipes/", payload);
   return data;
 }
+
+export async function updateRecipe(recipeId: number, payload: Record<string, unknown>) {
+  const { data } = await http.patch(`/recipes/${recipeId}/`, payload);
+  return data;
+}
+
+export async function deleteRecipe(recipeId: number) {
+  const { data } = await http.delete(`/recipes/${recipeId}/`);
+  return data;
+}
+
+export async function listIngredients() {
+  const { data } = await http.get("/ingredients/");
+  return data;
+}
+
+export async function profileRecommendations() {
+  const { data } = await http.get("/recommendations/by-profile/");
+  return data;
+}

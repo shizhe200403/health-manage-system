@@ -135,6 +135,8 @@
           <div class="footer-actions">
             <el-button text @click="openDetail(recipe)">查看详情</el-button>
             <el-button type="primary" plain @click="addToRecord(recipe)">加入记录</el-button>
+            <el-button text @click="openEditor(recipe)">编辑</el-button>
+            <el-button text type="danger" :loading="deletingId === recipe.id" @click="handleDelete(recipe)">删除</el-button>
           </div>
         </div>
       </article>
@@ -157,7 +159,7 @@
       @favorite-change="handleFavoriteChange"
       @add-to-record="addToRecord"
     />
-    <el-dialog v-model="creatorVisible" width="760px" title="上传菜谱">
+    <el-dialog v-model="creatorVisible" width="760px" :title="editingRecipeId ? '编辑菜谱' : '上传菜谱'">
       <el-form label-position="top" class="creator-form">
         <el-row :gutter="16">
           <el-col :span="24" :md="12">
@@ -255,7 +257,7 @@
       <template #footer>
         <div class="dialog-actions">
           <el-button @click="creatorVisible = false">取消</el-button>
-          <el-button type="primary" :loading="creatingRecipe" @click="submitCreatorRecipe">保存菜谱</el-button>
+          <el-button type="primary" :loading="creatingRecipe" @click="submitCreatorRecipe">{{ editingRecipeId ? '保存修改' : '保存菜谱' }}</el-button>
         </div>
       </template>
     </el-dialog>
@@ -265,13 +267,14 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
+import { ElMessageBox } from "element-plus";
 import CollectionSkeleton from "../components/CollectionSkeleton.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import { notifyActionError, notifyActionSuccess, notifyLoadError, notifyWarning } from "../lib/feedback";
 import { useRouter } from "vue-router";
 import RecipeDetailDialog from "../components/RecipeDetailDialog.vue";
-import { createRecipe, explainRecommendation, favoriteRecipe, listFavoriteRecipes, listRecipes, unfavoriteRecipe } from "../api/recipes";
+import { createRecipe, explainRecommendation, favoriteRecipe, listFavoriteRecipes, listRecipes, unfavoriteRecipe, updateRecipe, deleteRecipe } from "../api/recipes";
 import { trackEvent } from "../api/behavior";
 import { listHealthGoals } from "../api/goals";
 
@@ -292,6 +295,8 @@ const selectedReasonText = ref("");
 const activeGoal = ref<Record<string, any> | null>(null);
 const creatorVisible = ref(false);
 const creatingRecipe = ref(false);
+const editingRecipeId = ref<number | null>(null);
+const deletingId = ref<number | null>(null);
 const creatorForm = reactive({
   title: "",
   description: "",
@@ -584,6 +589,38 @@ function resetCreatorForm() {
 
 function openCreator() {
   resetCreatorForm();
+  editingRecipeId.value = null;
+  creatorVisible.value = true;
+}
+
+function openEditor(recipe: Record<string, any>) {
+  resetCreatorForm();
+  editingRecipeId.value = Number(recipe.id);
+  creatorForm.title = recipe.title || "";
+  creatorForm.description = recipe.description || "";
+  creatorForm.meal_type = recipe.meal_type || "lunch";
+  creatorForm.servings = recipe.servings || 1;
+  creatorForm.portion_size = recipe.portion_size || "1 份";
+  creatorForm.difficulty = recipe.difficulty || "easy";
+  creatorForm.prep_time_minutes = recipe.prep_time_minutes || 10;
+  creatorForm.cook_time_minutes = recipe.cook_time_minutes || 15;
+  if (recipe.recipe_ingredients?.length) {
+    creatorForm.ingredients = recipe.recipe_ingredients.map((item: Record<string, any>) => ({
+      ingredient_name: item.ingredient?.canonical_name || item.ingredient_name || "",
+      amount: item.amount || 1,
+      unit: item.unit || "份",
+      is_main: item.is_main || false,
+    }));
+  }
+  if (recipe.steps?.length) {
+    creatorForm.steps = recipe.steps.map((item: Record<string, any>) => ({ content: item.content || "" }));
+  }
+  if (recipe.nutrition_summary) {
+    creatorForm.nutrition.energy = recipe.nutrition_summary.per_serving_energy ?? null;
+    creatorForm.nutrition.protein = recipe.nutrition_summary.per_serving_protein ?? null;
+    creatorForm.nutrition.fat = recipe.nutrition_summary.per_serving_fat ?? null;
+    creatorForm.nutrition.carbohydrate = recipe.nutrition_summary.per_serving_carbohydrate ?? null;
+  }
   creatorVisible.value = true;
 }
 
@@ -648,7 +685,7 @@ async function submitCreatorRecipe() {
 
   try {
     creatingRecipe.value = true;
-    const response = await createRecipe({
+    const payload = {
       title: creatorForm.title.trim(),
       description: creatorForm.description.trim(),
       meal_type: creatorForm.meal_type,
@@ -661,19 +698,31 @@ async function submitCreatorRecipe() {
       steps,
       nutrition_input: nutritionSummary,
       cuisine_tags: ["用户上传"],
-    });
-    const createdRecipe = response?.data ?? response;
-    if (createdRecipe?.id) {
-      recipes.value = [createdRecipe, ...recipes.value.filter((item) => Number(item.id) !== Number(createdRecipe.id))];
-      keyword.value = "";
-      mealFilter.value = "all";
-      sceneFilter.value = "all";
-      sortMode.value = "smart";
-      favoriteOnly.value = false;
+    };
+    if (editingRecipeId.value) {
+      const response = await updateRecipe(editingRecipeId.value, payload);
+      const updated = response?.data ?? response;
+      if (updated?.id) {
+        recipes.value = recipes.value.map((item) => Number(item.id) === Number(updated.id) ? updated : item);
+      }
+      creatorVisible.value = false;
+      notifyActionSuccess("菜谱已更新");
+      loadRecipes().catch(() => undefined);
+    } else {
+      const response = await createRecipe(payload);
+      const createdRecipe = response?.data ?? response;
+      if (createdRecipe?.id) {
+        recipes.value = [createdRecipe, ...recipes.value.filter((item) => Number(item.id) !== Number(createdRecipe.id))];
+        keyword.value = "";
+        mealFilter.value = "all";
+        sceneFilter.value = "all";
+        sortMode.value = "smart";
+        favoriteOnly.value = false;
+      }
+      creatorVisible.value = false;
+      notifyActionSuccess("菜谱已上传");
+      loadRecipes().catch(() => undefined);
     }
-    creatorVisible.value = false;
-    notifyActionSuccess("菜谱已上传");
-    loadRecipes().catch(() => undefined);
   } catch {
     notifyActionError("上传菜谱");
   } finally {
@@ -681,8 +730,25 @@ async function submitCreatorRecipe() {
   }
 }
 
+async function handleDelete(recipe: Record<string, any>) {
+  try {
+    await ElMessageBox.confirm(`确认删除菜谱「${recipe.title}」？`, "删除确认", { type: "warning", confirmButtonText: "删除", cancelButtonText: "取消" });
+  } catch {
+    return;
+  }
+  try {
+    deletingId.value = Number(recipe.id);
+    await deleteRecipe(Number(recipe.id));
+    recipes.value = recipes.value.filter((item) => Number(item.id) !== Number(recipe.id));
+    notifyActionSuccess("菜谱已删除");
+  } catch {
+    notifyActionError("删除菜谱");
+  } finally {
+    deletingId.value = null;
+  }
+}
+
 async function openDetail(recipe: Record<string, any>) {
-  selectedRecipe.value = recipe;
   selectedRecipeId.value = Number(recipe.id);
   detailVisible.value = true;
   try {

@@ -15,6 +15,16 @@ export async function listReportTasks() {
   return data;
 }
 
+export async function getReportTask(taskId: string) {
+  const { data } = await http.get(`/reports/tasks/${taskId}/`);
+  return data;
+}
+
+export async function deleteReportTask(taskId: string) {
+  const { data } = await http.delete(`/reports/tasks/${taskId}/`);
+  return data;
+}
+
 export async function exportReport(payload: Record<string, unknown>) {
   const { data } = await http.post("/reports/export/", payload);
   return data;

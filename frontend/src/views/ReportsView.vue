@@ -280,6 +280,7 @@
             <a v-if="task.file_url" :href="task.file_url" target="_blank" rel="noreferrer">下载 PDF</a>
             <span v-else-if="task.status === 'failed'">本次生成失败，可重新发起导出</span>
             <span v-else>文件生成中，页面会自动刷新</span>
+            <el-button text type="danger" size="small" :loading="deletingTaskId === task.task_id" @click="removeReportTask(task.task_id)">删除</el-button>
           </div>
         </article>
       </div>
@@ -304,7 +305,7 @@ import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import TrendMiniBars from "../components/TrendMiniBars.vue";
 import { notifyActionError, notifyActionSuccess, notifyLoadError } from "../lib/feedback";
-import { exportReport, listReportTasks, monthlyReport, weeklyReport } from "../api/reports";
+import { exportReport, deleteReportTask, listReportTasks, monthlyReport, weeklyReport } from "../api/reports";
 import { trackEvent } from "../api/behavior";
 import { listMealRecords, mealStatistics } from "../api/tracking";
 
@@ -324,6 +325,7 @@ const reportForm = reactive({
 });
 
 let pollTimer: ReturnType<typeof window.setInterval> | null = null;
+const deletingTaskId = ref<string | null>(null);
 
 const hasCustomRange = computed(() => reportForm.dates.length === 2);
 const latestTask = computed(() => reportTasks.value[0] ?? null);
@@ -695,6 +697,19 @@ function syncPolling() {
   pollTimer = window.setInterval(() => {
     loadReportTasks(true).catch(() => undefined);
   }, 6000);
+}
+
+async function removeReportTask(taskId: string) {
+  try {
+    deletingTaskId.value = taskId;
+    await deleteReportTask(taskId);
+    reportTasks.value = reportTasks.value.filter((task) => task.task_id !== taskId);
+    notifyActionSuccess("报表记录已删除");
+  } catch {
+    notifyActionError("删除报表记录");
+  } finally {
+    deletingTaskId.value = null;
+  }
 }
 
 async function loadReportTasks(silent = false) {

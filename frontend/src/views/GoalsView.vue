@@ -157,6 +157,7 @@
               <el-button v-if="goal.status === 'active'" text @click="updateStatus(goal, 'paused')">暂停</el-button>
               <el-button v-else-if="goal.status === 'paused'" text @click="updateStatus(goal, 'active')">恢复</el-button>
               <el-button v-if="goal.status !== 'completed'" text @click="updateStatus(goal, 'completed')">完成</el-button>
+              <el-button text type="danger" :loading="deletingGoalId === goal.id" @click="removeGoal(goal)">删除</el-button>
             </div>
           </div>
         </div>
@@ -230,7 +231,8 @@ import CollectionSkeleton from "../components/CollectionSkeleton.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import { notifyActionError, notifyActionSuccess, notifyLoadError, notifyWarning } from "../lib/feedback";
-import { createGoalProgress, createHealthGoal, listGoalProgress, listHealthGoals, updateHealthGoal } from "../api/goals";
+import { ElMessageBox } from "element-plus";
+import { createGoalProgress, createHealthGoal, deleteHealthGoal, listGoalProgress, listHealthGoals, updateHealthGoal } from "../api/goals";
 import { trackEvent } from "../api/behavior";
 
 const goals = ref<any[]>([]);
@@ -238,6 +240,7 @@ const loadingGoals = ref(false);
 const savingGoal = ref(false);
 const progressSavingId = ref<number | null>(null);
 const editingGoalId = ref<number | null>(null);
+const deletingGoalId = ref<number | null>(null);
 const statusFilter = ref<"all" | "active" | "paused" | "completed">("active");
 const progressDrafts = reactive<Record<number, { progress_date: string; progress_value: number | null; note: string }>>({});
 
@@ -485,6 +488,25 @@ async function submitGoal() {
     notifyActionError(editingGoalId.value ? "更新目标" : "保存目标");
   } finally {
     savingGoal.value = false;
+  }
+}
+
+async function removeGoal(goal: Record<string, any>) {
+  try {
+    await ElMessageBox.confirm(`确认删除目标「${goalTypeLabel(goal.goal_type)}」？此操作不可恢复。`, "删除目标", { type: "warning", confirmButtonText: "删除", cancelButtonText: "取消" });
+  } catch {
+    return;
+  }
+  try {
+    deletingGoalId.value = Number(goal.id);
+    await deleteHealthGoal(Number(goal.id));
+    goals.value = goals.value.filter((item) => Number(item.id) !== Number(goal.id));
+    if (editingGoalId.value === Number(goal.id)) cancelEditing();
+    notifyActionSuccess("目标已删除");
+  } catch {
+    notifyActionError("删除目标");
+  } finally {
+    deletingGoalId.value = null;
   }
 }
 

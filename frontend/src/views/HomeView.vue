@@ -287,7 +287,7 @@ import { ElMessageBox, notifyLoadError } from "../lib/feedback";
 import { useRouter } from "vue-router";
 import RecipeDetailDialog from "../components/RecipeDetailDialog.vue";
 import { useAuthStore } from "../stores/auth";
-import { explainRecommendation, listFavoriteRecipes, listRecommendations } from "../api/recipes";
+import { explainRecommendation, listFavoriteRecipes, listRecommendations, profileRecommendations } from "../api/recipes";
 import { getMe } from "../api/auth";
 import { trackEvent } from "../api/behavior";
 import { nutritionAnalysis } from "../api/nutrition";
@@ -664,6 +664,16 @@ async function loadDashboard() {
     const meData = unwrapPayload<Record<string, any> | null>(meResponse, null);
     const nutritionData = unwrapPayload<Record<string, any>>(nutritionResponse, {});
     const recommendationData = unwrapList(recommendationResponse);
+    // 若 home 推荐为空，尝试 by-profile 推荐作为 fallback
+    let finalRecommendationData = recommendationData;
+    if (!recommendationData.length) {
+      try {
+        const profileResult = await profileRecommendations();
+        finalRecommendationData = unwrapList(profileResult);
+      } catch {
+        // ignore
+      }
+    }
     const favoriteData = unwrapList(favoriteResponse);
     const goalData = unwrapList(goalResponse);
     const reportData = unwrapList(reportResponse);
@@ -693,7 +703,7 @@ async function loadDashboard() {
     nutritionSummary.calorie_target = nutritionData?.calorie_target ?? "-";
     nutritionSummary.protein_target = nutritionData?.protein_target ?? "-";
 
-    recommendations.value = recommendationData.map((item: Record<string, any>) => ({
+    recommendations.value = finalRecommendationData.map((item: Record<string, any>) => ({
       recipe_id: Number(item.recipe_id),
       title: item.title,
       reason_text: item.reason_text,
