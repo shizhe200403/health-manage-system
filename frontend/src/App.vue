@@ -85,6 +85,7 @@ const navItems = [
   { to: "/community", label: "社区", icon: "社", copy: "查看经验内容与互动反馈" },
   { to: "/reports", label: "报表", icon: "报", copy: "生成周报和月报并做复盘" },
   { to: "/profile", label: "我的", icon: "我", copy: "维护账号资料与健康档案" },
+  { to: "/assistant", label: "AI助手", icon: "智", copy: "和AI营养师对话，获取个性化建议" },
 ];
 
 const showChrome = computed(() => route.path !== "/login");

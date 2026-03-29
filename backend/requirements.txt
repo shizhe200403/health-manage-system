@@ -11,3 +11,4 @@ gunicorn==23.0.0
 Pillow==11.2.1
 requests==2.32.3
 reportlab==4.2.5
+openai>=1.0

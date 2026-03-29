@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "apps.nutrition.apps.NutritionConfig",
     "apps.community.apps.CommunityConfig",
     "apps.reports.apps.ReportsConfig",
+    "apps.assistant.apps.AssistantConfig",
 ]
 
 MIDDLEWARE = [
@@ -169,3 +170,8 @@ SPECTACULAR_SETTINGS = {
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", os.getenv("REDIS_URL", "redis://redis:6379/0"))
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", os.getenv("REDIS_URL", "redis://redis:6379/0"))
 CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_TASK_ALWAYS_EAGER", "false").lower() == "true"
+
+# LLM (通义千问 Qwen via OpenAI-compatible API)
+LLM_API_KEY = os.getenv("LLM_API_KEY", "")
+LLM_MODEL = os.getenv("LLM_MODEL", "qwen-plus")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
