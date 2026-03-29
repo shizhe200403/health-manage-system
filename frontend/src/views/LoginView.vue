@@ -48,6 +48,8 @@
           <span v-else>支持使用用户名、邮箱或手机号登录。</span>
         </div>
 
+        <div v-if="errorMsg" class="error-banner">{{ errorMsg }}</div>
+
         <FormActionBar
           compact
           :tone="loading ? 'saving' : submitTone"
@@ -65,7 +67,6 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from "vue";
-import { ElMessageBox } from "element-plus";
 import FormActionBar from "../components/FormActionBar.vue";
 import { extractApiErrorMessage, notifyActionSuccess, notifyWarning } from "../lib/feedback";
 import { useRouter } from "vue-router";
@@ -75,6 +76,7 @@ import { register } from "../api/auth";
 const router = useRouter();
 const auth = useAuthStore();
 const loading = ref(false);
+const errorMsg = ref("");
 const mode = ref<"login" | "register">("login");
 
 const form = reactive({
@@ -120,6 +122,7 @@ function switchMode(nextMode: "login" | "register") {
   mode.value = nextMode;
   form.password = "";
   form.confirmPassword = "";
+  errorMsg.value = "";
 }
 
 function ruleClass(passed: boolean) {
@@ -143,11 +146,11 @@ async function handleRegister() {
     return;
   }
   if (!passwordValid.value) {
-    ElMessageBox.alert("密码需同时包含字母和数字，且至少 8 位。\n例如：abc12345", "密码不符合要求", { confirmButtonText: "知道了" });
+    errorMsg.value = "密码需同时包含字母和数字，且至少 8 位。例如：abc12345";
     return;
   }
   if (form.password !== form.confirmPassword) {
-    ElMessageBox.alert("两次输入的密码不一致，请重新确认。", "密码不一致", { confirmButtonText: "知道了" });
+    errorMsg.value = "两次输入的密码不一致，请重新确认。";
     return;
   }
 
@@ -163,6 +166,7 @@ async function handleRegister() {
 }
 
 async function submit() {
+  errorMsg.value = "";
   loading.value = true;
   try {
     if (isRegisterMode.value) {
@@ -172,8 +176,7 @@ async function submit() {
     await handleLogin();
   } catch (error) {
     const fallback = isRegisterMode.value ? "注册失败，请稍后重试" : "账号或密码错误，请重新输入";
-    const msg = extractApiErrorMessage(error, fallback);
-    ElMessageBox.alert(msg, isRegisterMode.value ? "注册失败" : "登录失败", { confirmButtonText: "知道了", type: "error" });
+    errorMsg.value = extractApiErrorMessage(error, fallback);
   } finally {
     loading.value = false;
   }
@@ -280,6 +283,19 @@ h2 {
   background: rgba(29, 111, 95, 0.12);
   color: #1d6f5f;
   font-weight: 600;
+}
+
+.error-banner {
+  margin-top: 4px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: #fff1f0;
+  border: 1px solid #ffccc7;
+  color: #cf1322;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.6;
 }
 
 .actions {
