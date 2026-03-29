@@ -89,3 +89,47 @@ video {
     flex: 0 0 auto;
   }
 }
+
+/* 全局操作提示 — 居中显示，带色背景 */
+.el-message {
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  min-width: 280px;
+  max-width: 420px;
+  border-radius: 16px !important;
+  padding: 16px 24px !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18) !important;
+}
+
+.el-message--success {
+  background: #1d6f5f !important;
+  border-color: #1d6f5f !important;
+}
+
+.el-message--success .el-message__content,
+.el-message--success .el-message__icon {
+  color: #fff !important;
+}
+
+.el-message--error {
+  background: #cf1322 !important;
+  border-color: #cf1322 !important;
+}
+
+.el-message--error .el-message__content,
+.el-message--error .el-message__icon {
+  color: #fff !important;
+}
+
+.el-message--warning {
+  background: #d46b08 !important;
+  border-color: #d46b08 !important;
+}
+
+.el-message--warning .el-message__content,
+.el-message--warning .el-message__icon {
+  color: #fff !important;
+}
