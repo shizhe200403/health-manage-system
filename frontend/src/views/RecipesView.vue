@@ -128,16 +128,11 @@
           <span>{{ recipe.nutrition_summary.per_serving_energy ?? 0 }} kcal / 份</span>
           <span>{{ recipe.nutrition_summary.per_serving_protein ?? 0 }} g 蛋白</span>
         </div>
-        <div class="footer">
-          <div class="footer-copy">
-            <p>{{ footerCopy(recipe) }}</p>
-          </div>
-          <div class="footer-actions">
-            <el-button text @click="openDetail(recipe)">查看详情</el-button>
-            <el-button type="primary" plain @click="addToRecord(recipe)">加入记录</el-button>
-            <el-button text @click="openEditor(recipe)">编辑</el-button>
-            <el-button text type="danger" :loading="deletingId === recipe.id" @click="handleDelete(recipe)">删除</el-button>
-          </div>
+        <div class="footer-actions">
+          <el-button text @click="openDetail(recipe)">查看详情</el-button>
+          <el-button type="primary" plain @click="addToRecord(recipe)">加入记录</el-button>
+          <el-button text @click="openEditor(recipe)">编辑</el-button>
+          <el-button text type="danger" :loading="deletingId === recipe.id" @click="handleDelete(recipe)">删除</el-button>
         </div>
       </article>
     </div>
@@ -782,7 +777,6 @@ onMounted(loadRecipes);
 .head-actions,
 .toolbar,
 .card-head,
-.footer,
 .footer-actions,
 .scene-row,
 .focus-strip,
@@ -795,6 +789,15 @@ onMounted(loadRecipes);
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
+}
+
+.footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(16, 34, 42, 0.06);
 }
 
 .tag {
@@ -826,7 +829,7 @@ h2 {
 .quick-picks,
 .grid {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .summary-grid {
@@ -839,7 +842,7 @@ h2 {
 .quick-picks article,
 .grid article,
 .empty-state {
-  padding: 20px;
+  padding: 22px 24px;
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.86);
   border: 1px solid rgba(16, 34, 42, 0.08);
@@ -931,14 +934,6 @@ h2 {
   color: #6b2f8e;
 }
 
-.footer {
-  margin-top: 18px;
-}
-
-.footer-copy {
-  flex: 1;
-}
-
 .creator-form {
   display: grid;
   gap: 16px;
@@ -1001,8 +996,6 @@ h2 {
   .head-actions,
   .toolbar,
   .card-head,
-  .footer,
-  .footer-actions,
   .scene-row,
   .focus-strip,
   .creator-strip,
