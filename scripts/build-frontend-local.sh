@@ -1,14 +1,18 @@
 #!/bin/bash
 
 # 本地构建前端并上传到服务器的脚本
-# 避免在服务器上进行耗时的 npm install 和 build
+# 避免在服务器上进行耗时的 npm install 和 build，直接同步 dist
 
 set -e
 
 echo "🔨 开始在本地构建前端..."
 
 # 进入前端目录
-cd "$(dirname "$0")/frontend"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+FRONTEND_DIR="$PROJECT_ROOT/frontend"
+
+cd "$FRONTEND_DIR"
 
 # 检查 Node.js 版本
 if ! command -v node &> /dev/null; then
@@ -17,7 +21,7 @@ if ! command -v node &> /dev/null; then
 fi
 
 echo "📦 安装依赖..."
-npm install
+npm ci --no-audit --no-fund
 
 echo "🏗️  构建生产版本..."
 npm run build
@@ -41,29 +45,22 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     ssh root@$server_ip "mkdir -p /tmp/frontend-dist"
 
     # 上传 dist 目录
-    scp -r dist root@$server_ip:/tmp/frontend-dist/
+    scp -r "$FRONTEND_DIR/dist" root@$server_ip:/tmp/frontend-dist/
 
     echo "🔄 在服务器上部署..."
     ssh root@$server_ip << 'ENDSSH'
 cd /root/demo-git
 
-# 停止前端容器
-docker compose -p demo --env-file .env.production -f docker-compose.prod.yml stop frontend
-
-# 备份旧版本
-if [ -d frontend/dist ]; then
-    mv frontend/dist frontend/dist.backup.$(date +%Y%m%d_%H%M%S)
-fi
-
-# 复制新版本
+# 同步最新 dist 到宿主机目录，供 frontend 容器直接挂载使用
+rm -rf frontend/dist
 mkdir -p frontend/dist
-cp -r /tmp/frontend-dist/dist/* frontend/dist/
+cp -r /tmp/frontend-dist/dist/. frontend/dist/
 
 # 清理临时文件
 rm -rf /tmp/frontend-dist
 
-# 重启前端容器
-docker compose -p demo --env-file .env.production -f docker-compose.prod.yml start frontend
+# 重建并重启 frontend，使挂载生效
+docker compose -p demo --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate frontend
 
 echo "✅ 部署完成!"
 ENDSSH
