@@ -1,14 +1,21 @@
 import json
 
+from drf_spectacular.utils import extend_schema
 from django.http import StreamingHttpResponse
 from rest_framework import permissions, status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, parser_classes, permission_classes
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
 from .context import build_user_context
-from .llm import stream_chat
+from .llm import analyze_food_image, stream_chat
 from .models import Conversation, Message
-from .serializers import ConversationSerializer, MessageSerializer
+from .serializers import (
+    ConversationSerializer,
+    FoodImageAnalysisRequestSerializer,
+    FoodImageAnalysisResponseSerializer,
+    MessageSerializer,
+)
 
 
 @api_view(["GET", "POST"])
@@ -76,3 +83,26 @@ def chat(request, pk):
     response["Cache-Control"] = "no-cache"
     response["X-Accel-Buffering"] = "no"
     return response
+
+
+@extend_schema(
+    request=FoodImageAnalysisRequestSerializer,
+    responses=FoodImageAnalysisResponseSerializer,
+)
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def analyze_food_photo(request):
+    serializer = FoodImageAnalysisRequestSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    image = serializer.validated_data["image"]
+    if image.size > 10 * 1024 * 1024:
+        return Response({"code": 1, "message": "图片大小不能超过 10MB"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        data = analyze_food_image(image.read())
+    except ValueError as exc:
+        return Response({"code": 1, "message": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response({"code": 0, "message": "success", "data": data}, status=status.HTTP_200_OK)

@@ -58,8 +58,10 @@
 
     <PageStateBlock
       tone="info"
-      title="AI 图片识别会在后续版本接入"
-      description="后续会支持上传食物照片，由 AI 助手识别食材、份量与营养估算。本轮先把手动上传菜谱链路做顺。"
+      title="AI 图片识别已开放试用"
+      description="现在可以先上传一张食物照片，系统会尝试识别食材、份量与营养估算，并回填到菜谱草稿中。识别结果仍建议人工确认。"
+      action-label="上传照片识别"
+      @action="openCreator"
       compact
     />
 
@@ -156,6 +158,56 @@
     />
     <el-dialog v-model="creatorVisible" width="760px" :title="editingRecipeId ? '编辑菜谱' : '上传菜谱'">
       <el-form label-position="top" class="creator-form">
+        <div class="creator-section vision-section">
+          <div class="section-head">
+            <div>
+              <strong>AI 图片识别</strong>
+              <span>上传一张食物照片，系统会尝试识别菜品、主要食材和每份营养信息，并回填到下方表单。</span>
+            </div>
+            <div class="vision-actions">
+              <input
+                ref="foodImageInput"
+                class="hidden-file-input"
+                type="file"
+                accept="image/*"
+                @change="handleFoodImageSelected"
+              />
+              <el-button plain @click="foodImageInput?.click()">
+                {{ selectedFoodImageName ? "重新选择照片" : "选择照片" }}
+              </el-button>
+              <el-button
+                type="primary"
+                plain
+                :disabled="!selectedFoodImage || analyzingFoodImage"
+                :loading="analyzingFoodImage"
+                @click="runFoodImageAnalysis"
+              >
+                AI 识别并填充
+              </el-button>
+            </div>
+          </div>
+
+          <div v-if="selectedFoodImagePreview || foodImageAnalysis" class="vision-result">
+            <img v-if="selectedFoodImagePreview" :src="selectedFoodImagePreview" alt="待识别食物照片预览" class="vision-preview" />
+            <div class="vision-copy">
+              <strong>{{ foodImageAnalysis?.title || selectedFoodImageName || "已选择待识别图片" }}</strong>
+              <p v-if="foodImageAnalysis?.description">{{ foodImageAnalysis.description }}</p>
+              <p v-else-if="selectedFoodImageName">已选择图片：{{ selectedFoodImageName }}</p>
+              <div v-if="foodImageAnalysis" class="vision-tags">
+                <span>{{ mealTypeLabel(foodImageAnalysis.meal_type) }}</span>
+                <span>{{ `${Math.max(1, Math.round(Number(foodImageAnalysis.servings || 1)))} 份` }}</span>
+                <span v-if="foodImageAnalysis.nutrition?.energy != null">{{ `${foodImageAnalysis.nutrition.energy} kcal/份` }}</span>
+              </div>
+              <p v-if="foodImageAnalysis?.confidence_notes" class="vision-note">
+                {{ foodImageAnalysis.confidence_notes }}
+              </p>
+              <p v-if="foodImageAnalysis?.warning" class="vision-note is-warning">
+                {{ foodImageAnalysis.warning }}
+              </p>
+            </div>
+          </div>
+        </div>
+
         <el-row :gutter="16">
           <el-col :span="24" :md="12">
             <el-form-item label="菜谱名称">
@@ -261,17 +313,41 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { ElMessageBox } from "element-plus";
 import CollectionSkeleton from "../components/CollectionSkeleton.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
-import { notifyActionError, notifyActionSuccess, notifyLoadError, notifyWarning } from "../lib/feedback";
+import { extractApiErrorMessage, notifyActionError, notifyActionSuccess, notifyErrorMessage, notifyLoadError, notifyWarning } from "../lib/feedback";
 import { useRouter } from "vue-router";
 import RecipeDetailDialog from "../components/RecipeDetailDialog.vue";
 import { createRecipe, explainRecommendation, favoriteRecipe, listFavoriteRecipes, listRecipes, unfavoriteRecipe, updateRecipe, deleteRecipe } from "../api/recipes";
+import { analyzeFoodImage } from "../api/assistant";
 import { trackEvent } from "../api/behavior";
 import { listHealthGoals } from "../api/goals";
+
+type FoodImageAnalysis = {
+  title?: string;
+  description?: string;
+  meal_type: "breakfast" | "lunch" | "dinner" | "snack";
+  servings?: number | null;
+  portion_size?: string;
+  ingredients?: Array<{
+    ingredient_name: string;
+    amount?: number | null;
+    unit?: string;
+    is_main?: boolean;
+  }>;
+  steps?: string[];
+  nutrition?: {
+    energy?: number | null;
+    protein?: number | null;
+    fat?: number | null;
+    carbohydrate?: number | null;
+  };
+  confidence_notes?: string;
+  warning?: string;
+};
 
 const router = useRouter();
 const recipes = ref<any[]>([]);
@@ -292,6 +368,12 @@ const creatorVisible = ref(false);
 const creatingRecipe = ref(false);
 const editingRecipeId = ref<number | null>(null);
 const deletingId = ref<number | null>(null);
+const analyzingFoodImage = ref(false);
+const foodImageInput = ref<HTMLInputElement | null>(null);
+const selectedFoodImage = ref<File | null>(null);
+const selectedFoodImageName = ref("");
+const selectedFoodImagePreview = ref("");
+const foodImageAnalysis = ref<FoodImageAnalysis | null>(null);
 const creatorForm = reactive({
   title: "",
   description: "",
@@ -582,14 +664,29 @@ function resetCreatorForm() {
   creatorForm.nutrition.carbohydrate = null;
 }
 
+function resetFoodImageState() {
+  selectedFoodImage.value = null;
+  selectedFoodImageName.value = "";
+  foodImageAnalysis.value = null;
+  if (selectedFoodImagePreview.value) {
+    URL.revokeObjectURL(selectedFoodImagePreview.value);
+    selectedFoodImagePreview.value = "";
+  }
+  if (foodImageInput.value) {
+    foodImageInput.value.value = "";
+  }
+}
+
 function openCreator() {
   resetCreatorForm();
+  resetFoodImageState();
   editingRecipeId.value = null;
   creatorVisible.value = true;
 }
 
 function openEditor(recipe: Record<string, any>) {
   resetCreatorForm();
+  resetFoodImageState();
   editingRecipeId.value = Number(recipe.id);
   creatorForm.title = recipe.title || "";
   creatorForm.description = recipe.description || "";
@@ -639,6 +736,89 @@ function removeCreatorStep(index: number) {
     return;
   }
   creatorForm.steps.splice(index, 1);
+}
+
+function handleFoodImageSelected(event: Event) {
+  const input = event.target as HTMLInputElement | null;
+  const file = input?.files?.[0];
+  if (!file) {
+    return;
+  }
+  if (!file.type.startsWith("image/")) {
+    notifyWarning("请选择图片文件");
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    notifyWarning("图片大小不能超过 10MB");
+    return;
+  }
+
+  if (selectedFoodImagePreview.value) {
+    URL.revokeObjectURL(selectedFoodImagePreview.value);
+  }
+
+  selectedFoodImage.value = file;
+  selectedFoodImageName.value = file.name;
+  selectedFoodImagePreview.value = URL.createObjectURL(file);
+  foodImageAnalysis.value = null;
+}
+
+function applyFoodImageAnalysis(analysis: FoodImageAnalysis) {
+  if (analysis.title) {
+    creatorForm.title = analysis.title;
+  }
+  if (analysis.description) {
+    creatorForm.description = analysis.description;
+  }
+  if (analysis.meal_type) {
+    creatorForm.meal_type = analysis.meal_type;
+  }
+  if (analysis.servings != null) {
+    creatorForm.servings = Math.max(1, Math.round(Number(analysis.servings || 1)));
+  }
+  if (analysis.portion_size) {
+    creatorForm.portion_size = analysis.portion_size;
+  }
+  if (analysis.ingredients?.length) {
+    creatorForm.ingredients = analysis.ingredients.map((item, index) => ({
+      ingredient_name: item.ingredient_name,
+      amount: item.amount != null ? Number(item.amount) : 1,
+      unit: item.unit || "份",
+      is_main: index === 0 ? true : Boolean(item.is_main),
+    }));
+  }
+  if (analysis.steps?.length) {
+    creatorForm.steps = analysis.steps.map((content) => ({ content }));
+  }
+  if (analysis.nutrition) {
+    creatorForm.nutrition.energy = analysis.nutrition.energy ?? null;
+    creatorForm.nutrition.protein = analysis.nutrition.protein ?? null;
+    creatorForm.nutrition.fat = analysis.nutrition.fat ?? null;
+    creatorForm.nutrition.carbohydrate = analysis.nutrition.carbohydrate ?? null;
+  }
+}
+
+async function runFoodImageAnalysis() {
+  if (!selectedFoodImage.value) {
+    notifyWarning("请先选择一张食物照片");
+    return;
+  }
+
+  try {
+    analyzingFoodImage.value = true;
+    const response = await analyzeFoodImage(selectedFoodImage.value);
+    const analysis = (response.data ?? response) as FoodImageAnalysis;
+    foodImageAnalysis.value = analysis;
+    applyFoodImageAnalysis(analysis);
+    notifyActionSuccess("已根据照片填充菜谱草稿");
+    if (analysis.warning) {
+      notifyWarning(analysis.warning);
+    }
+  } catch (error) {
+    notifyErrorMessage(extractApiErrorMessage(error, "图片识别失败，请稍后重试"));
+  } finally {
+    analyzingFoodImage.value = false;
+  }
 }
 
 async function submitCreatorRecipe() {
@@ -765,6 +945,11 @@ function handleFavoriteChange(payload: { recipeId: number; favorited: boolean })
 }
 
 onMounted(loadRecipes);
+onBeforeUnmount(() => {
+  if (selectedFoodImagePreview.value) {
+    URL.revokeObjectURL(selectedFoodImagePreview.value);
+  }
+});
 </script>
 
 <style scoped>
@@ -948,6 +1133,10 @@ h2 {
   border: 1px solid rgba(16, 34, 42, 0.06);
 }
 
+.hidden-file-input {
+  display: none;
+}
+
 .section-head strong {
   font-size: 16px;
 }
@@ -956,6 +1145,69 @@ h2 {
   color: #5a7a8a;
   font-size: 13px;
   line-height: 1.6;
+}
+
+.vision-section .section-head {
+  align-items: center;
+}
+
+.vision-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.vision-result {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(16, 34, 42, 0.08);
+}
+
+.vision-preview {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 14px;
+  background: rgba(232, 241, 247, 0.9);
+}
+
+.vision-copy {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.vision-copy p {
+  margin: 0;
+  color: #476072;
+  line-height: 1.6;
+}
+
+.vision-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.vision-tags span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #e8f1f7;
+  color: #24566a;
+  font-size: 12px;
+}
+
+.vision-note {
+  font-size: 13px;
+}
+
+.vision-note.is-warning {
+  color: #a35b13;
 }
 
 .creator-row,
@@ -1008,7 +1260,8 @@ h2 {
 
   .creator-row,
   .creator-step-row,
-  .nutrition-editor {
+  .nutrition-editor,
+  .vision-result {
     grid-template-columns: 1fr;
   }
 }

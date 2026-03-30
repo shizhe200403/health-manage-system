@@ -20,6 +20,18 @@ export async function deleteConversation(id: number) {
   return data;
 }
 
+export async function analyzeFoodImage(file: File) {
+  const formData = new FormData();
+  formData.append("image", file);
+  const { data } = await http.post("/assistant/food-image/analyze/", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+    timeout: 30000,
+  });
+  return data;
+}
+
 export async function chatSSE(
   conversationId: number,
   message: string,

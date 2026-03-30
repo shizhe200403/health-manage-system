@@ -174,4 +174,5 @@ CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_TASK_ALWAYS_EAGER", "false").lower(
 # LLM (通义千问 Qwen via OpenAI-compatible API)
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen-plus")
+LLM_VISION_MODEL = os.getenv("LLM_VISION_MODEL", "")
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
