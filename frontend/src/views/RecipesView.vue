@@ -267,11 +267,18 @@
             <el-button plain @click="addCreatorIngredient">新增食材</el-button>
           </div>
           <div v-for="(ingredient, index) in creatorForm.ingredients" :key="`ingredient-${index}`" class="creator-row">
-            <el-input v-model.trim="ingredient.ingredient_name" placeholder="食材名称，例如：鸡胸肉" />
-            <el-input-number v-model="ingredient.amount" :min="0" :max="9999" :precision="1" />
-            <el-input v-model.trim="ingredient.unit" placeholder="单位，例如：g / 个 / 份" />
-            <el-switch v-model="ingredient.is_main" active-text="主食材" />
-            <el-button text type="danger" :disabled="creatorForm.ingredients.length === 1" @click="removeCreatorIngredient(index)">删除</el-button>
+            <el-input class="ingredient-name-field" v-model.trim="ingredient.ingredient_name" placeholder="食材名称，例如：鸡胸肉" />
+            <el-input-number
+              class="ingredient-amount-field"
+              v-model="ingredient.amount"
+              :min="0"
+              :max="9999"
+              :precision="1"
+              controls-position="right"
+            />
+            <el-input class="ingredient-unit-field" v-model.trim="ingredient.unit" placeholder="单位，例如：g / 个 / 份" />
+            <el-switch class="ingredient-main-switch" v-model="ingredient.is_main" active-text="主食材" />
+            <el-button class="ingredient-remove-button" text type="danger" :disabled="creatorForm.ingredients.length === 1" @click="removeCreatorIngredient(index)">删除</el-button>
           </div>
         </div>
 
@@ -1218,8 +1225,30 @@ h2 {
 }
 
 .creator-row {
-  grid-template-columns: minmax(0, 2fr) 120px 120px 100px auto;
+  grid-template-columns: minmax(0, 2.2fr) minmax(148px, 0.9fr) minmax(112px, 0.7fr) max-content auto;
   align-items: center;
+}
+
+.creator-row > * {
+  min-width: 0;
+}
+
+.ingredient-main-switch,
+.ingredient-remove-button {
+  justify-self: start;
+}
+
+.creator-row :deep(.el-input),
+.creator-row :deep(.el-input-number) {
+  width: 100%;
+}
+
+.creator-row :deep(.el-input-number .el-input__wrapper) {
+  padding-right: 44px;
+}
+
+.creator-row :deep(.el-input-number.is-controls-right .el-input__wrapper) {
+  padding-left: 12px;
 }
 
 .creator-step-row {
