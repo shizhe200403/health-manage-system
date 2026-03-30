@@ -354,14 +354,84 @@ h1 {
   }
 
   .content {
-    padding: 12px 16px calc(86px + env(safe-area-inset-bottom));
+    padding: 10px 12px calc(78px + env(safe-area-inset-bottom));
+  }
+
+  .content.with-mobile-nav {
+    padding-bottom: calc(78px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-topbar {
+    gap: 12px;
+    padding: calc(10px + env(safe-area-inset-top)) 12px 8px;
   }
 
   .mobile-topbar strong {
+    font-size: 18px;
+    line-height: 1.2;
     display: -webkit-box;
     overflow: hidden;
     -webkit-line-clamp: 1;
     -webkit-box-orient: vertical;
+  }
+
+  .mobile-eyebrow {
+    margin-bottom: 3px;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+  }
+
+  .ghost,
+  .sheet-logout {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .mobile-bottom-nav {
+    left: 8px;
+    right: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    gap: 4px;
+    padding: 6px;
+    border-radius: 18px;
+    box-shadow: 0 12px 28px rgba(15, 30, 39, 0.14);
+  }
+
+  .mobile-nav-link {
+    gap: 2px;
+    padding: 5px 2px;
+    border-radius: 12px;
+    font-size: 9px;
+    line-height: 1.1;
+  }
+
+  .mobile-nav-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 10px;
+  }
+
+  .mobile-sheet {
+    left: 8px;
+    right: 8px;
+    bottom: calc(64px + env(safe-area-inset-bottom));
+    padding: 14px;
+    border-radius: 20px;
+    max-height: min(68vh, 520px);
+  }
+
+  .sheet-links {
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .sheet-links a {
+    padding: 12px 14px;
+    border-radius: 16px;
+  }
+
+  .sheet-links small {
+    font-size: 12px;
   }
 }
 </style>

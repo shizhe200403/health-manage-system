@@ -1002,6 +1002,30 @@ h2 {
 }
 
 @media (max-width: 768px) {
+  .hero-copy,
+  .panel,
+  .summary-grid article,
+  .recommend-list article,
+  .focus-box,
+  .action-item,
+  .shortcut-item,
+  .record-item,
+  .onboarding-item {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .cta-row {
+    margin-top: 16px;
+  }
+
+  .summary-grid,
+  .metric-grid,
+  .workbench-grid,
+  .secondary-grid {
+    grid-template-columns: 1fr;
+  }
+
   .panel-header,
   .row,
   .action-item,
@@ -1011,6 +1035,10 @@ h2 {
   .metric-top,
   .focus-topline {
     flex-direction: column;
+  }
+
+  .placeholder-icon {
+    font-size: 40px;
   }
 }
 </style>

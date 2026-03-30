@@ -1152,6 +1152,15 @@ h2 {
 }
 
 @media (max-width: 768px) {
+  .card,
+  .day-group,
+  .list article,
+  .empty-state,
+  .stats article {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
   .head,
   .card-head,
   .list-head,
@@ -1172,6 +1181,24 @@ h2 {
   .summary-grid,
   .meal-checklist {
     grid-template-columns: 1fr;
+  }
+
+  .stats {
+    grid-template-columns: 1fr;
+  }
+
+  .shortcut-list {
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .shortcut-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .shortcut-card {
+    min-width: min(78vw, 240px);
   }
 }
 </style>

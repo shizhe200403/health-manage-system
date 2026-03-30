@@ -1042,6 +1042,18 @@ h2 {
 }
 
 @media (max-width: 768px) {
+  .summary-grid article,
+  .card,
+  .coverage-grid article {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .summary-grid,
+  .meta {
+    grid-template-columns: 1fr;
+  }
+
   .head,
   .card-head,
   .history-head,
@@ -1050,6 +1062,11 @@ h2 {
   .status-row,
   .action-item {
     flex-direction: column;
+  }
+
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>

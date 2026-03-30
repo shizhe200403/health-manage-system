@@ -737,6 +737,12 @@ h2 {
 }
 
 @media (max-width: 768px) {
+  .summary-grid,
+  .focus-metrics,
+  .goal-metrics {
+    grid-template-columns: 1fr;
+  }
+
   .head,
   .card-head,
   .goal-head,

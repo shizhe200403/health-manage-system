@@ -88,6 +88,131 @@ video {
   .mobile-scroll-row > * {
     flex: 0 0 auto;
   }
+
+  body {
+    font-size: 14px;
+  }
+
+  .page,
+  .dashboard {
+    gap: 12px !important;
+  }
+
+  .page .tag,
+  .dashboard .tag {
+    margin-bottom: 4px !important;
+    font-size: 11px !important;
+    letter-spacing: 0.14em !important;
+  }
+
+  .page h2,
+  .dashboard h2 {
+    font-size: 24px !important;
+    line-height: 1.15 !important;
+  }
+
+  .page .desc,
+  .dashboard .desc {
+    margin-top: 6px !important;
+    font-size: 14px !important;
+    line-height: 1.55 !important;
+  }
+
+  .page .card,
+  .page .empty-state,
+  .page .summary-grid article,
+  .page .grid article,
+  .page .quick-picks article,
+  .page .focus-strip,
+  .page .creator-strip,
+  .page .goal-card,
+  .page .post-card,
+  .page .day-group,
+  .page .history-item,
+  .page .status-item,
+  .page .action-item,
+  .page .helper-panel,
+  .page .shortcut-panel,
+  .page .focus-box,
+  .page .report-overview,
+  .page .recipe-preview,
+  .page .meal-chip,
+  .page .progress-card,
+  .page .vision-result,
+  .page .creator-section,
+  .page .stats article,
+  .page .summary article,
+  .dashboard .hero-copy,
+  .dashboard .panel,
+  .dashboard .summary-grid article,
+  .dashboard .focus-box,
+  .dashboard .action-item,
+  .dashboard .shortcut-item,
+  .dashboard .record-item,
+  .dashboard .onboarding-item,
+  .dashboard .recommend-list article {
+    padding: 16px !important;
+    border-radius: 18px !important;
+  }
+
+  .page .summary-grid strong,
+  .page .summary strong,
+  .page .grid strong,
+  .page .empty-state strong,
+  .page .focus-strip strong,
+  .page .stats strong,
+  .dashboard .summary-grid strong,
+  .dashboard .metric-grid strong,
+  .dashboard .focus-box strong,
+  .dashboard .action-item strong,
+  .dashboard .shortcut-item strong,
+  .dashboard .record-item strong {
+    font-size: 18px !important;
+  }
+
+  .page .toolbar,
+  .page .actions,
+  .page .head,
+  .dashboard .cta-row,
+  .dashboard .head-actions,
+  .dashboard .recommend-actions,
+  .dashboard .shortcut-actions {
+    gap: 10px !important;
+  }
+
+  .page .summary-grid,
+  .page .summary,
+  .page .overview-grid,
+  .page .progress-grid,
+  .page .goal-list,
+  .page .list,
+  .page .stats,
+  .dashboard .summary-grid,
+  .dashboard .workbench-grid,
+  .dashboard .secondary-grid,
+  .dashboard .recommend-list,
+  .dashboard .shortcut-list,
+  .dashboard .record-list {
+    gap: 10px !important;
+  }
+
+  .el-dialog {
+    width: calc(100vw - 16px) !important;
+    max-width: none !important;
+    margin-top: 3vh !important;
+  }
+
+  .el-dialog__header {
+    padding: 16px 16px 0 !important;
+  }
+
+  .el-dialog__body {
+    padding: 16px !important;
+  }
+
+  .el-dialog__footer {
+    padding: 0 16px 16px !important;
+  }
 }
 
 /* 统一业务提示：固定在顶部中央，避免被移动端底部导航遮挡 */

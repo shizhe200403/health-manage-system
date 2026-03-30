@@ -488,6 +488,11 @@ h2 {
 }
 
 @media (max-width: 768px) {
+  .summary-grid,
+  .toggle-grid {
+    grid-template-columns: 1fr;
+  }
+
   .head {
     flex-direction: column;
     align-items: stretch;

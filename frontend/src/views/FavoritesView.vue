@@ -283,6 +283,11 @@ h2 {
 }
 
 @media (max-width: 768px) {
+  .summary,
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
   .head,
   .toolbar,
   .card-head,

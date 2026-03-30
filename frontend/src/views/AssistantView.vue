@@ -230,7 +230,7 @@ onMounted(loadConversations);
 .page {
   display: grid;
   gap: 16px;
-  height: calc(100vh - 120px);
+  min-height: calc(100dvh - 140px);
   grid-template-rows: auto 1fr;
 }
 
@@ -415,10 +415,47 @@ h2 { margin: 0; font-size: 30px; }
 .input-area :deep(.el-textarea) { flex: 1; }
 
 @media (max-width: 768px) {
-  .page { height: auto; }
-  .chat-layout { grid-template-columns: 1fr; }
-  .sidebar { max-height: 180px; }
-  .chat-area { min-height: 60vh; }
-  .bubble { max-width: 88%; }
+  .page {
+    min-height: auto;
+    grid-template-rows: auto;
+  }
+
+  .head,
+  .input-area {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chat-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    max-height: 132px;
+    border-radius: 16px;
+  }
+
+  .chat-area {
+    min-height: calc(100dvh - 280px);
+    border-radius: 16px;
+  }
+
+  .messages {
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .placeholder-inner {
+    padding: 24px 16px;
+  }
+
+  .bubble {
+    max-width: 92%;
+    padding: 10px 12px;
+  }
+
+  .input-area {
+    padding: 12px;
+  }
 }
 </style>

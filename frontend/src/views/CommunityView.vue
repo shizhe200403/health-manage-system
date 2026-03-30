@@ -604,6 +604,11 @@ h2 {
 }
 
 @media (max-width: 768px) {
+  .summary-grid,
+  .overview-grid {
+    grid-template-columns: 1fr;
+  }
+
   .head,
   .card-head,
   .row,
