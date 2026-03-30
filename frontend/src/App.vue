@@ -21,11 +21,18 @@
           <p class="mobile-eyebrow">每日饮食</p>
           <strong>{{ currentTitle }}</strong>
         </div>
-        <button class="ghost" type="button" @click="mobileMoreOpen = true">{{ auth.user?.nickname || "菜单" }}</button>
+        <button class="ghost mobile-nav-trigger" type="button" :aria-expanded="mobileNavOpen" @click="mobileNavOpen = !mobileNavOpen">
+          <span class="hamburger-mark" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
+          <span>{{ mobileNavOpen ? "收起" : "导航" }}</span>
+        </button>
       </header>
     </template>
 
-    <main class="content" :class="{ 'with-mobile-nav': showChrome }">
+    <main class="content" :class="{ 'with-mobile-nav': showChrome, 'with-mobile-nav-open': showChrome && mobileNavOpen }">
       <div class="content-inner">
         <RouterView v-slot="{ Component, route: currentRoute }">
           <Transition name="route-shell" mode="out-in">
@@ -35,34 +42,32 @@
       </div>
     </main>
 
-    <nav v-if="showChrome" class="mobile-bottom-nav mobile-only" aria-label="移动端快捷导航">
-      <RouterLink v-for="item in mobileNavItems" :key="item.to" :to="item.to" class="mobile-nav-link">
-        <span class="mobile-nav-icon">{{ item.icon }}</span>
-        <span>{{ item.label }}</span>
-      </RouterLink>
-      <button class="mobile-nav-link more-link" :class="{ active: moreLinkActive }" type="button" @click="mobileMoreOpen = true">
-        <span class="mobile-nav-icon">···</span>
-        <span>更多</span>
+    <nav v-if="showChrome" class="mobile-rail mobile-only" :class="{ open: mobileNavOpen }" aria-label="移动端快捷导航">
+      <button class="mobile-rail-toggle" type="button" :aria-expanded="mobileNavOpen" @click="mobileNavOpen = !mobileNavOpen">
+        <span class="hamburger-mark" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </span>
+        <span>{{ mobileNavOpen ? "隐藏导航" : "展开导航" }}</span>
       </button>
-    </nav>
-
-    <div v-if="showChrome && mobileMoreOpen" class="mobile-sheet-mask mobile-only" @click="mobileMoreOpen = false" />
-    <aside v-if="showChrome" class="mobile-sheet mobile-only" :class="{ open: mobileMoreOpen }" aria-label="更多导航">
-      <div class="sheet-head">
-        <div>
-          <p class="mobile-eyebrow">快捷入口</p>
-          <strong>{{ auth.user?.nickname || auth.user?.username || "当前账号" }}</strong>
-        </div>
-        <button class="ghost" type="button" @click="mobileMoreOpen = false">关闭</button>
-      </div>
-      <div class="sheet-links">
-        <RouterLink v-for="item in secondaryNavItems" :key="item.to" :to="item.to" @click="mobileMoreOpen = false">
+      <div v-if="mobileNavOpen" class="mobile-rail-scroll mobile-scroll-row">
+        <RouterLink
+          v-for="item in navItems"
+          :key="item.to"
+          :to="item.to"
+          class="mobile-rail-link"
+          @click="mobileNavOpen = false"
+        >
+          <span class="mobile-rail-icon">{{ item.icon }}</span>
           <span>{{ item.label }}</span>
-          <small>{{ item.copy }}</small>
         </RouterLink>
+        <button v-if="auth.isAuthenticated" class="mobile-rail-link mobile-rail-logout" type="button" @click="handleMobileLogout">
+          <span class="mobile-rail-icon">退</span>
+          <span>退出</span>
+        </button>
       </div>
-      <button v-if="auth.isAuthenticated" class="sheet-logout" type="button" @click="handleMobileLogout">退出登录</button>
-    </aside>
+    </nav>
   </div>
 </template>
 
@@ -74,7 +79,7 @@ import { useAuthStore } from "./stores/auth";
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
-const mobileMoreOpen = ref(false);
+const mobileNavOpen = ref(false);
 
 const navItems = [
   { to: "/", label: "首页", icon: "首", copy: "查看今天的进度与下一步" },
@@ -90,15 +95,12 @@ const navItems = [
 
 const showChrome = computed(() => route.path !== "/login");
 const primaryNavItems = computed(() => navItems);
-const mobileNavItems = computed(() => navItems.filter((item) => ["/", "/records", "/reports"].includes(item.to)));
-const secondaryNavItems = computed(() => navItems.filter((item) => !mobileNavItems.value.some((nav) => nav.to === item.to)));
-const moreLinkActive = computed(() => secondaryNavItems.value.some((item) => item.to === route.path));
 const currentTitle = computed(() => navItems.find((item) => item.to === route.path)?.label || "营养饮食助手");
 
 watch(
   () => route.fullPath,
   () => {
-    mobileMoreOpen.value = false;
+    mobileNavOpen.value = false;
   },
 );
 
@@ -108,7 +110,7 @@ function logout() {
 }
 
 function handleMobileLogout() {
-  mobileMoreOpen.value = false;
+  mobileNavOpen.value = false;
   logout();
 }
 </script>
@@ -127,8 +129,7 @@ function handleMobileLogout() {
 .topbar,
 .mobile-topbar,
 .nav,
-.user-box,
-.sheet-head {
+.user-box {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -214,7 +215,11 @@ h1 {
 }
 
 .content.with-mobile-nav {
-  padding-bottom: calc(82px + env(safe-area-inset-bottom));
+  padding-bottom: calc(64px + env(safe-area-inset-bottom));
+}
+
+.content.with-mobile-nav-open {
+  padding-bottom: calc(126px + env(safe-area-inset-bottom));
 }
 
 .content-inner {
@@ -223,117 +228,112 @@ h1 {
   min-width: 0;
 }
 
-.mobile-bottom-nav {
+.mobile-nav-trigger,
+.mobile-rail-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hamburger-mark {
+  display: inline-flex;
+  width: 14px;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hamburger-mark span {
+  width: 14px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.mobile-rail {
   position: fixed;
-  left: 10px;
-  right: 10px;
-  bottom: calc(10px + env(safe-area-inset-bottom));
+  left: 8px;
+  right: 8px;
+  bottom: calc(8px + env(safe-area-inset-bottom));
   z-index: 30;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.mobile-rail.open {
+  pointer-events: auto;
+}
+
+.mobile-rail-toggle,
+.mobile-rail-scroll {
+  pointer-events: auto;
+}
+
+.mobile-rail-toggle {
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  color: #173042;
+  padding: 10px 14px;
+  border-radius: 999px;
+  box-shadow: 0 12px 28px rgba(15, 30, 39, 0.14);
+  backdrop-filter: blur(16px);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.mobile-rail-scroll {
+  width: 100%;
   padding: 8px;
-  border-radius: 20px;
+  border-radius: 18px;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(16, 34, 42, 0.08);
-  box-shadow: 0 18px 40px rgba(15, 30, 39, 0.16);
+  box-shadow: 0 12px 28px rgba(15, 30, 39, 0.14);
   backdrop-filter: blur(16px);
 }
 
-.mobile-nav-link {
-  display: grid;
-  justify-items: center;
-  gap: 3px;
-  padding: 6px 4px;
-  border-radius: 14px;
+.mobile-rail-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 999px;
   color: #476072;
   text-decoration: none;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
-  border: 0;
-  background: transparent;
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  background: rgba(247, 251, 255, 0.94);
+  white-space: nowrap;
 }
 
-.mobile-nav-link.router-link-active,
-.mobile-nav-link.active {
+.mobile-rail-link.router-link-active,
+.mobile-rail-link.active {
   background: #173042;
   color: #fff;
+  border-color: #173042;
 }
 
-.mobile-nav-icon {
+.mobile-rail-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-radius: 999px;
   background: rgba(23, 48, 66, 0.08);
-  font-size: 11px;
+  font-size: 10px;
 }
 
-.mobile-nav-link.router-link-active .mobile-nav-icon,
-.mobile-nav-link.active .mobile-nav-icon,
-.more-link .mobile-nav-icon {
+.mobile-rail-link.router-link-active .mobile-rail-icon,
+.mobile-rail-link.active .mobile-rail-icon,
+.mobile-rail-logout .mobile-rail-icon {
   background: rgba(255, 255, 255, 0.18);
 }
 
-.mobile-sheet-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 39;
-  background: rgba(16, 34, 42, 0.32);
-}
-
-.mobile-sheet {
-  position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: calc(76px + env(safe-area-inset-bottom));
-  z-index: 40;
-  padding: 18px;
-  max-height: min(72vh, 560px);
-  overflow-y: auto;
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(16, 34, 42, 0.08);
-  box-shadow: 0 18px 50px rgba(15, 30, 39, 0.18);
-  backdrop-filter: blur(16px);
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(12px);
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-
-.mobile-sheet.open {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
-}
-
-.sheet-links {
-  display: grid;
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.sheet-links a {
-  display: grid;
-  gap: 4px;
-  padding: 14px 16px;
-  border-radius: 18px;
-  text-decoration: none;
-  background: rgba(247, 251, 255, 0.94);
-  border: 1px solid rgba(16, 34, 42, 0.06);
-}
-
-.sheet-links small {
-  color: #5a7a8a;
-  line-height: 1.5;
-}
-
-.sheet-logout {
-  width: 100%;
-  margin-top: 16px;
+.mobile-rail-logout {
+  cursor: pointer;
 }
 
 .desktop-only {
@@ -354,11 +354,15 @@ h1 {
   }
 
   .content {
-    padding: 10px 12px calc(78px + env(safe-area-inset-bottom));
+    padding: 10px 12px calc(64px + env(safe-area-inset-bottom));
   }
 
   .content.with-mobile-nav {
-    padding-bottom: calc(78px + env(safe-area-inset-bottom));
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+
+  .content.with-mobile-nav-open {
+    padding-bottom: calc(120px + env(safe-area-inset-bottom));
   }
 
   .mobile-topbar {
@@ -382,56 +386,19 @@ h1 {
   }
 
   .ghost,
-  .sheet-logout {
+  .mobile-rail-toggle {
     padding: 8px 12px;
     font-size: 13px;
   }
 
-  .mobile-bottom-nav {
-    left: 8px;
-    right: 8px;
-    bottom: calc(8px + env(safe-area-inset-bottom));
-    gap: 4px;
+  .mobile-rail-scroll {
     padding: 6px;
-    border-radius: 18px;
-    box-shadow: 0 12px 28px rgba(15, 30, 39, 0.14);
-  }
-
-  .mobile-nav-link {
-    gap: 2px;
-    padding: 5px 2px;
-    border-radius: 12px;
-    font-size: 9px;
-    line-height: 1.1;
-  }
-
-  .mobile-nav-icon {
-    width: 20px;
-    height: 20px;
-    font-size: 10px;
-  }
-
-  .mobile-sheet {
-    left: 8px;
-    right: 8px;
-    bottom: calc(64px + env(safe-area-inset-bottom));
-    padding: 14px;
-    border-radius: 20px;
-    max-height: min(68vh, 520px);
-  }
-
-  .sheet-links {
-    gap: 8px;
-    margin-top: 12px;
-  }
-
-  .sheet-links a {
-    padding: 12px 14px;
     border-radius: 16px;
   }
 
-  .sheet-links small {
-    font-size: 12px;
+  .mobile-rail-link {
+    padding: 8px 10px;
+    font-size: 11px;
   }
 }
 </style>
