@@ -292,6 +292,8 @@ function addToRecord(recipe: Record<string, any>) {
       recipe_id: String(recipe.id),
       meal_type: recipe.meal_type || "lunch",
       note: recipe.title || "",
+      source: "favorites",
+      from_title: recipe.title || "",
     },
   });
 }

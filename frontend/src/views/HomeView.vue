@@ -999,6 +999,8 @@ function addToRecord(recipe: Record<string, any>) {
       recipe_id: String(recipe.id),
       meal_type: recipe.meal_type || "lunch",
       note: recipe.title || "",
+      source: "home",
+      from_title: recipe.title || "",
     },
   });
 }
@@ -1009,6 +1011,8 @@ function goToNextMealRecord() {
     query: {
       meal_type: nextMealFocusType.value,
       note: `今天的${mealTypeLabel(nextMealFocusType.value)}`,
+      source: "home",
+      from_title: todaySuggestedRecipe.value?.title || "",
     },
   });
 }

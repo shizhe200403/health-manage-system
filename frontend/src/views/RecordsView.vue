@@ -200,6 +200,17 @@
             <el-button plain :disabled="!mealDraftReadyForAi" @click="openAssistantForMealDraft">让 AI 帮我补全这一餐</el-button>
           </div>
         </div>
+        <div v-if="recordHandoff" class="record-handoff">
+          <div class="record-handoff-copy">
+            <span class="record-handoff-badge">{{ recordHandoff.badge }}</span>
+            <strong>{{ recordHandoff.title }}</strong>
+            <p>{{ recordHandoff.description }}</p>
+          </div>
+          <div class="record-handoff-actions">
+            <el-button plain @click="router.push(recordHandoff.to)">{{ recordHandoff.cta }}</el-button>
+            <el-button text @click="clearRecordHandoff">关闭提示</el-button>
+          </div>
+        </div>
 
         <div v-if="recentRecipeShortcuts.length || frequentRecipeShortcuts.length" class="shortcut-panel">
           <div class="shortcut-head">
@@ -617,6 +628,50 @@ const recommendedMealType = computed<"breakfast" | "lunch" | "dinner" | "snack">
 });
 const recommendedMealYesterdayRecord = computed(() => findYesterdayMealRecord(recommendedMealType.value));
 const mealDraftReadyForAi = computed(() => Boolean(form.note.trim() || form.recipe_id));
+const prefillSource = computed(() => String(route.query.source || "").trim());
+const recordHandoff = computed<null | { badge: string; title: string; description: string; cta: string; to: string }>(() => {
+  const source = prefillSource.value;
+  const fromTitle = String(route.query.from_title || "").trim();
+  const dishLabel = selectedRecipe.value?.title || form.note.trim() || fromTitle;
+
+  if (source === "home") {
+    return {
+      badge: "首页接续",
+      title: "你正在接首页的今天工作台",
+      description: dishLabel
+        ? `当前带入的是「${dishLabel}」。保存完这条记录后，可以直接回首页继续看今天还差什么。`
+        : "这是从首页工作台接过来的记录动作，保存后再回首页看今天进度会更顺。",
+      cta: "回首页工作台",
+      to: "/",
+    };
+  }
+
+  if (source === "recipes") {
+    return {
+      badge: "菜谱接续",
+      title: "你正在接菜谱页的决策结果",
+      description: dishLabel
+        ? `当前带入的是「${dishLabel}」。如果这条记录顺利落下，就等于把刚才在菜谱页的决策真正执行了。`
+        : "这是从菜谱页带过来的选择，先记上这一餐，再决定要不要继续挑下一道。",
+      cta: "回菜谱页",
+      to: "/recipes",
+    };
+  }
+
+  if (source === "favorites") {
+    return {
+      badge: "收藏接续",
+      title: "你正在把常用收藏落成今天记录",
+      description: dishLabel
+        ? `当前带入的是「${dishLabel}」。把收藏真正记进今天，首页和趋势才会开始反映这次选择。`
+        : "这是从收藏中心带过来的常用选择，先记上这一餐，收藏才真正变成执行资产。",
+      cta: "回收藏中心",
+      to: "/favorites",
+    };
+  }
+
+  return null;
+});
 const workbenchStatus = computed(() => {
   const missingCount = mealChecklist.value.filter((item) => !item.done).length;
   if (!records.value.length) {
@@ -969,16 +1024,25 @@ function buildFollowUp(recordDate: string, mealType: string, mode: "create" | "u
   const badge = mode === "update" ? "已更新" : "已保存";
   const isToday = recordDate === todayString();
   const nextMeal = nextMealType(mealType);
+  const sourceReturnAction =
+    prefillSource.value === "home"
+      ? { label: "回首页看今天工作台", to: "/" }
+      : prefillSource.value === "recipes"
+        ? { label: "回菜谱页继续挑", to: "/recipes" }
+        : prefillSource.value === "favorites"
+          ? { label: "回收藏中心", to: "/favorites" }
+          : null;
 
   if (!isToday) {
     return {
       badge,
       title: `${mealTypeLabel(mealType)}已同步到 ${recordDate}`,
       description: "这条记录已经归档到对应日期。现在可以补今天的一餐，或者回看最近记录确认整体节奏。",
-      highlights: buildFollowUpHighlights(recordDate, mealType),
+      highlights: buildFollowUpHighlights(recordDate, mealType).concat(sourceReturnAction ? [`来源 ${recordHandoff.value?.badge || "跨页带入"}`] : []),
       actions: [
         { label: `快速记${mealTypeLabel(nextMeal)}`, primary: true, mealType: nextMeal },
         { label: "查看最近记录", to: "/records" },
+        ...(sourceReturnAction ? [sourceReturnAction] : []),
       ],
     };
   }
@@ -991,10 +1055,11 @@ function buildFollowUp(recordDate: string, mealType: string, mode: "create" | "u
       badge,
       title: `今天蛋白还差 ${proteinGap.toFixed(1)} g`,
       description: `当前${mealTypeLabel(mealType)}已经记上了。下一步更适合补一份高蛋白选择，而不是继续盲目加量。`,
-      highlights: buildFollowUpHighlights(recordDate, mealType),
+      highlights: buildFollowUpHighlights(recordDate, mealType).concat(sourceReturnAction ? [`来源 ${recordHandoff.value?.badge || "跨页带入"}`] : []),
       actions: [
         { label: followUpLibraryLabel(), primary: true, to: followUpLibraryTarget() },
         { label: `继续记${mealTypeLabel(nextMeal)}`, mealType: nextMeal },
+        ...(sourceReturnAction ? [sourceReturnAction] : []),
       ],
     };
   }
@@ -1004,10 +1069,11 @@ function buildFollowUp(recordDate: string, mealType: string, mode: "create" | "u
       badge,
       title: "今天热量已经明显偏高",
       description: "后续一餐更适合轻负担、低油低糖一点，先避免继续上冲，再回看整体趋势。",
-      highlights: buildFollowUpHighlights(recordDate, mealType),
+      highlights: buildFollowUpHighlights(recordDate, mealType).concat(sourceReturnAction ? [`来源 ${recordHandoff.value?.badge || "跨页带入"}`] : []),
       actions: [
         { label: "去菜谱库看轻负担", primary: true, to: "/recipes" },
         { label: "查看今天记录", to: "/records" },
+        ...(sourceReturnAction ? [sourceReturnAction] : []),
       ],
     };
   }
@@ -1017,10 +1083,11 @@ function buildFollowUp(recordDate: string, mealType: string, mode: "create" | "u
       badge,
       title: `距离今日热量目标还差 ${energyGap.toFixed(0)} kcal`,
       description: "今天的记录已经在推进，继续补下一餐，热量和蛋白会更接近目标。",
-      highlights: buildFollowUpHighlights(recordDate, mealType),
+      highlights: buildFollowUpHighlights(recordDate, mealType).concat(sourceReturnAction ? [`来源 ${recordHandoff.value?.badge || "跨页带入"}`] : []),
       actions: [
         { label: `继续记${mealTypeLabel(nextMeal)}`, primary: true, mealType: nextMeal },
         { label: followUpLibraryLabel(), to: followUpLibraryTarget() },
+        ...(sourceReturnAction ? [sourceReturnAction] : []),
       ],
     };
   }
@@ -1029,10 +1096,11 @@ function buildFollowUp(recordDate: string, mealType: string, mode: "create" | "u
     badge,
     title: "这一餐已经记上，今天节奏基本正常",
     description: "可以继续补下一餐，或者回看趋势和报表，确认这几天是不是都在稳定推进。",
-    highlights: buildFollowUpHighlights(recordDate, mealType),
+    highlights: buildFollowUpHighlights(recordDate, mealType).concat(sourceReturnAction ? [`来源 ${recordHandoff.value?.badge || "跨页带入"}`] : []),
     actions: [
       { label: "看看报表", primary: true, to: "/reports" },
       { label: `继续记${mealTypeLabel(nextMeal)}`, mealType: nextMeal },
+      ...(sourceReturnAction ? [sourceReturnAction] : []),
     ],
   };
 }
@@ -1045,6 +1113,13 @@ function runFollowUpAction(action: { to?: string; mealType?: "breakfast" | "lunc
   if (action.to) {
     router.push(action.to);
   }
+}
+
+function clearRecordHandoff() {
+  const nextQuery = { ...route.query };
+  delete nextQuery.source;
+  delete nextQuery.from_title;
+  router.replace({ path: route.path, query: nextQuery });
 }
 
 function openAssistantForRecordPlan() {
@@ -1522,6 +1597,55 @@ h2 {
   justify-content: flex-end;
 }
 
+.record-handoff {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top right, rgba(87, 181, 231, 0.14), transparent 34%),
+    rgba(247, 251, 255, 0.92);
+  border: 1px solid rgba(16, 34, 42, 0.08);
+}
+
+.record-handoff-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.record-handoff-badge {
+  justify-self: flex-start;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(23, 48, 66, 0.08);
+  color: #173042;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.record-handoff strong {
+  font-size: 18px;
+  color: #173042;
+}
+
+.record-handoff p {
+  margin: 0;
+  color: #476072;
+  line-height: 1.65;
+}
+
+.record-handoff-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .save-preview,
 .save-follow-up {
   display: flex;
@@ -1825,6 +1949,8 @@ h2 {
   .quick-helpers,
   .helper-panel,
   .helper-actions,
+  .record-handoff,
+  .record-handoff-actions,
   .save-preview,
   .save-follow-up,
   .workbench-hero,
@@ -1864,11 +1990,17 @@ h2 {
     justify-content: stretch;
   }
 
+  .record-handoff-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
   .save-preview-highlights,
   .save-follow-up-highlights {
     width: 100%;
   }
 
+  .record-handoff-actions :deep(.el-button),
   .save-follow-up-actions :deep(.el-button) {
     width: 100%;
     margin-left: 0;
