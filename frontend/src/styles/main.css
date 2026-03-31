@@ -21,6 +21,8 @@
   --app-radius: 24px;
   --app-radius-soft: 18px;
   --app-ease: 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  --app-bounce: 380ms cubic-bezier(0.2, 1.18, 0.32, 1);
+  --app-press: 170ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 * {
@@ -51,6 +53,22 @@ body {
 
 a {
   color: inherit;
+}
+
+a[href]:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+.el-button:focus-visible,
+.mobile-rail-link:focus-visible,
+.ghost:focus-visible,
+.ribbon-link:focus-visible,
+.nav a:focus-visible,
+.more-menu a:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 1px rgba(47, 124, 152, 0.34),
+    0 0 0 5px rgba(87, 181, 231, 0.18),
+    0 18px 36px rgba(15, 30, 39, 0.12) !important;
 }
 
 a[href],
@@ -196,7 +214,8 @@ video {
     transform var(--app-ease),
     box-shadow var(--app-ease),
     border-color var(--app-ease),
-    background var(--app-ease);
+    background var(--app-ease),
+    filter var(--app-ease);
 }
 
 @media (hover: hover) {
@@ -225,10 +244,24 @@ video {
   .dashboard .record-item:hover,
   .dashboard .onboarding-item:hover,
   .dashboard .recommend-list article:hover {
-    transform: translateY(-3px);
+    transform: translateY(-4px) scale(1.004);
     box-shadow: var(--app-shadow-hover) !important;
     border-color: rgba(23, 48, 66, 0.12) !important;
+    filter: saturate(1.02);
   }
+}
+
+.page .action-item:active,
+.page .shortcut-panel:active,
+.page .focus-box:active,
+.page .recipe-preview:active,
+.page .history-item:active,
+.page .progress-card:active,
+.dashboard .action-item:active,
+.dashboard .shortcut-item:active,
+.dashboard .record-item:active,
+.dashboard .recommend-list article:active {
+  transform: translateY(-1px) scale(0.986);
 }
 
 .page .tag,
@@ -242,6 +275,9 @@ video {
 }
 
 .el-button {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   border-radius: 16px !important;
   font-weight: 700 !important;
   letter-spacing: 0.01em;
@@ -249,17 +285,66 @@ video {
     transform var(--app-ease),
     box-shadow var(--app-ease),
     border-color var(--app-ease),
-    background var(--app-ease) !important;
+    background var(--app-ease),
+    filter var(--app-ease) !important;
+}
+
+.nav a,
+.more-menu a,
+.ghost,
+.sheet-logout,
+.ribbon-link,
+.mobile-rail-link,
+.mobile-rail-toggle {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.el-button::after,
+.nav a::after,
+.more-menu a::after,
+.ghost::after,
+.sheet-logout::after,
+.ribbon-link::after,
+.mobile-rail-link::after,
+.mobile-rail-toggle::after {
+  content: "";
+  position: absolute;
+  inset: -40% auto auto -18%;
+  width: 140px;
+  height: 180%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.78), transparent);
+  opacity: 0;
+  transform: translate3d(-140%, 0, 0) rotate(18deg);
+  pointer-events: none;
+  transition: transform 0.72s ease, opacity 0.28s ease;
+}
+
+@media (hover: hover) {
+  .el-button:hover::after,
+  .nav a:hover::after,
+  .more-menu a:hover::after,
+  .ghost:hover::after,
+  .sheet-logout:hover::after,
+  .ribbon-link:hover::after,
+  .mobile-rail-link:hover::after,
+  .mobile-rail-toggle:hover::after {
+    opacity: 0.34;
+    transform: translate3d(260%, 0, 0) rotate(18deg);
+  }
 }
 
 .el-button:not(.is-disabled):hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px) scale(1.01);
+  filter: saturate(1.03);
 }
 
 .el-button:not(.is-disabled):active,
 button:not(:disabled):active,
 a[href]:active {
-  transform: translateY(0) scale(0.975);
+  transform: translateY(0) scale(0.968);
+  transition-duration: var(--app-press) !important;
 }
 
 .el-button--primary {
@@ -284,10 +369,36 @@ a[href]:active {
 .el-textarea__inner,
 .el-date-editor.el-input__wrapper,
 .el-date-editor .el-input__wrapper {
+  position: relative;
+  overflow: hidden;
   border-radius: 16px !important;
   box-shadow: 0 0 0 1px rgba(16, 34, 42, 0.08), 0 8px 20px rgba(15, 30, 39, 0.04) !important;
-  background: rgba(255, 255, 255, 0.92) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 252, 255, 0.92)) !important;
   transition: box-shadow var(--app-ease), transform var(--app-ease), background var(--app-ease) !important;
+}
+
+.el-input__wrapper::before,
+.el-select__wrapper::before,
+.el-date-editor.el-input__wrapper::before,
+.el-date-editor .el-input__wrapper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.66), transparent 28%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.14), transparent 40%);
+  pointer-events: none;
+}
+
+.el-input__inner,
+.el-textarea__inner {
+  caret-color: #173042 !important;
+}
+
+.el-input__inner::placeholder,
+.el-textarea__inner::placeholder {
+  color: rgba(77, 106, 121, 0.8) !important;
 }
 
 .el-input__wrapper:hover,
@@ -295,8 +406,10 @@ a[href]:active {
 .el-textarea__inner:hover,
 .el-date-editor.el-input__wrapper:hover,
 .el-date-editor .el-input__wrapper:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 0 0 1px rgba(16, 34, 42, 0.12), 0 12px 24px rgba(15, 30, 39, 0.06) !important;
+  transform: translateY(-1px) scale(1.003);
+  box-shadow: 0 0 0 1px rgba(16, 34, 42, 0.12), 0 14px 28px rgba(15, 30, 39, 0.07) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(249, 253, 255, 0.96)) !important;
 }
 
 .el-switch,
@@ -326,10 +439,11 @@ a[href]:active {
 .el-textarea__inner:focus,
 .el-date-editor.el-input__wrapper.is-focus,
 .el-date-editor .el-input__wrapper.is-focus {
+  transform: translateY(-1px) scale(1.004);
   box-shadow:
     0 0 0 1px rgba(47, 124, 152, 0.28),
     0 0 0 5px rgba(87, 181, 231, 0.12),
-    0 12px 26px rgba(15, 30, 39, 0.08) !important;
+    0 16px 30px rgba(15, 30, 39, 0.1) !important;
 }
 
 .el-radio-group,
@@ -502,6 +616,8 @@ a[href]:active {
   align-items: flex-start !important;
   z-index: 3000 !important;
   backdrop-filter: blur(18px) !important;
+  animation: feedback-pop-in 0.52s var(--app-bounce);
+  transform-origin: top center;
 }
 
 .app-feedback-message::before {
@@ -510,6 +626,8 @@ a[href]:active {
   inset: 0 0 auto;
   height: 3px;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.18));
+  transform-origin: left center;
+  animation: feedback-progress 3.2s linear forwards;
 }
 
 .app-feedback-message::after {
@@ -521,12 +639,21 @@ a[href]:active {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   pointer-events: none;
+  animation: feedback-orb-drift 4.8s ease-in-out infinite;
 }
 
 .app-feedback-message .el-message__content {
   line-height: 1.5 !important;
   white-space: normal !important;
   word-break: break-word !important;
+}
+
+.app-feedback-message .el-message__closeBtn {
+  transition: transform var(--app-ease), opacity var(--app-ease);
+}
+
+.app-feedback-message .el-message__closeBtn:hover {
+  transform: scale(1.08);
 }
 
 .app-feedback-message.el-message--success {
@@ -595,5 +722,39 @@ a[href]:active {
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes feedback-pop-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -18px) scale(0.94);
+  }
+  58% {
+    opacity: 1;
+    transform: translate(-50%, 2px) scale(1.015);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@keyframes feedback-progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0.14);
+  }
+}
+
+@keyframes feedback-orb-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(18px, 12px, 0) scale(1.08);
   }
 }

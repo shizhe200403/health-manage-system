@@ -1,7 +1,7 @@
 <template>
   <div class="shell" :style="shellStyle" @pointermove="handleShellPointerMove" @pointerleave="resetShellPointer">
     <template v-if="showChrome">
-      <header class="topbar desktop-only">
+      <header class="topbar desktop-only shell-surface">
         <div class="brand">
           <div class="brand-topline">
             <p class="eyebrow">每日饮食</p>
@@ -10,7 +10,7 @@
           <h1>饮食执行助手</h1>
           <p class="subtitle">把“今天还差什么、下一餐吃什么、顺手怎么记”压成一条更轻、更快的执行链路。</p>
         </div>
-        <nav class="nav" aria-label="主导航">
+        <nav class="nav shell-surface" aria-label="主导航">
           <RouterLink v-for="item in primaryNavItems" :key="item.to" :to="item.to">
             <span>{{ item.label }}</span>
             <small>{{ item.copy }}</small>
@@ -23,6 +23,10 @@
             </button>
             <Transition name="menu-float">
               <div v-if="moreMenuOpen" class="more-menu">
+                <div class="more-menu-intro">
+                  <span>低频管理</span>
+                  <strong>把需要偶尔处理的功能收在这里，主线就不会被打断。</strong>
+                </div>
                 <RouterLink v-for="item in secondaryNavItems" :key="item.to" :to="item.to" @click="moreMenuOpen = false">
                   <strong>{{ item.label }}</strong>
                   <span>{{ item.copy }}</span>
@@ -55,13 +59,17 @@
     <main class="content" :class="{ 'with-mobile-nav': showChrome, 'with-mobile-nav-open': showChrome && mobileNavOpen }">
       <div class="content-inner">
         <Transition name="ribbon-float" mode="out-in">
-          <article v-if="showChrome" :key="route.path" class="floating-ribbon">
+          <article v-if="showChrome" :key="route.path" v-spotlight class="floating-ribbon interactive-spotlight">
             <div class="floating-ribbon-copy">
               <span>{{ currentRouteMoment.badge }}</span>
               <strong>{{ currentRouteMoment.title }}</strong>
               <p>{{ currentRouteMoment.copy }}</p>
             </div>
             <div class="floating-ribbon-actions">
+              <div class="ribbon-status">
+                <span class="ribbon-status-dot" aria-hidden="true" />
+                <strong>{{ currentRouteMoment.hint }}</strong>
+              </div>
               <RouterLink class="ribbon-link" :to="currentRouteMoment.to">{{ currentRouteMoment.cta }}</RouterLink>
               <p class="ribbon-meta">{{ auth.user ? `继续中：${auth.user?.nickname || auth.user?.username}` : "欢迎回来，继续把今天推进一点点" }}</p>
             </div>
@@ -147,15 +155,15 @@ const navItems = [
 ];
 const primaryNavPaths = ["/", "/records", "/recipes", "/favorites"];
 const routeMoments = [
-  { path: "/", badge: "Today Flow", title: "先把今天最值得做的动作点出来", copy: "首页应该像晨间工作台，而不是总览页。先看缺口，再定下一餐。", cta: "去记下一餐", to: "/records" },
-  { path: "/records", badge: "Quick Capture", title: "把记录动作压到最顺手", copy: "现在适合直接完成一餐，而不是继续找入口。先记上，再决定要不要细化。", cta: "看看收藏选餐", to: "/favorites" },
-  { path: "/recipes", badge: "Meal Library", title: "把下一餐选得更轻松", copy: "菜谱页不只是看内容，更应该帮你更快决定这顿吃什么。", cta: "去记录页带入", to: "/records" },
-  { path: "/favorites", badge: "Fast Return", title: "常吃内容应该越用越快", copy: "收藏不是终点，它更像你日常执行时最快回来的那条路。", cta: "继续去记录", to: "/records" },
-  { path: "/reports", badge: "Weekly Review", title: "先看结论，再把下周动作收紧", copy: "报表页不该只给数字，更该把下一步讲清楚。", cta: "打开 AI 行动版", to: "/assistant" },
-  { path: "/assistant", badge: "Task Co-Pilot", title: "把 AI 放到你刚好卡住的那一步", copy: "AI 最有用的时候，不是闲聊，而是帮你把当前动作做完。", cta: "回首页继续", to: "/" },
-  { path: "/goals", badge: "Goal Focus", title: "目标页更适合做节奏校准", copy: "阶段目标不需要天天改，但需要在你偏离时把主线拉回来。", cta: "回首页看今天", to: "/" },
-  { path: "/community", badge: "Shared Notes", title: "社区更像灵感补给，不该盖过主线", copy: "看看别人怎么做可以，但别让今天的执行动作被内容流打断。", cta: "回到记录页", to: "/records" },
-  { path: "/profile", badge: "Profile Ready", title: "资料越完整，系统建议越像真的懂你", copy: "健康档案是系统判断下一步的底层信息，不需要花哨，但需要清楚。", cta: "回首页继续", to: "/" },
+  { path: "/", badge: "Today Flow", title: "先把今天最值得做的动作点出来", copy: "首页应该像晨间工作台，而不是总览页。先看缺口，再定下一餐。", hint: "先看缺口，再动手", cta: "去记下一餐", to: "/records" },
+  { path: "/records", badge: "Quick Capture", title: "把记录动作压到最顺手", copy: "现在适合直接完成一餐，而不是继续找入口。先记上，再决定要不要细化。", hint: "先记上，细化可以稍后", cta: "看看收藏选餐", to: "/favorites" },
+  { path: "/recipes", badge: "Meal Library", title: "把下一餐选得更轻松", copy: "菜谱页不只是看内容，更应该帮你更快决定这顿吃什么。", hint: "别选太久，先锁定一份", cta: "去记录页带入", to: "/records" },
+  { path: "/favorites", badge: "Fast Return", title: "常吃内容应该越用越快", copy: "收藏不是终点，它更像你日常执行时最快回来的那条路。", hint: "常吃内容要越点越顺手", cta: "继续去记录", to: "/records" },
+  { path: "/reports", badge: "Weekly Review", title: "先看结论，再把下周动作收紧", copy: "报表页不该只给数字，更该把下一步讲清楚。", hint: "结论要比数字更先到位", cta: "打开 AI 行动版", to: "/assistant" },
+  { path: "/assistant", badge: "Task Co-Pilot", title: "把 AI 放到你刚好卡住的那一步", copy: "AI 最有用的时候，不是闲聊，而是帮你把当前动作做完。", hint: "卡住时再叫它最值", cta: "回首页继续", to: "/" },
+  { path: "/goals", badge: "Goal Focus", title: "目标页更适合做节奏校准", copy: "阶段目标不需要天天改，但需要在你偏离时把主线拉回来。", hint: "目标负责校准，不负责打断", cta: "回首页看今天", to: "/" },
+  { path: "/community", badge: "Shared Notes", title: "社区更像灵感补给，不该盖过主线", copy: "看看别人怎么做可以，但别让今天的执行动作被内容流打断。", hint: "逛一会儿就够，主线更重要", cta: "回到记录页", to: "/records" },
+  { path: "/profile", badge: "Profile Ready", title: "资料越完整，系统建议越像真的懂你", copy: "健康档案是系统判断下一步的底层信息，不需要花哨，但需要清楚。", hint: "底层信息补齐，建议才会更准", cta: "回首页继续", to: "/" },
 ];
 
 const showChrome = computed(() => route.path !== "/login");
@@ -241,6 +249,22 @@ function resetShellPointer() {
   border-bottom: 1px solid rgba(16, 34, 42, 0.08);
   box-shadow: 0 14px 40px rgba(18, 32, 44, 0.06);
   backdrop-filter: blur(18px);
+}
+
+.shell-surface {
+  position: relative;
+  overflow: hidden;
+}
+
+.shell-surface::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.44), transparent 28%),
+    linear-gradient(120deg, transparent 10%, rgba(255, 255, 255, 0.28), transparent 42%);
+  opacity: 0.72;
+  pointer-events: none;
 }
 
 .mobile-topbar {
@@ -367,6 +391,30 @@ h1 {
   border: 1px solid rgba(16, 34, 42, 0.08);
   box-shadow: 0 28px 48px rgba(15, 30, 39, 0.16);
   backdrop-filter: blur(22px);
+}
+
+.more-menu-intro {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(23, 48, 66, 0.96), rgba(35, 75, 96, 0.92)),
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.18), transparent 38%);
+  box-shadow: 0 16px 28px rgba(15, 30, 39, 0.18);
+}
+
+.more-menu-intro span {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.64);
+}
+
+.more-menu-intro strong {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #fff;
 }
 
 .more-menu a {
@@ -501,6 +549,32 @@ h1 {
   min-width: 220px;
 }
 
+.ribbon-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  box-shadow: 0 10px 24px rgba(15, 30, 39, 0.08);
+}
+
+.ribbon-status strong {
+  font-size: 12px;
+  color: #284c5d;
+  letter-spacing: 0.02em;
+}
+
+.ribbon-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #57b5e7, #22c55e);
+  box-shadow: 0 0 0 6px rgba(87, 181, 231, 0.14);
+  animation: ribbon-status-pulse 2.4s ease-in-out infinite;
+}
+
 .ribbon-link {
   display: inline-flex;
   align-items: center;
@@ -561,6 +635,18 @@ h1 {
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ribbon-status-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(87, 181, 231, 0.14);
+  }
+  50% {
+    transform: scale(1.12);
+    box-shadow: 0 0 0 9px rgba(87, 181, 231, 0.08);
   }
 }
 
@@ -756,6 +842,10 @@ h1 {
   .floating-ribbon-actions {
     min-width: 0;
     justify-items: stretch;
+  }
+
+  .ribbon-status {
+    justify-content: center;
   }
 
   .ribbon-link {
