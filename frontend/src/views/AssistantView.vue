@@ -96,7 +96,8 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref, onMounted } from "vue";
+import { nextTick, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { chatSSE, createConversation, deleteConversation, getConversation, listConversations } from "../api/assistant";
 import { notifyActionError, notifyActionSuccess } from "../lib/feedback";
 import { ElMessageBox } from "element-plus";
@@ -104,6 +105,8 @@ import { ElMessageBox } from "element-plus";
 interface Conversation { id: number; title: string; created_at: string; updated_at: string }
 interface Message { id: number; role: string; content: string; created_at: string }
 
+const route = useRoute();
+const router = useRouter();
 const conversations = ref<Conversation[]>([]);
 const currentConvId = ref<number | null>(null);
 const messages = ref<Message[]>([]);
@@ -114,6 +117,8 @@ const creating = ref(false);
 const deletingId = ref<number | null>(null);
 const loadingMessages = ref(false);
 const messagesEl = ref<HTMLElement | null>(null);
+const autoLaunching = ref(false);
+const handledPromptToken = ref("");
 
 function renderContent(text: string) {
   return text
@@ -189,12 +194,30 @@ async function removeConversation(id: number) {
   }
 }
 
-async function sendMessage() {
-  const text = inputText.value.trim();
-  if (!text || !currentConvId.value || streaming.value) return;
+async function ensureConversation(forceNew = false) {
+  if (currentConvId.value && !forceNew) {
+    return currentConvId.value;
+  }
+  creating.value = true;
+  try {
+    const res = await createConversation();
+    const conv = res.data;
+    conversations.value = [conv, ...conversations.value];
+    currentConvId.value = conv.id;
+    messages.value = [];
+    return conv.id;
+  } finally {
+    creating.value = false;
+  }
+}
 
-  inputText.value = "";
-  messages.value.push({ id: Date.now(), role: "user", content: text, created_at: new Date().toISOString() });
+function sendPrompt(text: string) {
+  const prompt = text.trim();
+  if (!prompt || !currentConvId.value || streaming.value) {
+    return;
+  }
+
+  messages.value.push({ id: Date.now(), role: "user", content: prompt, created_at: new Date().toISOString() });
   scrollToBottom();
 
   streaming.value = true;
@@ -202,7 +225,7 @@ async function sendMessage() {
 
   chatSSE(
     currentConvId.value,
-    text,
+    prompt,
     (chunk) => {
       streamingContent.value += chunk;
       scrollToBottom();
@@ -211,7 +234,6 @@ async function sendMessage() {
       messages.value.push({ id: Date.now() + 1, role: "assistant", content: streamingContent.value, created_at: new Date().toISOString() });
       streamingContent.value = "";
       streaming.value = false;
-      // Update conversation title in list
       loadConversations();
       scrollToBottom();
     },
@@ -223,7 +245,52 @@ async function sendMessage() {
   );
 }
 
-onMounted(loadConversations);
+async function sendMessage() {
+  const text = inputText.value.trim();
+  if (!text || streaming.value) return;
+  if (!currentConvId.value) {
+    await ensureConversation();
+  }
+  inputText.value = "";
+  sendPrompt(text);
+}
+
+async function launchPromptFromRoute() {
+  const prompt = String(route.query.prompt || "").trim();
+  const source = String(route.query.source || "").trim();
+  const token = `${source}::${prompt}`;
+  if (!prompt || handledPromptToken.value === token || autoLaunching.value || streaming.value) {
+    return;
+  }
+
+  autoLaunching.value = true;
+  handledPromptToken.value = token;
+  try {
+    await ensureConversation(true);
+    sendPrompt(prompt);
+    const nextQuery = { ...route.query };
+    delete nextQuery.prompt;
+    delete nextQuery.source;
+    router.replace({ path: route.path, query: nextQuery });
+  } catch {
+    handledPromptToken.value = "";
+    notifyActionError("初始化任务对话");
+  } finally {
+    autoLaunching.value = false;
+  }
+}
+
+onMounted(async () => {
+  await loadConversations();
+  await launchPromptFromRoute();
+});
+
+watch(
+  () => route.fullPath,
+  () => {
+    launchPromptFromRoute();
+  },
+);
 </script>
 
 <style scoped>

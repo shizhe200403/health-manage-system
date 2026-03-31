@@ -56,6 +56,7 @@
             <el-button v-else type="primary" @click="triggerRecommendedGeneration(reviewFallbackType)">
               {{ reviewFallbackType === "monthly" ? "生成推荐月报" : "生成推荐周报" }}
             </el-button>
+            <el-button plain @click="openAssistantForReview">让 AI 解释这次复盘</el-button>
             <a v-if="latestCompletedTask?.file_url" class="review-link" :href="latestCompletedTask.file_url" target="_blank" rel="noreferrer">打开最新报表</a>
           </div>
         </div>
@@ -872,6 +873,28 @@ async function handleReportSuggestion(item: {
     return;
   }
   await triggerRecommendedGeneration(item.action.reportType);
+}
+
+function openAssistantForReview() {
+  const prompt = [
+    "请基于我当前的报表页状态，用直接、可执行的语言解释这次复盘结论。",
+    `当前复盘标题：${reviewHeadline.value}。`,
+    `当前复盘摘要：${reviewSummary.value}。`,
+    `最近7天活跃天数：${readiness.week.activeDays}。`,
+    `最近7天餐次：${readiness.week.meals}。`,
+    `最近30天活跃天数：${readiness.month.activeDays}。`,
+    `日均蛋白估算：${weekAverageProtein.value.toFixed(1)} g。`,
+    primaryReviewSuggestion.value ? `当前推荐动作：${primaryReviewSuggestion.value.title}。` : "当前没有单独推荐动作。",
+    "请输出三部分：1）这次复盘最主要的问题是什么；2）哪些习惯值得保留；3）下周如果只改一件事，先改什么。",
+  ].join("\n");
+
+  router.push({
+    path: "/assistant",
+    query: {
+      source: "reports_review_explain",
+      prompt,
+    },
+  });
 }
 
 function syncPolling() {

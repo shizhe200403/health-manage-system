@@ -38,6 +38,7 @@
           <div class="today-primary-actions">
             <el-button type="primary" @click="goToNextMealRecord">{{ primaryRecordButtonLabel }}</el-button>
             <el-button v-if="todaySuggestedRecipe" plain @click="addToRecord(todaySuggestedRecipe)">一键带入推荐菜</el-button>
+            <el-button plain @click="openAssistantForTodayPlan">让 AI 解释今天下一步</el-button>
           </div>
         </div>
 
@@ -902,6 +903,26 @@ function goToNextMealRecord() {
     query: {
       meal_type: nextMealFocusType.value,
       note: `今天的${mealTypeLabel(nextMealFocusType.value)}`,
+    },
+  });
+}
+
+function openAssistantForTodayPlan() {
+  const prompt = [
+    "请基于我当前首页状态，用非常直接、可执行的话告诉我今天下一步怎么做。",
+    `今天已记录餐次：${todayCompletedMealCount.value}。`,
+    `当前建议优先补：${mealTypeLabel(nextMealFocusType.value)}。`,
+    `今日热量：${formatMetric(todayMetrics.energy, "kcal")}，目标：${formatMetric(calorieTargetNumber.value, "kcal")}。`,
+    `今日蛋白：${formatMetric(todayMetrics.protein, "g")}，目标：${formatMetric(proteinTargetNumber.value, "g")}。`,
+    todaySuggestedRecipe.value ? `当前更省事的下一餐候选：${todaySuggestedRecipe.value.title}。` : "当前还没有明确的下一餐候选。",
+    "请输出三部分：1）一句话判断我现在最该做什么；2）为什么；3）我点进记录页后应该怎么记。",
+  ].join("\n");
+
+  router.push({
+    path: "/assistant",
+    query: {
+      source: "home_today_workbench",
+      prompt,
     },
   });
 }
