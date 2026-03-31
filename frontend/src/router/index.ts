@@ -13,7 +13,7 @@ const router = createRouter({
     { path: "/reports", component: () => import("../views/ReportsView.vue") },
     { path: "/profile", component: () => import("../views/ProfileView.vue") },
     { path: "/assistant", component: () => import("../views/AssistantView.vue") },
-    { path: "/admin/users", component: () => import("../views/AdminUsersView.vue"), meta: { requiresAdmin: true } },
+    { path: "/ops/users", component: () => import("../views/AdminUsersView.vue"), meta: { requiresAdmin: true } },
   ],
 });
 
