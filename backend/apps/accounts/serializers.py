@@ -61,6 +61,8 @@ class UserSerializer(serializers.ModelSerializer):
             "nickname",
             "signature",
             "avatar_url",
+            "is_staff",
+            "is_superuser",
             "profile",
             "health_condition",
         ]
@@ -151,3 +153,96 @@ class FlexibleTokenObtainPairSerializer(serializers.Serializer):
 
         attrs["user"] = authenticated
         return attrs
+
+
+class AdminUserListSerializer(serializers.ModelSerializer):
+    profile_completion = serializers.SerializerMethodField()
+    health_flags = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "username",
+            "nickname",
+            "email",
+            "phone",
+            "role",
+            "status",
+            "date_joined",
+            "last_login",
+            "profile_completion",
+            "health_flags",
+        ]
+
+    def get_profile_completion(self, obj):
+        profile = getattr(obj, "profile", None)
+        if profile is None:
+            return 0
+
+        filled_fields = [
+            bool(profile.height_cm),
+            bool(profile.weight_kg),
+            bool(profile.target_weight_kg),
+            bool(profile.activity_level),
+            bool(profile.diet_type),
+            bool(profile.meal_preference),
+            bool(profile.occupation),
+        ]
+        return round(sum(filled_fields) / len(filled_fields) * 100)
+
+    def get_health_flags(self, obj):
+        health = getattr(obj, "health_condition", None)
+        if health is None:
+            return []
+
+        labels = []
+        if health.has_diabetes:
+            labels.append("糖尿病")
+        if health.has_hypertension:
+            labels.append("高血压")
+        if health.has_hyperlipidemia:
+            labels.append("高血脂")
+        if health.has_allergy:
+            labels.append("过敏")
+        return labels
+
+
+class AdminUserDetailSerializer(serializers.ModelSerializer):
+    profile = UserProfileSerializer(read_only=True)
+    health_condition = UserHealthConditionSerializer(read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "username",
+            "email",
+            "phone",
+            "role",
+            "status",
+            "nickname",
+            "signature",
+            "avatar_url",
+            "is_staff",
+            "is_superuser",
+            "date_joined",
+            "last_login",
+            "profile",
+            "health_condition",
+        ]
+
+
+class AdminUserUpdateSerializer(UserUpdateSerializer):
+    class Meta(UserUpdateSerializer.Meta):
+        fields = UserUpdateSerializer.Meta.fields + ["role", "status"]
+
+    def validate_role(self, value):
+        if value not in dict(User.ROLE_CHOICES):
+            raise serializers.ValidationError("角色不合法")
+        return value
+
+    def validate_status(self, value):
+        if value not in dict(User.STATUS_CHOICES):
+            raise serializers.ValidationError("状态不合法")
+        return value

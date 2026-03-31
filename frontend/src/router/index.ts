@@ -13,6 +13,7 @@ const router = createRouter({
     { path: "/reports", component: () => import("../views/ReportsView.vue") },
     { path: "/profile", component: () => import("../views/ProfileView.vue") },
     { path: "/assistant", component: () => import("../views/AssistantView.vue") },
+    { path: "/admin/users", component: () => import("../views/AdminUsersView.vue"), meta: { requiresAdmin: true } },
   ],
 });
 
@@ -23,6 +24,13 @@ router.beforeEach((to) => {
   }
   if (token && to.path === "/login") {
     return "/";
+  }
+  if (to.meta.requiresAdmin) {
+    const role = localStorage.getItem("user_role");
+    const isSuperuser = localStorage.getItem("user_is_superuser") === "true";
+    if ((role || isSuperuser) && role !== "admin" && !isSuperuser) {
+      return "/";
+    }
   }
   return true;
 });

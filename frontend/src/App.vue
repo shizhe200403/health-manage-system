@@ -16,6 +16,7 @@
           </RouterLink>
         </nav>
         <div class="user-box">
+          <RouterLink v-if="isAdminUser" class="ghost admin-entry" to="/admin/users">后台</RouterLink>
           <div class="more-menu-wrap">
             <button class="ghost more-trigger" type="button" :aria-expanded="moreMenuOpen" @click="moreMenuOpen = !moreMenuOpen">
               更多
@@ -108,6 +109,15 @@
           <div class="mobile-rail-group">
             <span class="mobile-rail-label">更多</span>
             <RouterLink
+              v-if="isAdminUser"
+              to="/admin/users"
+              class="mobile-rail-link"
+              @click="mobileNavOpen = false"
+            >
+              <span class="mobile-rail-icon">管</span>
+              <span>后台</span>
+            </RouterLink>
+            <RouterLink
               v-for="item in secondaryNavItems"
               :key="item.to"
               :to="item.to"
@@ -166,12 +176,17 @@ const routeMoments = [
   { path: "/goals", badge: "Goal Focus", title: "目标页更适合做节奏校准", copy: "阶段目标不需要天天改，但需要在你偏离时把主线拉回来。", hint: "目标负责校准，不负责打断", cta: "回首页看今天", to: "/" },
   { path: "/community", badge: "Shared Notes", title: "社区更像灵感补给，不该盖过主线", copy: "看看别人怎么做可以，但别让今天的执行动作被内容流打断。", hint: "逛一会儿就够，主线更重要", cta: "回到记录页", to: "/records" },
   { path: "/profile", badge: "Profile Ready", title: "资料越完整，系统建议越像真的懂你", copy: "健康档案是系统判断下一步的底层信息，不需要花哨，但需要清楚。", hint: "底层信息补齐，建议才会更准", cta: "回首页继续", to: "/" },
+  { path: "/admin/users", badge: "Admin Desk", title: "先把用户状态和权限边界看清楚", copy: "后台第一步不是堆模块，而是先把账号、角色和资料质量管理稳。", hint: "先排权限，再排问题", cta: "回首页看今天", to: "/" },
 ];
 
 const showChrome = computed(() => route.path !== "/login");
 const primaryNavItems = computed(() => navItems.filter((item) => primaryNavPaths.includes(item.to)));
 const secondaryNavItems = computed(() => navItems.filter((item) => !primaryNavPaths.includes(item.to)));
-const currentTitle = computed(() => navItems.find((item) => item.to === route.path)?.label || "营养饮食助手");
+const isAdminUser = computed(() => Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser)));
+const currentTitle = computed(() => {
+  if (route.path === "/admin/users") return "后台用户";
+  return navItems.find((item) => item.to === route.path)?.label || "营养饮食助手";
+});
 const currentRouteMoment = computed(() => routeMoments.find((item) => item.path === route.path) ?? routeMoments[0]);
 const fallbackTickerTips = computed(() => [
   currentRouteMoment.value.hint,

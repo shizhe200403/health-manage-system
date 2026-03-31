@@ -122,6 +122,46 @@ class ProductApiSmokeTests(APITestCase):
         self.assertIsNotNone(nutrition_response.data["data"]["calorie_target"])
         self.assertIsNotNone(nutrition_response.data["data"]["protein_target"])
 
+    def test_admin_can_list_and_update_users(self):
+        admin_user = self._create_user(username="admin_user", email="admin@example.com", phone="13800000002")
+        admin_user.role = "admin"
+        admin_user.save(update_fields=["role"])
+        managed_user = self._create_user(username="carol", email="carol@example.com", phone="13800000003")
+
+        self._login("admin@example.com")
+
+        list_response = self.client.get("/api/v1/accounts/admin/users/?keyword=carol")
+        self.assertEqual(list_response.status_code, 200)
+        items = list_response.data["data"]["items"]
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["username"], "carol")
+
+        detail_response = self.client.patch(
+            f"/api/v1/accounts/admin/users/{managed_user.id}/",
+            {
+                "account": {"nickname": "Carol Ops", "status": "disabled"},
+                "profile": {"diet_type": "high_protein", "activity_level": "high"},
+                "health_condition": {"has_hypertension": True},
+            },
+            format="json",
+        )
+        self.assertEqual(detail_response.status_code, 200)
+
+        managed_user.refresh_from_db()
+        managed_user.profile.refresh_from_db()
+        managed_user.health_condition.refresh_from_db()
+        self.assertEqual(managed_user.nickname, "Carol Ops")
+        self.assertEqual(managed_user.status, "disabled")
+        self.assertEqual(managed_user.profile.diet_type, "high_protein")
+        self.assertTrue(managed_user.health_condition.has_hypertension)
+
+    def test_regular_user_cannot_access_admin_user_endpoints(self):
+        self._create_user()
+        self._login("alice")
+
+        response = self.client.get("/api/v1/accounts/admin/users/")
+        self.assertEqual(response.status_code, 403)
+
     def test_recipe_recommendation_and_favorite_flow(self):
         user = self._create_user()
         self._login("alice")

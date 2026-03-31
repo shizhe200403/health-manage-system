@@ -26,6 +26,8 @@ export const useAuthStore = defineStore("auth", {
       this.user = null;
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
+      localStorage.removeItem("user_role");
+      localStorage.removeItem("user_is_superuser");
     },
     async login(username: string, password: string) {
       const response = await loginApi(username, password);
@@ -37,6 +39,8 @@ export const useAuthStore = defineStore("auth", {
       const response = await getMe();
       this.user = response.data ?? null;
       this.ready = true;
+      localStorage.setItem("user_role", this.user?.role ?? "");
+      localStorage.setItem("user_is_superuser", String(Boolean(this.user?.is_superuser)));
     },
   },
 });
