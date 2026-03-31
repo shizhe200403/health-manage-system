@@ -1,6 +1,12 @@
 <template>
-  <div class="shell" :style="shellStyle" @pointermove="handleShellPointerMove" @pointerleave="resetShellPointer">
-    <template v-if="showChrome">
+  <div
+    class="shell"
+    :class="{ 'admin-shell-root': isAdminRoute }"
+    :style="shellStyle"
+    @pointermove="handleShellPointerMove"
+    @pointerleave="resetShellPointer"
+  >
+    <template v-if="showChrome && !isAdminRoute">
       <header class="topbar desktop-only shell-surface">
         <div class="brand">
           <div class="brand-topline">
@@ -16,7 +22,7 @@
           </RouterLink>
         </nav>
         <div class="user-box">
-          <RouterLink v-if="isAdminUser" class="ghost admin-entry" to="/ops/users">后台</RouterLink>
+          <RouterLink v-if="isAdminUser" class="ghost admin-entry" to="/ops">后台</RouterLink>
           <div ref="moreMenuWrapRef" class="more-menu-wrap">
             <button ref="moreTriggerRef" class="ghost more-trigger" type="button" :aria-expanded="moreMenuOpen" @click="toggleMoreMenu">
               更多
@@ -30,8 +36,8 @@
       <header class="mobile-topbar mobile-only">
         <div>
           <p class="mobile-eyebrow">每日饮食</p>
-          <strong>{{ currentTitle }}</strong>
-          <p class="mobile-subtitle">{{ currentRouteMoment.copy }}</p>
+          <strong>{{ currentFrontTitle }}</strong>
+          <p class="mobile-subtitle">{{ currentFrontMoment.copy }}</p>
         </div>
         <button class="ghost mobile-nav-trigger" type="button" :aria-expanded="mobileNavOpen" @click="mobileNavOpen = !mobileNavOpen">
           <span class="hamburger-mark" aria-hidden="true">
@@ -42,107 +48,261 @@
           <span>{{ mobileNavOpen ? "收起" : "导航" }}</span>
         </button>
       </header>
+
+      <Teleport to="body">
+        <Transition name="menu-float">
+          <div v-if="moreMenuOpen" ref="moreMenuRef" class="more-menu more-menu-portal" :style="moreMenuStyle">
+            <div class="more-menu-intro">
+              <span>低频管理</span>
+              <strong>把需要偶尔处理的功能收在这里，主线就不会被打断。</strong>
+            </div>
+            <RouterLink v-for="item in secondaryNavItems" :key="item.to" :to="item.to" @click="moreMenuOpen = false">
+              <strong>{{ item.label }}</strong>
+              <span>{{ item.copy }}</span>
+            </RouterLink>
+          </div>
+        </Transition>
+      </Teleport>
+
+      <main class="content" :class="{ 'with-mobile-nav': true, 'with-mobile-nav-open': mobileNavOpen }">
+        <div class="content-inner">
+          <Transition name="ribbon-float" mode="out-in">
+            <article :key="route.path" class="floating-ribbon news-ticker">
+              <div class="ticker-label">
+                <span class="ribbon-status-dot" aria-hidden="true" />
+                <strong>今日建议</strong>
+              </div>
+              <div class="ticker-viewport" aria-label="今日建议播报">
+                <div class="ticker-track">
+                  <span v-for="(message, index) in tickerLoopMessages" :key="`${route.path}-${index}-${message}`" class="ticker-item">
+                    {{ message }}
+                  </span>
+                </div>
+              </div>
+              <RouterLink class="ticker-action" :to="currentFrontMoment.to">{{ currentFrontMoment.cta }}</RouterLink>
+            </article>
+          </Transition>
+          <RouterView v-slot="{ Component, route: currentRoute }">
+            <Transition name="route-shell" mode="out-in">
+              <component :is="Component" :key="currentRoute.path" />
+            </Transition>
+          </RouterView>
+        </div>
+      </main>
+
+      <nav class="mobile-rail mobile-only" :class="{ open: mobileNavOpen }" aria-label="移动端快捷导航">
+        <button class="mobile-rail-toggle" type="button" :aria-expanded="mobileNavOpen" @click="mobileNavOpen = !mobileNavOpen">
+          <span class="hamburger-mark" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
+          <span>{{ mobileNavOpen ? "隐藏导航" : "展开导航" }}</span>
+        </button>
+        <Transition name="rail-float">
+          <div v-if="mobileNavOpen" class="mobile-rail-scroll">
+            <div class="mobile-rail-group">
+              <span class="mobile-rail-label">常用</span>
+              <RouterLink
+                v-for="item in primaryNavItems"
+                :key="item.to"
+                :to="item.to"
+                class="mobile-rail-link"
+                @click="mobileNavOpen = false"
+              >
+                <span class="mobile-rail-icon">{{ item.icon }}</span>
+                <span>{{ item.label }}</span>
+              </RouterLink>
+            </div>
+            <div class="mobile-rail-group">
+              <span class="mobile-rail-label">更多</span>
+              <RouterLink
+                v-if="isAdminUser"
+                to="/ops"
+                class="mobile-rail-link"
+                @click="mobileNavOpen = false"
+              >
+                <span class="mobile-rail-icon">管</span>
+                <span>后台</span>
+              </RouterLink>
+              <RouterLink
+                v-for="item in secondaryNavItems"
+                :key="item.to"
+                :to="item.to"
+                class="mobile-rail-link"
+                @click="mobileNavOpen = false"
+              >
+                <span class="mobile-rail-icon">{{ item.icon }}</span>
+                <span>{{ item.label }}</span>
+              </RouterLink>
+            </div>
+            <button v-if="auth.isAuthenticated" class="mobile-rail-link mobile-rail-logout" type="button" @click="handleMobileLogout">
+              <span class="mobile-rail-icon">退</span>
+              <span>退出</span>
+            </button>
+          </div>
+        </Transition>
+      </nav>
     </template>
 
-    <Teleport to="body">
-      <Transition name="menu-float">
-        <div v-if="moreMenuOpen" ref="moreMenuRef" class="more-menu more-menu-portal" :style="moreMenuStyle">
-          <div class="more-menu-intro">
-            <span>低频管理</span>
-            <strong>把需要偶尔处理的功能收在这里，主线就不会被打断。</strong>
-          </div>
-          <RouterLink v-for="item in secondaryNavItems" :key="item.to" :to="item.to" @click="moreMenuOpen = false">
-            <strong>{{ item.label }}</strong>
-            <span>{{ item.copy }}</span>
-          </RouterLink>
+    <template v-else-if="showChrome && isAdminRoute">
+      <header class="admin-mobile-topbar mobile-only">
+        <div class="admin-mobile-copy">
+          <p class="mobile-eyebrow">Admin Console</p>
+          <strong>{{ currentAdminMoment.label }}</strong>
+          <p class="mobile-subtitle">{{ currentAdminMoment.copy }}</p>
         </div>
-      </Transition>
-    </Teleport>
+        <button class="ghost mobile-nav-trigger" type="button" :aria-expanded="adminMobileNavOpen" @click="adminMobileNavOpen = !adminMobileNavOpen">
+          <span class="hamburger-mark" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
+          <span>{{ adminMobileNavOpen ? "收起" : "导航" }}</span>
+        </button>
+      </header>
 
-    <main class="content" :class="{ 'with-mobile-nav': showChrome, 'with-mobile-nav-open': showChrome && mobileNavOpen }">
-      <div class="content-inner">
-        <Transition name="ribbon-float" mode="out-in">
-          <article v-if="showChrome" :key="route.path" class="floating-ribbon news-ticker">
-            <div class="ticker-label">
-              <span class="ribbon-status-dot" aria-hidden="true" />
-              <strong>今日建议</strong>
-            </div>
-            <div class="ticker-viewport" aria-label="今日建议播报">
-              <div class="ticker-track">
-                <span v-for="(message, index) in tickerLoopMessages" :key="`${route.path}-${index}-${message}`" class="ticker-item">
-                  {{ message }}
+      <div class="admin-shell-layout">
+        <aside class="admin-sidebar desktop-only">
+          <div class="admin-brand shell-surface">
+            <p class="eyebrow">Admin Console</p>
+            <h2>饮食管理台</h2>
+            <p>把权限、账号状态和资料质量先稳住，后台才算真正成型。</p>
+          </div>
+
+          <div class="admin-sidebar-group">
+            <span class="admin-section-label">后台主线</span>
+            <nav class="admin-nav" aria-label="后台导航">
+              <RouterLink v-for="item in adminNavItems" :key="item.to" :to="item.to" class="admin-nav-link">
+                <span class="admin-nav-icon">{{ item.icon }}</span>
+                <span class="admin-nav-copy">
+                  <strong>{{ item.label }}</strong>
+                  <small>{{ item.copy }}</small>
                 </span>
+              </RouterLink>
+            </nav>
+          </div>
+
+          <div class="admin-sidebar-group">
+            <span class="admin-section-label">前台入口</span>
+            <div class="admin-subnav">
+              <RouterLink v-for="item in primaryNavItems" :key="item.to" :to="item.to" class="admin-subnav-link">
+                <span>{{ item.label }}</span>
+                <small>{{ item.copy }}</small>
+              </RouterLink>
+            </div>
+          </div>
+
+          <div class="admin-sidebar-footer">
+            <div class="admin-operator">
+              <span class="admin-operator-label">当前值守</span>
+              <strong>{{ auth.user?.nickname || auth.user?.username || "管理员" }}</strong>
+            </div>
+            <button v-if="auth.isAuthenticated" class="ghost admin-logout" @click="logout">退出</button>
+          </div>
+        </aside>
+
+        <div class="admin-workspace">
+          <header class="admin-topbar desktop-only">
+            <div class="admin-topbar-copy">
+              <p class="eyebrow">{{ currentAdminMoment.badge }}</p>
+              <h1 class="admin-title">{{ currentAdminMoment.label }}</h1>
+              <p class="admin-subtitle">{{ currentAdminMoment.copy }}</p>
+            </div>
+            <div class="admin-topbar-actions">
+              <RouterLink class="ghost admin-return" to="/">回到前台</RouterLink>
+              <div class="admin-user-chip">
+                <span>管理员</span>
+                <strong>{{ auth.user?.nickname || auth.user?.username }}</strong>
               </div>
             </div>
-            <RouterLink class="ticker-action" :to="currentRouteMoment.to">{{ currentRouteMoment.cta }}</RouterLink>
-          </article>
-        </Transition>
-        <RouterView v-slot="{ Component, route: currentRoute }">
-          <Transition name="route-shell" mode="out-in">
-            <component :is="Component" :key="currentRoute.path" />
-          </Transition>
-        </RouterView>
-      </div>
-    </main>
+          </header>
 
-    <nav v-if="showChrome" class="mobile-rail mobile-only" :class="{ open: mobileNavOpen }" aria-label="移动端快捷导航">
-      <button class="mobile-rail-toggle" type="button" :aria-expanded="mobileNavOpen" @click="mobileNavOpen = !mobileNavOpen">
-        <span class="hamburger-mark" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-        </span>
-        <span>{{ mobileNavOpen ? "隐藏导航" : "展开导航" }}</span>
-      </button>
-      <Transition name="rail-float">
-        <div v-if="mobileNavOpen" class="mobile-rail-scroll">
-          <div class="mobile-rail-group">
-            <span class="mobile-rail-label">常用</span>
-            <RouterLink
-              v-for="item in primaryNavItems"
-              :key="item.to"
-              :to="item.to"
-              class="mobile-rail-link"
-              @click="mobileNavOpen = false"
-            >
-              <span class="mobile-rail-icon">{{ item.icon }}</span>
-              <span>{{ item.label }}</span>
-            </RouterLink>
-          </div>
-          <div class="mobile-rail-group">
-            <span class="mobile-rail-label">更多</span>
-            <RouterLink
-              v-if="isAdminUser"
-              to="/ops/users"
-              class="mobile-rail-link"
-              @click="mobileNavOpen = false"
-            >
-              <span class="mobile-rail-icon">管</span>
-              <span>后台</span>
-            </RouterLink>
-            <RouterLink
-              v-for="item in secondaryNavItems"
-              :key="item.to"
-              :to="item.to"
-              class="mobile-rail-link"
-              @click="mobileNavOpen = false"
-            >
-              <span class="mobile-rail-icon">{{ item.icon }}</span>
-              <span>{{ item.label }}</span>
-            </RouterLink>
-          </div>
-          <button v-if="auth.isAuthenticated" class="mobile-rail-link mobile-rail-logout" type="button" @click="handleMobileLogout">
-            <span class="mobile-rail-icon">退</span>
-            <span>退出</span>
-          </button>
+          <main class="admin-content">
+            <Transition name="ribbon-float" mode="out-in">
+              <article :key="route.path" class="floating-ribbon admin-pulse">
+                <div class="ticker-label">
+                  <span class="ribbon-status-dot" aria-hidden="true" />
+                  <strong>管理提醒</strong>
+                </div>
+                <div class="ticker-viewport" aria-label="后台管理提醒">
+                  <div class="ticker-track">
+                    <span v-for="(message, index) in adminTickerLoopMessages" :key="`${route.path}-admin-${index}-${message}`" class="ticker-item">
+                      {{ message }}
+                    </span>
+                  </div>
+                </div>
+                <RouterLink class="ticker-action" :to="currentAdminMoment.to">{{ currentAdminMoment.cta }}</RouterLink>
+              </article>
+            </Transition>
+
+            <div class="admin-content-inner">
+              <RouterView v-slot="{ Component, route: currentRoute }">
+                <Transition name="route-shell" mode="out-in">
+                  <component :is="Component" :key="currentRoute.path" />
+                </Transition>
+              </RouterView>
+            </div>
+          </main>
         </div>
+      </div>
+
+      <nav class="mobile-rail mobile-only admin-mobile-rail" :class="{ open: adminMobileNavOpen }" aria-label="后台移动端快捷导航">
+        <button class="mobile-rail-toggle" type="button" :aria-expanded="adminMobileNavOpen" @click="adminMobileNavOpen = !adminMobileNavOpen">
+          <span class="hamburger-mark" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
+          <span>{{ adminMobileNavOpen ? "隐藏导航" : "展开导航" }}</span>
+        </button>
+        <Transition name="rail-float">
+          <div v-if="adminMobileNavOpen" class="mobile-rail-scroll admin-mobile-scroll">
+            <div class="mobile-rail-group">
+              <span class="mobile-rail-label">后台主线</span>
+              <RouterLink
+                v-for="item in adminNavItems"
+                :key="item.to"
+                :to="item.to"
+                class="mobile-rail-link admin-mobile-link"
+                @click="adminMobileNavOpen = false"
+              >
+                <span class="mobile-rail-icon">{{ item.icon }}</span>
+                <span>{{ item.label }}</span>
+              </RouterLink>
+            </div>
+            <div class="mobile-rail-group">
+              <span class="mobile-rail-label">前台入口</span>
+              <RouterLink
+                v-for="item in primaryNavItems"
+                :key="item.to"
+                :to="item.to"
+                class="mobile-rail-link"
+                @click="adminMobileNavOpen = false"
+              >
+                <span class="mobile-rail-icon">{{ item.icon }}</span>
+                <span>{{ item.label }}</span>
+              </RouterLink>
+            </div>
+            <button v-if="auth.isAuthenticated" class="mobile-rail-link mobile-rail-logout" type="button" @click="handleAdminMobileLogout">
+              <span class="mobile-rail-icon">退</span>
+              <span>退出</span>
+            </button>
+          </div>
+        </Transition>
+      </nav>
+    </template>
+
+    <RouterView v-else v-slot="{ Component, route: currentRoute }">
+      <Transition name="route-shell" mode="out-in">
+        <component :is="Component" :key="currentRoute.path" />
       </Transition>
-    </nav>
+    </RouterView>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, watch, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { listHealthGoals } from "./api/goals";
 import { listMealRecords } from "./api/tracking";
@@ -152,6 +312,7 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const mobileNavOpen = ref(false);
+const adminMobileNavOpen = ref(false);
 const moreMenuOpen = ref(false);
 const moreMenuWrapRef = ref<HTMLElement | null>(null);
 const moreTriggerRef = ref<HTMLElement | null>(null);
@@ -168,43 +329,70 @@ const navItems = [
   { to: "/favorites", label: "收藏", icon: "藏", copy: "回到已经沉淀下来的常用选择" },
   { to: "/goals", label: "目标", icon: "标", copy: "管理重点目标与阶段进展" },
   { to: "/reports", label: "报表", icon: "报", copy: "生成周报和月报并做复盘" },
-  { to: "/assistant", label: "AI助手", icon: "智", copy: "和AI营养师对话，获取个性化建议" },
+  { to: "/assistant", label: "AI助手", icon: "智", copy: "和 AI 营养师对话，获取个性化建议" },
   { to: "/community", label: "社区", icon: "社", copy: "查看经验内容与互动反馈" },
   { to: "/profile", label: "我的", icon: "我", copy: "维护账号资料与健康档案" },
 ];
+
+const adminNavItems = [
+  { to: "/ops", label: "后台总览", icon: "览", copy: "先看今天的值守主线和后台建议" },
+  { to: "/ops/community", label: "社区审核", icon: "社", copy: "集中处理帖子审核、举报和评论隐藏" },
+  { to: "/ops/recipes", label: "菜谱管理", icon: "谱", copy: "集中处理菜谱状态、审核结论和内容质量" },
+  { to: "/ops/users", label: "用户管理", icon: "户", copy: "集中管理账号状态、角色边界和资料质量" },
+];
+
 const primaryNavPaths = ["/", "/records", "/recipes", "/favorites"];
-const routeMoments = [
-  { path: "/", badge: "Today Flow", title: "先把今天最值得做的动作点出来", copy: "首页应该像晨间工作台，而不是总览页。先看缺口，再定下一餐。", hint: "先看缺口，再动手", cta: "去记下一餐", to: "/records" },
-  { path: "/records", badge: "Quick Capture", title: "把记录动作压到最顺手", copy: "现在适合直接完成一餐，而不是继续找入口。先记上，再决定要不要细化。", hint: "先记上，细化可以稍后", cta: "看看收藏选餐", to: "/favorites" },
-  { path: "/recipes", badge: "Meal Library", title: "把下一餐选得更轻松", copy: "菜谱页不只是看内容，更应该帮你更快决定这顿吃什么。", hint: "别选太久，先锁定一份", cta: "去记录页带入", to: "/records" },
-  { path: "/favorites", badge: "Fast Return", title: "常吃内容应该越用越快", copy: "收藏不是终点，它更像你日常执行时最快回来的那条路。", hint: "常吃内容要越点越顺手", cta: "继续去记录", to: "/records" },
-  { path: "/reports", badge: "Weekly Review", title: "先看结论，再把下周动作收紧", copy: "报表页不该只给数字，更该把下一步讲清楚。", hint: "结论要比数字更先到位", cta: "打开 AI 行动版", to: "/assistant" },
-  { path: "/assistant", badge: "Task Co-Pilot", title: "把 AI 放到你刚好卡住的那一步", copy: "AI 最有用的时候，不是闲聊，而是帮你把当前动作做完。", hint: "卡住时再叫它最值", cta: "回首页继续", to: "/" },
-  { path: "/goals", badge: "Goal Focus", title: "目标页更适合做节奏校准", copy: "阶段目标不需要天天改，但需要在你偏离时把主线拉回来。", hint: "目标负责校准，不负责打断", cta: "回首页看今天", to: "/" },
-  { path: "/community", badge: "Shared Notes", title: "社区更像灵感补给，不该盖过主线", copy: "看看别人怎么做可以，但别让今天的执行动作被内容流打断。", hint: "逛一会儿就够，主线更重要", cta: "回到记录页", to: "/records" },
-  { path: "/profile", badge: "Profile Ready", title: "资料越完整，系统建议越像真的懂你", copy: "健康档案是系统判断下一步的底层信息，不需要花哨，但需要清楚。", hint: "底层信息补齐，建议才会更准", cta: "回首页继续", to: "/" },
-  { path: "/ops/users", badge: "Admin Desk", title: "先把用户状态和权限边界看清楚", copy: "后台第一步不是堆模块，而是先把账号、角色和资料质量管理稳。", hint: "先排权限，再排问题", cta: "回首页看今天", to: "/" },
+const frontRouteMoments = [
+  { path: "/", label: "首页", badge: "Today Flow", title: "先把今天最值得做的动作点出来", copy: "首页应该像晨间工作台，而不是总览页。先看缺口，再定下一餐。", hint: "先看缺口，再动手", cta: "去记下一餐", to: "/records" },
+  { path: "/records", label: "记录", badge: "Quick Capture", title: "把记录动作压到最顺手", copy: "现在适合直接完成一餐，而不是继续找入口。先记上，再决定要不要细化。", hint: "先记上，细化可以稍后", cta: "看看收藏选餐", to: "/favorites" },
+  { path: "/recipes", label: "菜谱", badge: "Meal Library", title: "把下一餐选得更轻松", copy: "菜谱页不只是看内容，更应该帮你更快决定这顿吃什么。", hint: "别选太久，先锁定一份", cta: "去记录页带入", to: "/records" },
+  { path: "/favorites", label: "收藏", badge: "Fast Return", title: "常吃内容应该越用越快", copy: "收藏不是终点，它更像你日常执行时最快回来的那条路。", hint: "常吃内容要越点越顺手", cta: "继续去记录", to: "/records" },
+  { path: "/reports", label: "报表", badge: "Weekly Review", title: "先看结论，再把下周动作收紧", copy: "报表页不该只给数字，更该把下一步讲清楚。", hint: "结论要比数字更先到位", cta: "打开 AI 行动版", to: "/assistant" },
+  { path: "/assistant", label: "AI助手", badge: "Task Co-Pilot", title: "把 AI 放到你刚好卡住的那一步", copy: "AI 最有用的时候，不是闲聊，而是帮你把当前动作做完。", hint: "卡住时再叫它最值", cta: "回首页继续", to: "/" },
+  { path: "/goals", label: "目标", badge: "Goal Focus", title: "目标页更适合做节奏校准", copy: "阶段目标不需要天天改，但需要在你偏离时把主线拉回来。", hint: "目标负责校准，不负责打断", cta: "回首页看今天", to: "/" },
+  { path: "/community", label: "社区", badge: "Shared Notes", title: "社区更像灵感补给，不该盖过主线", copy: "看看别人怎么做可以，但别让今天的执行动作被内容流打断。", hint: "逛一会儿就够，主线更重要", cta: "回到记录页", to: "/records" },
+  { path: "/profile", label: "我的", badge: "Profile Ready", title: "资料越完整，系统建议越像真的懂你", copy: "健康档案是系统判断下一步的底层信息，不需要花哨，但需要清楚。", hint: "底层信息补齐，建议才会更准", cta: "回首页继续", to: "/" },
+];
+const adminRouteMoments = [
+  { path: "/ops", label: "后台总览", badge: "Ops Overview", title: "先把后台今天最该处理的动作排清楚", copy: "后台先定优先级，再进入具体模块，避免一开始就散到每个角落。", hint: "先定优先级，再展开处理", cta: "去用户管理", to: "/ops/users" },
+  { path: "/ops/community", label: "社区审核", badge: "Community Moderation", title: "先把帖子审核和举报处理收紧", copy: "社区后台先看待审核内容、待处理举报和评论隐藏动作，别让风险内容继续外露。", hint: "优先看待审核帖子和待处理举报", cta: "回后台总览", to: "/ops" },
+  { path: "/ops/recipes", label: "菜谱管理", badge: "Recipe Operations", title: "先把菜谱状态和审核结论收紧", copy: "菜谱管理先盯状态、审核和信息质量，别让无效内容混进用户决策链路。", hint: "优先看待审核和信息不完整的菜谱", cta: "回后台总览", to: "/ops" },
+  { path: "/ops/users", label: "用户管理", badge: "User Operations", title: "先把账号、角色和资料边界看清楚", copy: "用户管理是后台最核心的第一块，先把角色边界、状态和资料质量稳住。", hint: "优先检查权限、停用状态和资料完整度", cta: "回后台总览", to: "/ops" },
 ];
 
 const showChrome = computed(() => route.path !== "/login");
+const isAdminRoute = computed(() => route.path.startsWith("/ops"));
 const primaryNavItems = computed(() => navItems.filter((item) => primaryNavPaths.includes(item.to)));
 const secondaryNavItems = computed(() => navItems.filter((item) => !primaryNavPaths.includes(item.to)));
 const isAdminUser = computed(() => Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser)));
-const currentTitle = computed(() => {
-  if (route.path === "/ops/users") return "后台用户";
-  return navItems.find((item) => item.to === route.path)?.label || "营养饮食助手";
-});
-const currentRouteMoment = computed(() => routeMoments.find((item) => item.path === route.path) ?? routeMoments[0]);
+const currentFrontMoment = computed(() => matchRouteMoment(route.path, frontRouteMoments) ?? frontRouteMoments[0]);
+const currentAdminMoment = computed(() => matchRouteMoment(route.path, adminRouteMoments) ?? adminRouteMoments[0]);
+const currentFrontTitle = computed(() => currentFrontMoment.value.label || "营养饮食助手");
 const fallbackTickerTips = computed(() => [
-  currentRouteMoment.value.hint,
-  `当前页：${currentTitle.value}，${currentRouteMoment.value.copy}`,
+  currentFrontMoment.value.hint,
+  `当前页：${currentFrontTitle.value}，${currentFrontMoment.value.copy}`,
   auth.user ? `继续保持，${auth.user?.nickname || auth.user?.username}，先完成一个最小动作就够了` : "先完成一个最小动作，今天就会更顺一点",
 ]);
 const tickerMessages = computed(() => [
   ...(personalizedTickerTips.value.length ? personalizedTickerTips.value : fallbackTickerTips.value),
-  `当前动作：${currentRouteMoment.value.title}`,
+  `当前动作：${currentFrontMoment.value.title}`,
 ]);
 const tickerLoopMessages = computed(() => [...tickerMessages.value, ...tickerMessages.value]);
+const adminTickerMessages = computed(() => [
+  currentAdminMoment.value.hint,
+  "后台先解决最影响真实用户体验的问题，再扩展模块深度。",
+  isAdminUser.value
+    ? `当前值守：${auth.user?.nickname || auth.user?.username}，先完成一个明确动作，比同时盯多块更有效。`
+    : "先确认管理员权限，再开始处理后台事项。",
+  route.path === "/ops/users"
+    ? "用户管理里先看账号状态、角色边界和资料完整度，再处理个别字段。"
+    : route.path === "/ops/community"
+      ? "社区审核里先处理待审核帖子、待处理举报和需要隐藏的评论。"
+    : route.path === "/ops/recipes"
+      ? "菜谱管理里先看待审核、草稿和信息缺口，再决定是否发布或驳回。"
+    : "先看后台总览，把今天的主线排清楚，再进入具体列表。",
+]);
+const adminTickerLoopMessages = computed(() => [...adminTickerMessages.value, ...adminTickerMessages.value]);
 const todayStamp = computed(() =>
   new Intl.DateTimeFormat("zh-CN", {
     month: "long",
@@ -221,15 +409,22 @@ watch(
   () => route.fullPath,
   () => {
     mobileNavOpen.value = false;
+    adminMobileNavOpen.value = false;
     moreMenuOpen.value = false;
-    void refreshTickerTips();
+    if (!isAdminRoute.value) {
+      void refreshTickerTips();
+    }
   },
 );
 
 watch(
   () => auth.user?.id,
   () => {
-    void refreshTickerTips();
+    if (!isAdminRoute.value) {
+      void refreshTickerTips();
+      return;
+    }
+    personalizedTickerTips.value = [];
   },
   { immediate: true },
 );
@@ -247,6 +442,11 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", handleViewportChange);
   window.removeEventListener("scroll", handleViewportChange, true);
 });
+
+function matchRouteMoment(routePath: string, moments: Array<{ path: string }>) {
+  const matched = [...moments].sort((a, b) => b.path.length - a.path.length).find((item) => routePath.startsWith(item.path));
+  return matched ?? moments[0];
+}
 
 function logout() {
   auth.clearAuth();
@@ -270,6 +470,11 @@ function handleMobileLogout() {
   logout();
 }
 
+function handleAdminMobileLogout() {
+  adminMobileNavOpen.value = false;
+  logout();
+}
+
 function handleDocumentPointerDown(event: PointerEvent) {
   if (!moreMenuOpen.value) {
     return;
@@ -277,11 +482,7 @@ function handleDocumentPointerDown(event: PointerEvent) {
 
   const wrap = moreMenuWrapRef.value;
   const menu = moreMenuRef.value;
-  if (
-    !(event.target instanceof Node) ||
-    wrap?.contains(event.target) ||
-    menu?.contains(event.target)
-  ) {
+  if (!(event.target instanceof Node) || wrap?.contains(event.target) || menu?.contains(event.target)) {
     return;
   }
 
@@ -310,10 +511,7 @@ function updateMoreMenuPosition() {
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
   const menuWidth = Math.min(320, viewportWidth - 32);
-  const left = Math.min(
-    Math.max(16, bounds.right - menuWidth),
-    Math.max(16, viewportWidth - menuWidth - 16),
-  );
+  const left = Math.min(Math.max(16, bounds.right - menuWidth), Math.max(16, viewportWidth - menuWidth - 16));
   const top = Math.max(16, bounds.bottom + 12);
   const maxHeight = Math.max(180, viewportHeight - top - 16);
 
@@ -399,7 +597,7 @@ function healthHint(health: Record<string, any> | null | undefined) {
 }
 
 async function refreshTickerTips() {
-  if (!auth.isAuthenticated) {
+  if (!auth.isAuthenticated || isAdminRoute.value) {
     personalizedTickerTips.value = [];
     return;
   }
@@ -431,7 +629,7 @@ async function refreshTickerTips() {
       dietTypeHint(profile?.diet_type),
       mealPreferenceHint(profile?.meal_preference),
       profile?.is_outdoor_eating_frequent ? "今天如果在外面吃，优先选配料简单、分量清楚的餐" : "今天如果在家吃，尽量把常吃菜谱沉淀成可复用选择",
-      currentRouteMoment.value.hint,
+      currentFrontMoment.value.hint,
     ]
       .filter((item, index, list): item is string => Boolean(item && item.trim()) && list.indexOf(item) === index)
       .slice(0, 4);
@@ -456,6 +654,14 @@ async function refreshTickerTips() {
     linear-gradient(180deg, #f7fbff 0%, #eef4f8 100%);
   color: #123;
   transition: background 0.26s ease;
+}
+
+.shell.admin-shell-root {
+  background:
+    radial-gradient(circle at var(--pointer-x) var(--pointer-y), rgba(87, 181, 231, 0.16), transparent 0, transparent 30%),
+    radial-gradient(circle at top left, rgba(33, 82, 118, 0.24), transparent 32%),
+    linear-gradient(180deg, #09121c 0%, #101d2a 42%, #122233 100%);
+  color: #ecf5ff;
 }
 
 .topbar,
@@ -497,14 +703,27 @@ async function refreshTickerTips() {
   pointer-events: none;
 }
 
-.mobile-topbar {
+.mobile-topbar,
+.admin-mobile-topbar {
   position: sticky;
   top: 0;
   z-index: 20;
   padding: calc(12px + env(safe-area-inset-top)) 16px 10px;
   backdrop-filter: blur(16px);
+}
+
+.mobile-topbar {
   background: rgba(247, 251, 255, 0.82);
   border-bottom: 1px solid rgba(16, 34, 42, 0.08);
+}
+
+.admin-mobile-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: rgba(9, 18, 28, 0.88);
+  border-bottom: 1px solid rgba(161, 197, 223, 0.14);
 }
 
 .brand {
@@ -529,6 +748,11 @@ async function refreshTickerTips() {
   color: #3e6d7f;
 }
 
+.admin-shell-root .eyebrow,
+.admin-shell-root .mobile-eyebrow {
+  color: rgba(172, 208, 234, 0.82);
+}
+
 .brand-date {
   display: inline-flex;
   align-items: center;
@@ -541,18 +765,29 @@ async function refreshTickerTips() {
   font-weight: 700;
 }
 
-h1 {
+h1,
+.admin-title {
   margin: 0;
   font-size: clamp(21px, 2vw, 26px);
   line-height: 1.1;
 }
 
-.subtitle {
+.subtitle,
+.mobile-subtitle,
+.admin-subtitle {
   margin: 4px 0 0;
   color: #476072;
-  line-height: 1.45;
-  max-width: 280px;
+  line-height: 1.5;
   font-size: 13px;
+}
+
+.subtitle {
+  max-width: 280px;
+}
+
+.admin-subtitle,
+.admin-mobile-copy .mobile-subtitle {
+  color: rgba(212, 230, 244, 0.72);
 }
 
 .nav {
@@ -603,10 +838,6 @@ h1 {
   background: #173042;
   color: #fff;
   box-shadow: 0 16px 30px rgba(23, 48, 66, 0.22);
-}
-
-.nav a.router-link-active small {
-  color: rgba(255, 255, 255, 0.72);
 }
 
 .more-menu-wrap {
@@ -692,6 +923,31 @@ h1 {
 .ghost,
 .sheet-logout {
   cursor: pointer;
+  border: 1px solid rgba(23, 48, 66, 0.18);
+  background: rgba(255, 255, 255, 0.55);
+  color: #173042;
+  padding: 8px 12px;
+  border-radius: 999px;
+  transition: transform 0.22s ease, background 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+}
+
+.shell.admin-shell-root .ghost {
+  border-color: rgba(161, 197, 223, 0.16);
+  background: rgba(11, 22, 35, 0.54);
+  color: #eff7ff;
+}
+
+.ghost:hover,
+.sheet-logout:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.86);
+  border-color: rgba(23, 48, 66, 0.24);
+  box-shadow: 0 10px 22px rgba(15, 30, 39, 0.08);
+}
+
+.shell.admin-shell-root .ghost:hover {
+  background: rgba(24, 43, 60, 0.9);
+  border-color: rgba(161, 197, 223, 0.24);
 }
 
 .user-box {
@@ -702,24 +958,6 @@ h1 {
   gap: 10px;
   white-space: nowrap;
   font-size: 13px;
-}
-
-.ghost,
-.sheet-logout {
-  border: 1px solid rgba(23, 48, 66, 0.18);
-  background: rgba(255, 255, 255, 0.55);
-  color: #173042;
-  padding: 8px 12px;
-  border-radius: 999px;
-  transition: transform 0.22s ease, background 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
-}
-
-.ghost:hover,
-.sheet-logout:hover {
-  transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.86);
-  border-color: rgba(23, 48, 66, 0.24);
-  box-shadow: 0 10px 22px rgba(15, 30, 39, 0.08);
 }
 
 .content {
@@ -740,6 +978,230 @@ h1 {
   min-width: 0;
 }
 
+.admin-shell-layout {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+}
+
+.admin-sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto auto auto 1fr;
+  gap: 18px;
+  padding: 22px 18px;
+  border-right: 1px solid rgba(161, 197, 223, 0.12);
+  background:
+    linear-gradient(180deg, rgba(8, 17, 26, 0.96), rgba(11, 22, 35, 0.94)),
+    radial-gradient(circle at top left, rgba(67, 128, 168, 0.16), transparent 34%);
+  backdrop-filter: blur(18px);
+}
+
+.admin-brand {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border-radius: 24px;
+  background:
+    linear-gradient(145deg, rgba(24, 48, 68, 0.92), rgba(12, 25, 39, 0.94)),
+    radial-gradient(circle at top right, rgba(106, 170, 212, 0.2), transparent 38%);
+  border: 1px solid rgba(161, 197, 223, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.admin-brand h2 {
+  margin: 0;
+  font-size: 22px;
+  color: #f0f8ff;
+}
+
+.admin-brand p:last-child {
+  margin: 0;
+  color: rgba(212, 230, 244, 0.72);
+  line-height: 1.7;
+  font-size: 13px;
+}
+
+.admin-sidebar-group {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-section-label {
+  padding: 0 2px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(172, 208, 234, 0.62);
+}
+
+.admin-nav,
+.admin-subnav {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-nav-link,
+.admin-subnav-link {
+  display: grid;
+  gap: 6px;
+  text-decoration: none;
+  border-radius: 20px;
+  border: 1px solid rgba(161, 197, 223, 0.12);
+  background: rgba(15, 31, 46, 0.72);
+  color: #e9f4ff;
+  transition: transform 0.24s ease, border-color 0.24s ease, background 0.24s ease, box-shadow 0.24s ease;
+}
+
+.admin-nav-link {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  padding: 14px;
+}
+
+.admin-nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 14px;
+  background: rgba(113, 175, 214, 0.14);
+  color: #e9f4ff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-nav-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-nav-copy strong,
+.admin-subnav-link span {
+  color: #f0f8ff;
+  font-size: 14px;
+}
+
+.admin-nav-copy small,
+.admin-subnav-link small {
+  color: rgba(212, 230, 244, 0.64);
+  line-height: 1.55;
+}
+
+.admin-subnav-link {
+  padding: 12px 14px;
+}
+
+.admin-nav-link:hover,
+.admin-subnav-link:hover {
+  transform: translateY(-2px);
+  border-color: rgba(161, 197, 223, 0.2);
+  background: rgba(21, 41, 59, 0.92);
+  box-shadow: 0 18px 28px rgba(4, 10, 17, 0.22);
+}
+
+.admin-nav-link.router-link-active,
+.admin-subnav-link.router-link-active {
+  border-color: rgba(122, 191, 234, 0.32);
+  background: linear-gradient(135deg, rgba(27, 60, 85, 0.96), rgba(18, 38, 55, 0.96));
+  box-shadow: inset 0 0 0 1px rgba(122, 191, 234, 0.08);
+}
+
+.admin-sidebar-footer {
+  align-self: end;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 22px;
+  background: rgba(11, 22, 35, 0.72);
+  border: 1px solid rgba(161, 197, 223, 0.12);
+}
+
+.admin-operator {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-operator-label {
+  color: rgba(172, 208, 234, 0.62);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.admin-operator strong {
+  color: #f0f8ff;
+}
+
+.admin-workspace {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.admin-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 18px 26px 14px;
+  border-bottom: 1px solid rgba(161, 197, 223, 0.12);
+  background: rgba(9, 18, 28, 0.72);
+  backdrop-filter: blur(18px);
+}
+
+.admin-topbar-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-user-chip {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(14, 28, 42, 0.74);
+  border: 1px solid rgba(161, 197, 223, 0.12);
+}
+
+.admin-user-chip span {
+  color: rgba(172, 208, 234, 0.62);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.admin-user-chip strong {
+  color: #f0f8ff;
+  font-size: 14px;
+}
+
+.admin-content {
+  min-width: 0;
+  padding: 18px 20px 32px;
+}
+
+.admin-content-inner {
+  width: min(100%, 1280px);
+  margin: 0 auto;
+  min-width: 0;
+}
+
 .floating-ribbon {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -755,6 +1217,30 @@ h1 {
   box-shadow: 0 14px 28px rgba(15, 30, 39, 0.07);
   backdrop-filter: blur(18px);
   animation: shell-soft-in 0.5s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+.admin-pulse {
+  width: min(100%, 1280px);
+  margin: 0 auto 14px;
+  background:
+    linear-gradient(135deg, rgba(18, 37, 53, 0.92), rgba(13, 28, 42, 0.94)),
+    radial-gradient(circle at top right, rgba(102, 173, 217, 0.14), transparent 38%);
+  border-color: rgba(161, 197, 223, 0.12);
+  box-shadow: 0 18px 34px rgba(4, 10, 17, 0.22);
+}
+
+.admin-pulse .ticker-label strong,
+.admin-pulse .ticker-item,
+.admin-pulse .ticker-item::before {
+  color: #e9f4ff;
+}
+
+.admin-pulse .ticker-item {
+  color: rgba(224, 239, 250, 0.8);
+}
+
+.admin-pulse .ticker-item::before {
+  background: rgba(122, 191, 234, 0.48);
 }
 
 .ticker-label {
@@ -822,6 +1308,12 @@ h1 {
   transition: transform 0.22s ease, box-shadow 0.22s ease;
 }
 
+.admin-pulse .ticker-action {
+  background: #7bc0eb;
+  color: #09121c;
+  box-shadow: 0 12px 22px rgba(24, 74, 103, 0.24);
+}
+
 .ribbon-status-dot {
   width: 8px;
   height: 8px;
@@ -834,13 +1326,6 @@ h1 {
 .ticker-action:hover {
   transform: translateY(-1px);
   box-shadow: 0 14px 24px rgba(23, 48, 66, 0.24);
-}
-
-.mobile-subtitle {
-  margin: 4px 0 0;
-  color: #5a7a8a;
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .menu-float-enter-active,
@@ -955,6 +1440,12 @@ h1 {
   font-weight: 700;
 }
 
+.admin-mobile-rail .mobile-rail-toggle {
+  border-color: rgba(161, 197, 223, 0.12);
+  background: rgba(9, 18, 28, 0.92);
+  color: #eff7ff;
+}
+
 .mobile-rail-scroll {
   display: grid;
   gap: 10px;
@@ -965,6 +1456,11 @@ h1 {
   border: 1px solid rgba(16, 34, 42, 0.08);
   box-shadow: 0 12px 28px rgba(15, 30, 39, 0.14);
   backdrop-filter: blur(16px);
+}
+
+.admin-mobile-scroll {
+  background: rgba(9, 18, 28, 0.94);
+  border-color: rgba(161, 197, 223, 0.12);
 }
 
 .mobile-rail-group {
@@ -984,6 +1480,10 @@ h1 {
   color: #5a7a8a;
 }
 
+.admin-mobile-scroll .mobile-rail-label {
+  color: rgba(172, 208, 234, 0.62);
+}
+
 .mobile-rail-link {
   display: inline-flex;
   align-items: center;
@@ -999,11 +1499,24 @@ h1 {
   white-space: nowrap;
 }
 
+.admin-mobile-link,
+.admin-mobile-scroll .mobile-rail-link {
+  border-color: rgba(161, 197, 223, 0.12);
+  background: rgba(15, 31, 46, 0.92);
+  color: #e9f4ff;
+}
+
 .mobile-rail-link.router-link-active,
 .mobile-rail-link.active {
   background: #173042;
   color: #fff;
   border-color: #173042;
+}
+
+.admin-mobile-scroll .mobile-rail-link.router-link-active {
+  background: #7bc0eb;
+  color: #09121c;
+  border-color: #7bc0eb;
 }
 
 .mobile-rail-icon {
@@ -1017,10 +1530,19 @@ h1 {
   font-size: 10px;
 }
 
+.admin-mobile-scroll .mobile-rail-icon {
+  background: rgba(122, 191, 234, 0.14);
+}
+
 .mobile-rail-link.router-link-active .mobile-rail-icon,
 .mobile-rail-link.active .mobile-rail-icon,
 .mobile-rail-logout .mobile-rail-icon {
   background: rgba(255, 255, 255, 0.18);
+}
+
+.admin-mobile-scroll .mobile-rail-link.router-link-active .mobile-rail-icon,
+.admin-mobile-scroll .mobile-rail-logout .mobile-rail-icon {
+  background: rgba(9, 18, 28, 0.14);
 }
 
 .mobile-rail-logout {
@@ -1035,6 +1557,17 @@ h1 {
   display: none;
 }
 
+@media (max-width: 1100px) {
+  .admin-shell-layout {
+    grid-template-columns: 250px minmax(0, 1fr);
+  }
+
+  .admin-topbar-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 @media (max-width: 960px) {
   .desktop-only {
     display: none;
@@ -1045,7 +1578,8 @@ h1 {
   }
 
   .mobile-topbar.mobile-only,
-  .mobile-rail.mobile-only {
+  .mobile-rail.mobile-only,
+  .admin-mobile-topbar.mobile-only {
     display: flex;
   }
 
@@ -1061,12 +1595,23 @@ h1 {
     padding-bottom: calc(120px + env(safe-area-inset-bottom));
   }
 
-  .mobile-topbar {
+  .admin-shell-layout {
+    display: block;
+    min-height: auto;
+  }
+
+  .admin-content {
+    padding: 12px 12px calc(64px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-topbar,
+  .admin-mobile-topbar {
     gap: 12px;
     padding: calc(10px + env(safe-area-inset-top)) 12px 8px;
   }
 
-  .mobile-topbar strong {
+  .mobile-topbar strong,
+  .admin-mobile-topbar strong {
     font-size: 18px;
     line-height: 1.2;
     display: -webkit-box;

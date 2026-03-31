@@ -162,6 +162,75 @@ class ProductApiSmokeTests(APITestCase):
         response = self.client.get("/api/v1/accounts/admin/users/")
         self.assertEqual(response.status_code, 403)
 
+    def test_admin_can_moderate_community_content(self):
+        admin_user = self._create_user(username="ops", email="ops@example.com", phone="13800000009")
+        admin_user.role = "admin"
+        admin_user.is_staff = True
+        admin_user.save(update_fields=["role", "is_staff"])
+
+        author = self._create_user(username="writer", email="writer@example.com", phone="13800000010")
+        reporter = self._create_user(username="reader", email="reader@example.com", phone="13800000011")
+
+        post = Post.objects.create(
+            user=author,
+            title="Need Review",
+            content="This post still needs moderation.",
+            status="published",
+            audit_status="pending",
+        )
+        PostComment.objects.create(post=post, user=reporter, content="Looks risky", status="hidden")
+        report = ContentReport.objects.create(
+            reporter=reporter,
+            target_type="post",
+            target_id=post.id,
+            reason="misleading nutrition claim",
+        )
+
+        self._login("ops@example.com")
+
+        post_list_response = self.client.get("/api/v1/community/admin/posts/")
+        self.assertEqual(post_list_response.status_code, 200)
+        post_items = post_list_response.data["data"]["items"]
+        self.assertEqual(post_items[0]["audit_status"], "pending")
+        self.assertEqual(post_items[0]["hidden_comment_count"], 1)
+        self.assertEqual(post_items[0]["report_count"], 1)
+
+        post_detail_response = self.client.patch(
+            f"/api/v1/community/admin/posts/{post.id}/",
+            {"audit_status": "approved", "status": "published", "title": "Reviewed Post"},
+            format="json",
+        )
+        self.assertEqual(post_detail_response.status_code, 200)
+        post.refresh_from_db()
+        self.assertEqual(post.audit_status, "approved")
+        self.assertEqual(post.title, "Reviewed Post")
+
+        report_list_response = self.client.get("/api/v1/community/admin/reports/")
+        self.assertEqual(report_list_response.status_code, 200)
+        report_items = report_list_response.data["data"]["items"]
+        self.assertEqual(report_items[0]["target_post_title"], "Reviewed Post")
+
+        report_detail_response = self.client.patch(
+            f"/api/v1/community/admin/reports/{report.id}/",
+            {"status": "processed"},
+            format="json",
+        )
+        self.assertEqual(report_detail_response.status_code, 200)
+        report.refresh_from_db()
+        self.assertEqual(report.status, "processed")
+        self.assertEqual(report.processed_by_id, admin_user.id)
+        self.assertIsNotNone(report.processed_at)
+
+    def test_regular_user_cannot_access_admin_community_endpoints(self):
+        self._create_user()
+        self._login("alice")
+
+        post_response = self.client.get("/api/v1/community/admin/posts/")
+        report_response = self.client.get("/api/v1/community/admin/reports/")
+
+        self.assertEqual(post_response.status_code, 403)
+        self.assertEqual(report_response.status_code, 403)
+
     def test_recipe_recommendation_and_favorite_flow(self):
         user = self._create_user()
         self._login("alice")

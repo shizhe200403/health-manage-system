@@ -137,7 +137,8 @@ async function handleLogin() {
 
   await auth.login(form.account, form.password);
   notifyActionSuccess("登录成功");
-  router.push("/");
+  const isAdminUser = Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser));
+  router.push(isAdminUser ? "/ops" : "/");
 }
 
 async function handleRegister() {

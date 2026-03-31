@@ -31,34 +31,50 @@
       <CollectionSkeleton v-if="loadingUsers && !users.length" variant="list" :card-count="5" />
       <RefreshFrame v-else :active="loadingUsers && !!users.length" label="正在同步用户列表与筛选结果">
         <div class="summary-grid">
-          <article>
+          <article v-spotlight>
             <span>用户总数</span>
             <strong>{{ pagination.total }}</strong>
             <p>当前筛选条件下的账号总量。</p>
           </article>
-          <article>
+          <article v-spotlight>
             <span>管理员</span>
             <strong>{{ adminCount }}</strong>
             <p>当前页中具备管理权限的账号数量。</p>
           </article>
-          <article>
+          <article v-spotlight>
             <span>已停用</span>
             <strong>{{ disabledCount }}</strong>
             <p>适合优先检查这些账号是否需要恢复或保留禁用。</p>
           </article>
-          <article>
+          <article v-spotlight>
             <span>资料较完整</span>
             <strong>{{ profileReadyCount }}</strong>
             <p>当前页档案完整度达到 70% 以上的用户数。</p>
           </article>
         </div>
 
-        <div class="card filter-card">
+        <div class="focus-strip">
+          <article
+            v-for="item in focusCards"
+            :key="item.key"
+            class="focus-card"
+            :class="{ active: focusPreset === item.key }"
+            v-spotlight
+            @click="applyFocusPreset(item.key)"
+          >
+            <span>{{ item.label }}</span>
+            <strong>{{ item.value }}</strong>
+            <p>{{ item.copy }}</p>
+          </article>
+        </div>
+
+        <div class="card filter-card" v-spotlight>
           <div class="card-head">
             <div>
               <h3>筛选与搜索</h3>
-              <p>先快速定位用户名、邮箱或手机号，再看角色和状态。</p>
+              <p>{{ filterHint }}</p>
             </div>
+            <el-button v-if="focusPreset !== 'all'" text type="primary" @click="applyFocusPreset('all')">回到全部视角</el-button>
           </div>
           <div class="toolbar-grid">
             <el-input v-model.trim="filters.keyword" placeholder="搜索用户名 / 昵称 / 邮箱 / 手机号" clearable @keyup.enter="applyFilters" />
@@ -76,15 +92,16 @@
           </div>
         </div>
 
-        <div class="card table-card">
+        <div class="card table-card" v-spotlight>
           <div class="card-head">
             <div>
               <h3>用户列表</h3>
-              <p>默认按注册时间倒序展示，适合先处理最新注册或异常状态用户。</p>
+              <p>默认按注册时间倒序展示。现在聚焦的是{{ focusPresetLabel }}，适合先处理这一批账号。</p>
             </div>
+            <span class="table-meta">当前页显示 {{ displayUsers.length }} / {{ users.length }} 人</span>
           </div>
 
-          <el-table :data="users" stripe class="user-table" empty-text="当前筛选下没有用户">
+          <el-table :data="displayUsers" stripe class="user-table" empty-text="当前筛选下没有用户">
             <el-table-column label="用户" min-width="200">
               <template #default="{ row }">
                 <div class="user-cell">
@@ -113,7 +130,10 @@
             </el-table-column>
             <el-table-column label="档案完整度" width="140">
               <template #default="{ row }">
-                <span>{{ row.profile_completion }}%</span>
+                <div class="completion-cell">
+                  <strong>{{ row.profile_completion }}%</strong>
+                  <small :class="completionToneClass(row.profile_completion)">{{ completionToneLabel(row.profile_completion) }}</small>
+                </div>
               </template>
             </el-table-column>
             <el-table-column label="健康提示" min-width="180">
@@ -129,6 +149,13 @@
                 <span>{{ formatDateTime(row.last_login) }}</span>
               </template>
             </el-table-column>
+            <el-table-column label="管理判断" min-width="180">
+              <template #default="{ row }">
+                <div class="judgement-cell">
+                  <span v-for="item in userJudgement(row)" :key="item">{{ item }}</span>
+                </div>
+              </template>
+            </el-table-column>
             <el-table-column label="操作" fixed="right" width="140">
               <template #default="{ row }">
                 <el-button text type="primary" @click="openUserDrawer(row.id)">查看并编辑</el-button>
@@ -137,7 +164,7 @@
           </el-table>
 
           <div class="table-footer">
-            <span>当前第 {{ pagination.page }} 页，共 {{ pagination.total }} 个账号。</span>
+            <span>当前第 {{ pagination.page }} 页，共 {{ pagination.total }} 个账号；当前视角下本页显示 {{ displayUsers.length }} 个。</span>
             <el-pagination
               background
               layout="prev, pager, next"
@@ -167,22 +194,35 @@
         />
         <template v-else>
           <div class="drawer-summary">
-            <article>
+            <article v-spotlight>
               <span>注册时间</span>
               <strong>{{ formatDateTime(selectedUser.date_joined) }}</strong>
             </article>
-            <article>
+            <article v-spotlight>
               <span>最近登录</span>
               <strong>{{ formatDateTime(selectedUser.last_login) }}</strong>
             </article>
-            <article>
+            <article v-spotlight>
               <span>当前角色</span>
               <strong>{{ roleLabel(accountDraft.role) }}</strong>
             </article>
           </div>
 
+          <div class="drawer-focus" v-spotlight>
+            <div class="drawer-focus-head">
+              <strong>当前管理判断</strong>
+              <span>{{ drawerFocusTitle }}</span>
+            </div>
+            <div class="drawer-focus-tags">
+              <span v-for="item in selectedUserSignals" :key="item" class="drawer-focus-tag">{{ item }}</span>
+            </div>
+            <ul class="drawer-checklist">
+              <li v-for="item in selectedUserChecklist" :key="item">{{ item }}</li>
+            </ul>
+          </div>
+
           <el-form label-position="top" class="drawer-form">
-            <div class="drawer-section">
+            <div class="drawer-section" v-spotlight>
               <div class="drawer-section-head">
                 <strong>账号信息</strong>
                 <span>角色、状态和联系方式优先在这里处理。</span>
@@ -232,7 +272,7 @@
               </el-form-item>
             </div>
 
-            <div class="drawer-section">
+            <div class="drawer-section" v-spotlight>
               <div class="drawer-section-head">
                 <strong>生活方式</strong>
                 <span>这些信息会直接影响推荐、目标和今日建议的判断。</span>
@@ -293,7 +333,7 @@
               </el-form-item>
             </div>
 
-            <div class="drawer-section">
+            <div class="drawer-section" v-spotlight>
               <div class="drawer-section-head">
                 <strong>健康约束</strong>
                 <span>这些约束会直接影响推荐和风险提醒，不适合留空太久。</span>
@@ -365,6 +405,7 @@ const savingUser = ref(false);
 const drawerOpen = ref(false);
 const users = ref<any[]>([]);
 const selectedUser = ref<any | null>(null);
+const focusPreset = ref<"all" | "pending" | "disabled" | "incomplete" | "flagged" | "admins">("all");
 
 const filters = reactive({
   keyword: "",
@@ -416,7 +457,110 @@ const isAdminUser = computed(() => Boolean(auth.user && (auth.user.role === "adm
 const adminCount = computed(() => users.value.filter((item) => item.role === "admin").length);
 const disabledCount = computed(() => users.value.filter((item) => item.status === "disabled").length);
 const profileReadyCount = computed(() => users.value.filter((item) => Number(item.profile_completion || 0) >= 70).length);
+const pendingCount = computed(() => users.value.filter((item) => item.status === "pending").length);
+const flaggedCount = computed(() => users.value.filter((item) => Array.isArray(item.health_flags) && item.health_flags.length > 0).length);
+const incompleteCount = computed(() => users.value.filter((item) => Number(item.profile_completion || 0) < 70).length);
 const drawerTitle = computed(() => (selectedUser.value ? `编辑用户：${selectedUser.value.nickname || selectedUser.value.username}` : "编辑用户"));
+const focusCards = computed(() => [
+  {
+    key: "pending" as const,
+    label: "待处理",
+    value: pendingCount.value,
+    copy: pendingCount.value > 0 ? "优先确认资料缺口或权限异常。" : "当前页没有明显待处理堆积。",
+  },
+  {
+    key: "disabled" as const,
+    label: "已停用",
+    value: disabledCount.value,
+    copy: disabledCount.value > 0 ? "适合复核是否误伤或需要恢复。" : "当前页没有停用聚集。",
+  },
+  {
+    key: "incomplete" as const,
+    label: "资料未满 70%",
+    value: incompleteCount.value,
+    copy: incompleteCount.value > 0 ? "这部分会直接拉低个性化建议质量。" : "当前页资料完整度还算稳定。",
+  },
+  {
+    key: "flagged" as const,
+    label: "有健康标记",
+    value: flaggedCount.value,
+    copy: flaggedCount.value > 0 ? "需要更关注饮食边界和风险提示。" : "当前页暂无明显健康约束聚集。",
+  },
+]);
+const focusPresetLabel = computed(() => ({
+  all: "全部账号",
+  pending: "待处理账号",
+  disabled: "停用账号",
+  incomplete: "资料待补齐账号",
+  flagged: "有健康标记账号",
+  admins: "管理员账号",
+}[focusPreset.value]));
+const filterHint = computed(() => {
+  if (focusPreset.value === "all") return "先快速定位用户名、邮箱或手机号，再看角色和状态。";
+  return `当前聚焦：${focusPresetLabel.value}。先把这一批处理掉，再回到全量视角。`;
+});
+const displayUsers = computed(() => {
+  switch (focusPreset.value) {
+    case "pending":
+      return users.value.filter((item) => item.status === "pending");
+    case "disabled":
+      return users.value.filter((item) => item.status === "disabled");
+    case "incomplete":
+      return users.value.filter((item) => Number(item.profile_completion || 0) < 70);
+    case "flagged":
+      return users.value.filter((item) => Array.isArray(item.health_flags) && item.health_flags.length > 0);
+    case "admins":
+      return users.value.filter((item) => item.role === "admin");
+    default:
+      return users.value;
+  }
+});
+const selectedUserSignals = computed(() => {
+  if (!selectedUser.value) return [];
+
+  const items = [
+    `状态：${statusLabel(accountDraft.status)}`,
+    `角色：${roleLabel(accountDraft.role)}`,
+    `档案完整度：${selectedUser.value.profile_completion || 0}%`,
+  ];
+  if (selectedUser.value.email || selectedUser.value.phone) {
+    items.push("联系方式已填写");
+  } else {
+    items.push("联系方式待补齐");
+  }
+  if (selectedUser.value.health_flags?.length) {
+    items.push(`健康标记：${selectedUser.value.health_flags.join("、")}`);
+  }
+  return items;
+});
+const drawerFocusTitle = computed(() => {
+  if (!selectedUser.value) return "先打开一个账号";
+  if (accountDraft.status === "pending") return "这位用户当前需要人工确认";
+  if (accountDraft.status === "disabled") return "这位用户当前处于停用状态";
+  if (Number(selectedUser.value.profile_completion || 0) < 70) return "这位用户的资料完整度仍偏低";
+  return "这位用户的基础状态相对稳定";
+});
+const selectedUserChecklist = computed(() => {
+  if (!selectedUser.value) return [];
+
+  const list = [];
+  if (!accountDraft.email && !accountDraft.phone) {
+    list.push("先确认至少留下一种联系方式，后续通知和排查会更顺。");
+  }
+  if (Number(selectedUser.value.profile_completion || 0) < 70) {
+    list.push("这位用户的档案完整度还不够，建议优先补齐基础资料。");
+  }
+  if (selectedUser.value.health_flags?.length) {
+    list.push("存在健康约束，检查推荐边界和忌口标签是否已经同步。");
+  }
+  if (accountDraft.role === "admin") {
+    list.push("这是管理员账号，角色边界和状态修改前建议再次确认。");
+  }
+  if (!list.length) {
+    list.push("当前账号没有明显风险堆积，可以做常规资料维护。");
+  }
+  return list;
+});
 
 onMounted(() => {
   if (isAdminUser.value) {
@@ -534,6 +678,7 @@ function resetFilters() {
   filters.role = "";
   filters.status = "";
   pagination.page = 1;
+  focusPreset.value = "all";
   void loadUsers();
 }
 
@@ -584,6 +729,10 @@ async function saveUser() {
   } finally {
     savingUser.value = false;
   }
+}
+
+function applyFocusPreset(preset: "all" | "pending" | "disabled" | "incomplete" | "flagged" | "admins") {
+  focusPreset.value = preset;
 }
 
 function roleLabel(value: string) {
@@ -638,11 +787,81 @@ function formatDateTime(value?: string) {
     minute: "2-digit",
   }).format(date);
 }
+
+function completionToneLabel(value: number | string) {
+  const numeric = Number(value || 0);
+  if (numeric >= 85) return "完整";
+  if (numeric >= 70) return "可用";
+  return "待补齐";
+}
+
+function completionToneClass(value: number | string) {
+  const numeric = Number(value || 0);
+  if (numeric >= 85) return "tone-good";
+  if (numeric >= 70) return "tone-mid";
+  return "tone-risk";
+}
+
+function userJudgement(user: Record<string, any>) {
+  const items = [];
+  if (user.status === "pending") items.push("待人工确认");
+  if (user.status === "disabled") items.push("复核停用原因");
+  if (Number(user.profile_completion || 0) < 70) items.push("资料待补齐");
+  if (Array.isArray(user.health_flags) && user.health_flags.length) items.push("关注健康约束");
+  if (user.role === "admin") items.push("注意权限边界");
+  return items.length ? items : ["常规维护"];
+}
 </script>
 
 <style scoped>
 .admin-page {
   gap: 18px;
+}
+
+.focus-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.focus-card {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  background:
+    linear-gradient(135deg, rgba(252, 254, 255, 0.96), rgba(244, 249, 252, 0.94)),
+    radial-gradient(circle at top right, rgba(87, 181, 231, 0.1), transparent 36%);
+  cursor: pointer;
+}
+
+.focus-card span {
+  color: #638295;
+  font-size: 12px;
+}
+
+.focus-card strong {
+  color: #173042;
+  font-size: 24px;
+}
+
+.focus-card p {
+  margin: 0;
+  color: #587686;
+  line-height: 1.6;
+}
+
+.focus-card.active {
+  border-color: rgba(23, 48, 66, 0.2);
+  background: linear-gradient(135deg, rgba(23, 48, 66, 0.96), rgba(39, 76, 99, 0.92));
+  box-shadow: 0 16px 30px rgba(15, 30, 39, 0.14);
+}
+
+.focus-card.active span,
+.focus-card.active strong,
+.focus-card.active p {
+  color: #f2f7fb;
 }
 
 .head-actions {
@@ -674,6 +893,12 @@ function formatDateTime(value?: string) {
   margin: 6px 0 0;
   color: #5b7888;
   line-height: 1.65;
+}
+
+.table-meta {
+  color: #6a8898;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .toolbar-grid {
@@ -709,6 +934,38 @@ function formatDateTime(value?: string) {
   gap: 6px;
 }
 
+.completion-cell,
+.judgement-cell {
+  display: grid;
+  gap: 4px;
+}
+
+.completion-cell strong {
+  color: #173042;
+}
+
+.completion-cell small {
+  font-size: 12px;
+}
+
+.tone-good {
+  color: #178048;
+}
+
+.tone-mid {
+  color: #1f6286;
+}
+
+.tone-risk {
+  color: #b45309;
+}
+
+.judgement-cell span {
+  color: #476072;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .table-footer {
   display: flex;
   justify-content: space-between;
@@ -717,6 +974,60 @@ function formatDateTime(value?: string) {
   flex-wrap: wrap;
   color: #5b7888;
   font-size: 13px;
+}
+
+.drawer-focus {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 18px;
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(23, 48, 66, 0.96), rgba(40, 84, 107, 0.92)),
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.12), transparent 38%);
+}
+
+.drawer-focus-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.drawer-focus-head strong {
+  color: #fff;
+  font-size: 16px;
+}
+
+.drawer-focus-head span {
+  color: rgba(242, 247, 251, 0.82);
+  font-size: 13px;
+}
+
+.drawer-focus-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.drawer-focus-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 12px;
+}
+
+.drawer-checklist {
+  margin: 0;
+  padding-left: 18px;
+  color: rgba(242, 247, 251, 0.86);
+  display: grid;
+  gap: 8px;
+  line-height: 1.65;
 }
 
 .drawer-summary {
@@ -789,6 +1100,7 @@ function formatDateTime(value?: string) {
 }
 
 @media (max-width: 960px) {
+  .focus-strip,
   .toolbar-grid {
     grid-template-columns: 1fr;
   }
