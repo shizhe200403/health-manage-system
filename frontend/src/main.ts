@@ -7,6 +7,7 @@ import { useAuthStore } from "./stores/auth";
 
 const app = createApp(App);
 const pinia = createPinia();
+const auth = useAuthStore(pinia);
 
 type SpotlightElement = HTMLElement & {
   __spotlightMove__?: (event: PointerEvent) => void;
@@ -45,15 +46,20 @@ app.directive("spotlight", {
   },
 });
 
-app.use(pinia);
-app.use(router);
+async function bootstrap() {
+  app.use(pinia);
+  if (localStorage.getItem("access_token")) {
+    await auth.fetchMe().catch(() => {
+      auth.clearAuth();
+    });
+  }
 
-const auth = useAuthStore(pinia);
-if (localStorage.getItem("access_token")) {
-  auth.fetchMe().catch(() => {
-    auth.clearAuth();
-    router.push("/login");
-  });
+  app.use(router);
+  if (!auth.isAuthenticated && router.currentRoute.value.path !== "/login") {
+    await router.replace("/login");
+  }
+  await router.isReady();
+  app.mount("#app");
 }
 
-app.mount("#app");
+void bootstrap();
