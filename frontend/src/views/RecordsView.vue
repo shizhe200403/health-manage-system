@@ -87,6 +87,56 @@
       </article>
     </div>
 
+    <article class="card record-workbench">
+      <div class="card-head">
+        <div>
+          <h3>下一餐工作台</h3>
+          <p>把现在最值得点的动作放到前面，减少重复搜索、重复输入和来回切换。</p>
+        </div>
+        <span class="workbench-status">{{ workbenchStatus }}</span>
+      </div>
+
+      <div class="workbench-hero">
+        <div class="workbench-copy">
+          <span>现在先做什么</span>
+          <strong>{{ workbenchHeadline }}</strong>
+          <p>{{ workbenchDescription }}</p>
+        </div>
+        <div class="workbench-actions">
+          <el-button type="primary" @click="applyQuickMeal(recommendedMealType)">
+            {{ `快速记${mealTypeLabel(recommendedMealType)}` }}
+          </el-button>
+          <el-button v-if="latestReusableRecord" plain @click="applyRecordTemplate(latestReusableRecord)">
+            复制最近一餐
+          </el-button>
+          <el-button v-if="recommendedMealYesterdayRecord" plain @click="applyRecordTemplate(recommendedMealYesterdayRecord)">复制昨天同餐</el-button>
+        </div>
+      </div>
+
+      <div v-if="recentRecordTemplates.length" class="template-panel">
+        <div class="template-head">
+          <div>
+            <strong>最近照着记</strong>
+            <p>直接复用你已经吃过、已经录过的组合，比重新找菜谱更快。</p>
+          </div>
+        </div>
+
+        <div class="template-grid">
+          <button
+            v-for="item in recentRecordTemplates"
+            :key="item.id"
+            type="button"
+            class="template-card"
+            @click="applyRecordTemplate(item)"
+          >
+            <span>{{ mealTypeLabel(item.meal_type || "lunch") }}</span>
+            <strong>{{ recordPrimaryTitle(item) }}</strong>
+            <p>{{ recordSecondaryLabel(item) }}</p>
+          </button>
+        </div>
+      </div>
+    </article>
+
     <div class="card">
       <div class="card-head">
         <div>
@@ -427,13 +477,7 @@ const recipeShortcutSource = computed(() => {
 const recentRecipeShortcuts = computed(() => recipeShortcutSource.value.slice().sort((a, b) => `${b.last_used_date}`.localeCompare(`${a.last_used_date}`)).slice(0, 4));
 const frequentRecipeShortcuts = computed(() => recipeShortcutSource.value.slice().sort((a, b) => b.count - a.count || `${b.last_used_date}`.localeCompare(`${a.last_used_date}`)).slice(0, 4));
 const yesterdaySameMealRecord = computed(() => {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const year = yesterday.getFullYear();
-  const month = `${yesterday.getMonth() + 1}`.padStart(2, "0");
-  const day = `${yesterday.getDate()}`.padStart(2, "0");
-  const targetDate = `${year}-${month}-${day}`;
-  return records.value.find((record) => record.record_date === targetDate && record.meal_type === form.meal_type) ?? null;
+  return findYesterdayMealRecord(form.meal_type);
 });
 const filteredRecords = computed(() => {
   const cutoff = new Date();
@@ -515,15 +559,82 @@ const trendHeadline = computed(() => {
   const average = values.reduce((total, value) => total + value, 0) / values.length;
   return `最近可见日均约 ${average.toFixed(0)} kcal，适合先看整体节奏，再判断某一天是否异常偏高。`;
 });
+const todayRecordSet = computed(() => new Set(records.value.filter((record) => record.record_date === todayString()).map((record) => record.meal_type)));
 const mealChecklist = computed(() => {
-  const today = todayString();
-  const set = new Set(records.value.filter((record) => record.record_date === today).map((record) => record.meal_type));
   return [
-    { label: "早餐", value: "breakfast", done: set.has("breakfast") },
-    { label: "午餐", value: "lunch", done: set.has("lunch") },
-    { label: "晚餐", value: "dinner", done: set.has("dinner") },
-    { label: "加餐", value: "snack", done: set.has("snack") },
+    { label: "早餐", value: "breakfast", done: todayRecordSet.value.has("breakfast") },
+    { label: "午餐", value: "lunch", done: todayRecordSet.value.has("lunch") },
+    { label: "晚餐", value: "dinner", done: todayRecordSet.value.has("dinner") },
+    { label: "加餐", value: "snack", done: todayRecordSet.value.has("snack") },
   ];
+});
+const latestReusableRecord = computed(() => {
+  return [...records.value]
+    .sort((left, right) => buildRecordSortValue(right) - buildRecordSortValue(left))
+    .find((record) => Boolean(record.id)) ?? null;
+});
+const recentRecordTemplates = computed(() => {
+  const seen = new Set<string>();
+  return [...records.value]
+    .sort((left, right) => buildRecordSortValue(right) - buildRecordSortValue(left))
+    .filter((record) => {
+      const recipeId = Number(record.items?.[0]?.recipe_id || 0);
+      const signature = `${record.meal_type || "lunch"}::${recipeId || 0}::${record.note || ""}`;
+      if (seen.has(signature)) {
+        return false;
+      }
+      seen.add(signature);
+      return true;
+    })
+    .slice(0, 4);
+});
+const recommendedMealType = computed<"breakfast" | "lunch" | "dinner" | "snack">(() => {
+  const anchorMeal = currentTimeMealType();
+  if (!todayRecordSet.value.has(anchorMeal)) {
+    return anchorMeal;
+  }
+  return (
+    ["breakfast", "lunch", "dinner", "snack"].find((mealType) => !todayRecordSet.value.has(mealType)) || "snack"
+  ) as "breakfast" | "lunch" | "dinner" | "snack";
+});
+const recommendedMealYesterdayRecord = computed(() => findYesterdayMealRecord(recommendedMealType.value));
+const workbenchStatus = computed(() => {
+  const missingCount = mealChecklist.value.filter((item) => !item.done).length;
+  if (!records.value.length) {
+    return "先记第一餐";
+  }
+  if (missingCount === 0) {
+    return "今天主线已齐";
+  }
+  return `还差 ${missingCount} 餐`;
+});
+const workbenchHeadline = computed(() => {
+  const missingCount = mealChecklist.value.filter((item) => !item.done).length;
+  if (!records.value.length) {
+    return "先把今天第一餐记上";
+  }
+  if (missingCount === 0) {
+    return "今天三餐主线已经基本齐了";
+  }
+  if (recommendedMealYesterdayRecord.value) {
+    return `先补${mealTypeLabel(recommendedMealType.value)}，可以直接复制昨天同餐`;
+  }
+  return `现在最适合先补${mealTypeLabel(recommendedMealType.value)}`;
+});
+const workbenchDescription = computed(() => {
+  if (!records.value.length) {
+    return "先保存一餐，今天进度、趋势和后续建议才会真正开始运转。";
+  }
+  if (mealChecklist.value.every((item) => item.done)) {
+    return "如果只是补录，优先复制最近一餐；如果今天已经记全，可以按需补加餐或回看趋势。";
+  }
+  if (recommendedMealYesterdayRecord.value) {
+    return `昨天已经记过${mealTypeLabel(recommendedMealType.value)}，这次直接复用会比重新选菜谱更省事。`;
+  }
+  if (latestReusableRecord.value) {
+    return "最近已有可复用内容，优先从“复制最近一餐”或“最近照着记”开始，效率会更高。";
+  }
+  return "先选一个最接近当前场景的餐次，把今天的记录连续性补起来。";
 });
 
 function todayString() {
@@ -531,6 +642,15 @@ function todayString() {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
   const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function yesterdayString() {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const year = yesterday.getFullYear();
+  const month = `${yesterday.getMonth() + 1}`.padStart(2, "0");
+  const day = `${yesterday.getDate()}`.padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
@@ -593,6 +713,39 @@ function mealTypeLabel(mealType: string) {
 function numericValue(value: unknown) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
+}
+
+function currentTimeMealType(): "breakfast" | "lunch" | "dinner" | "snack" {
+  const hour = new Date().getHours();
+  if (hour < 10) {
+    return "breakfast";
+  }
+  if (hour < 15) {
+    return "lunch";
+  }
+  if (hour < 20) {
+    return "dinner";
+  }
+  return "snack";
+}
+
+function mealTypeOrder(mealType: string) {
+  return {
+    breakfast: 1,
+    lunch: 2,
+    dinner: 3,
+    snack: 4,
+  }[mealType] || 0;
+}
+
+function buildRecordSortValue(record: Record<string, any>) {
+  const dateScore = Number(String(record.record_date || "").replaceAll("-", ""));
+  return dateScore * 10 + mealTypeOrder(record.meal_type || "");
+}
+
+function findYesterdayMealRecord(mealType: string) {
+  const targetDate = yesterdayString();
+  return records.value.find((record) => record.record_date === targetDate && record.meal_type === mealType) ?? null;
 }
 
 function formatMetric(value: unknown, unit: string) {
@@ -663,6 +816,23 @@ function applyRecipeShortcut(item: { recipe_id: number; title: string; meal_type
   if (!form.record_date) {
     form.record_date = todayString();
   }
+}
+
+function recordPrimaryTitle(record: Record<string, any>) {
+  return record.items?.[0]?.recipe_title || record.note || "未命名记录";
+}
+
+function recordSecondaryLabel(record: Record<string, any>) {
+  const datePart = record.record_date || "最近记录";
+  const energy = recordEnergy(record);
+  if (energy > 0) {
+    return `${datePart} · 热量 ${formatMetric(energy, "kcal")}`;
+  }
+  return `${datePart} · ${record.items?.length || 0} 个条目`;
+}
+
+function applyRecordTemplate(record: Record<string, any>) {
+  reuseRecord(record);
 }
 
 function copyYesterdayMeal() {
@@ -968,7 +1138,10 @@ watch(
 .preview-head,
 .progress-top,
 .quick-helpers,
-.helper-panel {
+.helper-panel,
+.workbench-hero,
+.workbench-actions,
+.template-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -1085,6 +1258,86 @@ h2 {
 
 .helper-copy {
   margin-top: 16px;
+}
+
+.record-workbench {
+  background:
+    radial-gradient(circle at top right, rgba(123, 173, 204, 0.18), transparent 30%),
+    linear-gradient(135deg, rgba(250, 252, 255, 0.98), rgba(242, 248, 251, 0.96));
+}
+
+.workbench-status,
+.workbench-copy span,
+.template-card span {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #5a7a8a;
+}
+
+.workbench-status {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(23, 48, 66, 0.08);
+}
+
+.workbench-hero {
+  margin-top: 16px;
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(16, 34, 42, 0.08);
+}
+
+.workbench-copy strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 28px;
+  line-height: 1.3;
+}
+
+.workbench-copy p,
+.template-head p,
+.template-card p {
+  margin: 8px 0 0;
+  color: #476072;
+  line-height: 1.65;
+}
+
+.workbench-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.template-panel {
+  margin-top: 16px;
+}
+
+.template-head strong {
+  font-size: 18px;
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.template-card {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  background: rgba(255, 255, 255, 0.82);
+  text-align: left;
+  cursor: pointer;
+}
+
+.template-card strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 17px;
+  color: #173042;
 }
 
 .recipe-preview {
@@ -1356,14 +1609,18 @@ h2 {
   .progress-top,
   .quick-helpers,
   .helper-panel,
-  .save-follow-up {
+  .save-follow-up,
+  .workbench-hero,
+  .workbench-actions,
+  .template-head {
     flex-direction: column;
   }
 
   .overview-grid,
   .progress-grid,
   .summary-grid,
-  .meal-checklist {
+  .meal-checklist,
+  .template-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1393,6 +1650,10 @@ h2 {
   .save-follow-up-actions :deep(.el-button) {
     width: 100%;
     margin-left: 0;
+  }
+
+  .workbench-copy strong {
+    font-size: 22px;
   }
 }
 </style>
