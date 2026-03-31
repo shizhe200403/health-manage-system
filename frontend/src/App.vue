@@ -18,21 +18,9 @@
         <div class="user-box">
           <RouterLink v-if="isAdminUser" class="ghost admin-entry" to="/ops/users">后台</RouterLink>
           <div ref="moreMenuWrapRef" class="more-menu-wrap">
-            <button class="ghost more-trigger" type="button" :aria-expanded="moreMenuOpen" @click="toggleMoreMenu">
+            <button ref="moreTriggerRef" class="ghost more-trigger" type="button" :aria-expanded="moreMenuOpen" @click="toggleMoreMenu">
               更多
             </button>
-            <Transition name="menu-float">
-              <div v-if="moreMenuOpen" class="more-menu">
-                <div class="more-menu-intro">
-                  <span>低频管理</span>
-                  <strong>把需要偶尔处理的功能收在这里，主线就不会被打断。</strong>
-                </div>
-                <RouterLink v-for="item in secondaryNavItems" :key="item.to" :to="item.to" @click="moreMenuOpen = false">
-                  <strong>{{ item.label }}</strong>
-                  <span>{{ item.copy }}</span>
-                </RouterLink>
-              </div>
-            </Transition>
           </div>
           <span v-if="auth.user">你好，{{ auth.user?.nickname || auth.user?.username }}</span>
           <button v-if="auth.isAuthenticated" class="ghost" @click="logout">退出</button>
@@ -55,6 +43,21 @@
         </button>
       </header>
     </template>
+
+    <Teleport to="body">
+      <Transition name="menu-float">
+        <div v-if="moreMenuOpen" ref="moreMenuRef" class="more-menu more-menu-portal" :style="moreMenuStyle">
+          <div class="more-menu-intro">
+            <span>低频管理</span>
+            <strong>把需要偶尔处理的功能收在这里，主线就不会被打断。</strong>
+          </div>
+          <RouterLink v-for="item in secondaryNavItems" :key="item.to" :to="item.to" @click="moreMenuOpen = false">
+            <strong>{{ item.label }}</strong>
+            <span>{{ item.copy }}</span>
+          </RouterLink>
+        </div>
+      </Transition>
+    </Teleport>
 
     <main class="content" :class="{ 'with-mobile-nav': showChrome, 'with-mobile-nav-open': showChrome && mobileNavOpen }">
       <div class="content-inner">
@@ -139,7 +142,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, watch, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, watch, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { listHealthGoals } from "./api/goals";
 import { listMealRecords } from "./api/tracking";
@@ -151,6 +154,9 @@ const auth = useAuthStore();
 const mobileNavOpen = ref(false);
 const moreMenuOpen = ref(false);
 const moreMenuWrapRef = ref<HTMLElement | null>(null);
+const moreTriggerRef = ref<HTMLElement | null>(null);
+const moreMenuRef = ref<HTMLElement | null>(null);
+const moreMenuStyle = ref<Record<string, string>>({});
 const shellPointer = reactive({ x: 16, y: 10 });
 const personalizedTickerTips = ref<string[]>([]);
 let tickerRequestId = 0;
@@ -231,11 +237,15 @@ watch(
 onMounted(() => {
   document.addEventListener("pointerdown", handleDocumentPointerDown);
   document.addEventListener("keydown", handleDocumentKeydown);
+  window.addEventListener("resize", handleViewportChange);
+  window.addEventListener("scroll", handleViewportChange, true);
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener("pointerdown", handleDocumentPointerDown);
   document.removeEventListener("keydown", handleDocumentKeydown);
+  window.removeEventListener("resize", handleViewportChange);
+  window.removeEventListener("scroll", handleViewportChange, true);
 });
 
 function logout() {
@@ -244,7 +254,15 @@ function logout() {
 }
 
 function toggleMoreMenu() {
-  moreMenuOpen.value = !moreMenuOpen.value;
+  if (moreMenuOpen.value) {
+    moreMenuOpen.value = false;
+    return;
+  }
+
+  moreMenuOpen.value = true;
+  void nextTick(() => {
+    updateMoreMenuPosition();
+  });
 }
 
 function handleMobileLogout() {
@@ -258,7 +276,12 @@ function handleDocumentPointerDown(event: PointerEvent) {
   }
 
   const wrap = moreMenuWrapRef.value;
-  if (!wrap || !(event.target instanceof Node) || wrap.contains(event.target)) {
+  const menu = moreMenuRef.value;
+  if (
+    !(event.target instanceof Node) ||
+    wrap?.contains(event.target) ||
+    menu?.contains(event.target)
+  ) {
     return;
   }
 
@@ -269,6 +292,37 @@ function handleDocumentKeydown(event: KeyboardEvent) {
   if (event.key === "Escape") {
     moreMenuOpen.value = false;
   }
+}
+
+function handleViewportChange() {
+  if (moreMenuOpen.value) {
+    updateMoreMenuPosition();
+  }
+}
+
+function updateMoreMenuPosition() {
+  const trigger = moreTriggerRef.value;
+  if (!trigger) {
+    return;
+  }
+
+  const bounds = trigger.getBoundingClientRect();
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const menuWidth = Math.min(320, viewportWidth - 32);
+  const left = Math.min(
+    Math.max(16, bounds.right - menuWidth),
+    Math.max(16, viewportWidth - menuWidth - 16),
+  );
+  const top = Math.max(16, bounds.bottom + 12);
+  const maxHeight = Math.max(180, viewportHeight - top - 16);
+
+  moreMenuStyle.value = {
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${menuWidth}px`,
+    maxHeight: `${maxHeight}px`,
+  };
 }
 
 function handleShellPointerMove(event: PointerEvent) {
@@ -561,10 +615,6 @@ h1 {
 }
 
 .more-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 12px);
-  z-index: 60;
   min-width: 280px;
   display: grid;
   gap: 8px;
@@ -574,6 +624,12 @@ h1 {
   border: 1px solid rgba(16, 34, 42, 0.08);
   box-shadow: 0 28px 48px rgba(15, 30, 39, 0.16);
   backdrop-filter: blur(22px);
+  overflow: auto;
+}
+
+.more-menu-portal {
+  position: fixed;
+  z-index: 2000;
 }
 
 .more-menu-intro {
