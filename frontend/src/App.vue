@@ -5,12 +5,23 @@
         <div class="brand">
           <p class="eyebrow">每日饮食</p>
           <h1>饮食管理助手</h1>
-          <p class="subtitle">记录饮食、查看推荐、追踪趋势，让每天吃什么更轻松、更有方向。</p>
+          <p class="subtitle">先看今天还差什么，再决定下一餐怎么吃、怎么记。</p>
         </div>
         <nav class="nav" aria-label="主导航">
           <RouterLink v-for="item in primaryNavItems" :key="item.to" :to="item.to">{{ item.label }}</RouterLink>
         </nav>
         <div class="user-box">
+          <div class="more-menu-wrap">
+            <button class="ghost more-trigger" type="button" :aria-expanded="moreMenuOpen" @click="moreMenuOpen = !moreMenuOpen">
+              更多
+            </button>
+            <div v-if="moreMenuOpen" class="more-menu">
+              <RouterLink v-for="item in secondaryNavItems" :key="item.to" :to="item.to" @click="moreMenuOpen = false">
+                <strong>{{ item.label }}</strong>
+                <span>{{ item.copy }}</span>
+              </RouterLink>
+            </div>
+          </div>
           <span v-if="auth.user">你好，{{ auth.user?.nickname || auth.user?.username }}</span>
           <button v-if="auth.isAuthenticated" class="ghost" @click="logout">退出</button>
         </div>
@@ -51,17 +62,33 @@
         </span>
         <span>{{ mobileNavOpen ? "隐藏导航" : "展开导航" }}</span>
       </button>
-      <div v-if="mobileNavOpen" class="mobile-rail-scroll mobile-scroll-row">
-        <RouterLink
-          v-for="item in navItems"
-          :key="item.to"
-          :to="item.to"
-          class="mobile-rail-link"
-          @click="mobileNavOpen = false"
-        >
-          <span class="mobile-rail-icon">{{ item.icon }}</span>
-          <span>{{ item.label }}</span>
-        </RouterLink>
+      <div v-if="mobileNavOpen" class="mobile-rail-scroll">
+        <div class="mobile-rail-group">
+          <span class="mobile-rail-label">常用</span>
+          <RouterLink
+            v-for="item in primaryNavItems"
+            :key="item.to"
+            :to="item.to"
+            class="mobile-rail-link"
+            @click="mobileNavOpen = false"
+          >
+            <span class="mobile-rail-icon">{{ item.icon }}</span>
+            <span>{{ item.label }}</span>
+          </RouterLink>
+        </div>
+        <div class="mobile-rail-group">
+          <span class="mobile-rail-label">更多</span>
+          <RouterLink
+            v-for="item in secondaryNavItems"
+            :key="item.to"
+            :to="item.to"
+            class="mobile-rail-link"
+            @click="mobileNavOpen = false"
+          >
+            <span class="mobile-rail-icon">{{ item.icon }}</span>
+            <span>{{ item.label }}</span>
+          </RouterLink>
+        </div>
         <button v-if="auth.isAuthenticated" class="mobile-rail-link mobile-rail-logout" type="button" @click="handleMobileLogout">
           <span class="mobile-rail-icon">退</span>
           <span>退出</span>
@@ -80,27 +107,31 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const mobileNavOpen = ref(false);
+const moreMenuOpen = ref(false);
 
 const navItems = [
   { to: "/", label: "首页", icon: "首", copy: "查看今天的进度与下一步" },
+  { to: "/records", label: "记录", icon: "记", copy: "记录今天这一餐并追踪趋势" },
   { to: "/recipes", label: "菜谱", icon: "谱", copy: "按场景快速挑选可执行菜谱" },
   { to: "/favorites", label: "收藏", icon: "藏", copy: "回到已经沉淀下来的常用选择" },
-  { to: "/records", label: "记录", icon: "记", copy: "记录今天这一餐并追踪趋势" },
   { to: "/goals", label: "目标", icon: "标", copy: "管理重点目标与阶段进展" },
-  { to: "/community", label: "社区", icon: "社", copy: "查看经验内容与互动反馈" },
   { to: "/reports", label: "报表", icon: "报", copy: "生成周报和月报并做复盘" },
-  { to: "/profile", label: "我的", icon: "我", copy: "维护账号资料与健康档案" },
   { to: "/assistant", label: "AI助手", icon: "智", copy: "和AI营养师对话，获取个性化建议" },
+  { to: "/community", label: "社区", icon: "社", copy: "查看经验内容与互动反馈" },
+  { to: "/profile", label: "我的", icon: "我", copy: "维护账号资料与健康档案" },
 ];
+const primaryNavPaths = ["/", "/records", "/recipes", "/favorites"];
 
 const showChrome = computed(() => route.path !== "/login");
-const primaryNavItems = computed(() => navItems);
+const primaryNavItems = computed(() => navItems.filter((item) => primaryNavPaths.includes(item.to)));
+const secondaryNavItems = computed(() => navItems.filter((item) => !primaryNavPaths.includes(item.to)));
 const currentTitle = computed(() => navItems.find((item) => item.to === route.path)?.label || "营养饮食助手");
 
 watch(
   () => route.fullPath,
   () => {
     mobileNavOpen.value = false;
+    moreMenuOpen.value = false;
   },
 );
 
@@ -190,6 +221,51 @@ h1 {
 .nav a.router-link-active {
   background: #173042;
   color: #fff;
+}
+
+.more-menu-wrap {
+  position: relative;
+}
+
+.more-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 12px);
+  min-width: 280px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  box-shadow: 0 22px 44px rgba(15, 30, 39, 0.14);
+  backdrop-filter: blur(18px);
+}
+
+.more-menu a {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  text-decoration: none;
+  border-radius: 16px;
+  background: rgba(247, 251, 255, 0.96);
+  border: 1px solid rgba(16, 34, 42, 0.06);
+}
+
+.more-menu a strong {
+  font-size: 14px;
+  color: #173042;
+}
+
+.more-menu a span {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #5a7a8a;
+}
+
+.more-menu a.router-link-active {
+  background: rgba(23, 48, 66, 0.08);
+  border-color: rgba(23, 48, 66, 0.12);
 }
 
 .ghost,
@@ -284,6 +360,8 @@ h1 {
 }
 
 .mobile-rail-scroll {
+  display: grid;
+  gap: 10px;
   width: 100%;
   padding: 8px;
   border-radius: 18px;
@@ -291,6 +369,23 @@ h1 {
   border: 1px solid rgba(16, 34, 42, 0.08);
   box-shadow: 0 12px 28px rgba(15, 30, 39, 0.14);
   backdrop-filter: blur(16px);
+}
+
+.mobile-rail-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mobile-rail-label {
+  display: block;
+  width: 100%;
+  padding: 2px 4px 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #5a7a8a;
 }
 
 .mobile-rail-link {

@@ -3,72 +3,33 @@
     <CollectionSkeleton v-if="showDashboardSkeleton" variant="dashboard" :card-count="4" />
     <RefreshFrame v-else :active="loadingDashboard" label="正在更新首页数据">
     <div class="hero">
-      <div class="hero-copy">
+      <article class="hero-copy">
         <p class="tag">Today</p>
         <h2>{{ greetingTitle }}</h2>
         <p class="desc">
-          先看今天的摄入进度，再补齐关键缺口，晚上再回来看一眼整体变化。
+          先看今天还差什么，再决定下一餐怎么吃、怎么记，不把首页做成一块只读看板。
         </p>
+        <div class="hero-status-strip">
+          <span>{{ profileReady ? "档案已完善" : "先补档案" }}</span>
+          <span>{{ activeGoal ? `${goalTypeLabel(activeGoal.goal_type)}进行中` : "还没有重点目标" }}</span>
+          <span>{{ hasTodayRecord ? "今天已有记录" : "今天还没开记" }}</span>
+        </div>
         <div class="cta-row mobile-scroll-row">
           <el-button type="primary" @click="router.push('/records')">记录今天这一餐</el-button>
-          <el-button @click="router.push('/favorites')">打开收藏中心</el-button>
-          <el-button plain @click="router.push('/reports')">查看报表</el-button>
+          <el-button @click="router.push('/favorites')">从收藏选餐</el-button>
+          <el-button plain @click="router.push('/recipes')">看看推荐菜谱</el-button>
         </div>
-      </div>
+      </article>
 
-      <div class="summary-grid">
-        <article>
-          <span>档案状态</span>
-          <strong>{{ profileReady ? "已完善" : "待完善" }}</strong>
-          <p>{{ profileReady ? "推荐与目标计算已经具备基础资料。" : "补充身高、体重和目标体重后，建议会更准确。" }}</p>
-        </article>
-        <article>
-          <span>BMI</span>
-          <strong>{{ nutritionSummary.bmi ?? "-" }}</strong>
-          <p>用于观察当前体重区间，不能替代医生建议。</p>
-        </article>
-        <article>
-          <span>今日热量目标</span>
-          <strong>{{ nutritionSummary.calorie_target }}</strong>
-          <p>当前重点：{{ nutritionSummary.goal_hint || "保持均衡饮食" }}</p>
-        </article>
-        <article>
-          <span>收藏沉淀</span>
-          <strong>{{ favoriteCount }}</strong>
-          <p>已收藏的菜谱可以直接加入记录，减少重复搜索成本。</p>
-        </article>
-      </div>
-    </div>
-
-    <div v-if="onboardingSteps.length" class="panel onboarding-panel">
-      <div class="panel-header">
-        <div>
-          <h3>起步引导</h3>
-          <p>第一次使用时，先把资料、记录和报表这几步走通，后面会顺手很多。</p>
-        </div>
-      </div>
-      <div class="onboarding-list">
-        <article v-for="item in onboardingSteps" :key="item.title" class="onboarding-item">
-          <div>
-            <strong>{{ item.title }}</strong>
-            <p>{{ item.copy }}</p>
-          </div>
-          <el-button plain @click="router.push(item.to)">{{ item.cta }}</el-button>
-        </article>
-      </div>
-    </div>
-
-    <div class="workbench-grid">
-      <article class="panel">
+      <article class="panel hero-panel">
         <div class="panel-header">
           <div>
-            <h3>今日摄入</h3>
-            <p>根据最近统计提取今天的趋势数据，快速判断是否偏离目标。</p>
+            <h3>今日进度</h3>
+            <p>{{ todayProgressSummary }}</p>
           </div>
-          <el-button text @click="router.push('/records')">去记录</el-button>
         </div>
         <div class="metric-grid">
-          <article v-for="item in todayMetricCards" :key="item.key" class="metric-card" :class="`is-${item.tone}`">
+          <article v-for="item in focusMetricCards" :key="item.key" class="metric-card" :class="`is-${item.tone}`">
             <div class="metric-top">
               <span>{{ item.label }}</span>
               <em>{{ item.badge }}</em>
@@ -77,26 +38,29 @@
             <p>{{ item.copy }}</p>
           </article>
         </div>
-        <TrendMiniBars
-          v-if="weekEnergyBars.length"
-          title="最近7天热量节奏"
-          description="看一眼最近几天的整体摄入强弱，判断今天是不是明显偏高或偏低。"
-          badge="近7天"
-          tone="energy"
-          compact
-          :items="weekEnergyBars"
-        />
+        <div class="hero-meta-grid">
+          <article>
+            <span>BMI</span>
+            <strong>{{ nutritionSummary.bmi ?? "-" }}</strong>
+            <p>用来观察体重区间，不替代医生建议。</p>
+          </article>
+          <article>
+            <span>收藏沉淀</span>
+            <strong>{{ favoriteCount }}</strong>
+            <p>已经验证过的菜谱，后续记录会更快。</p>
+          </article>
+        </div>
       </article>
 
-      <article class="panel">
+      <article class="panel hero-panel">
         <div class="panel-header">
           <div>
             <h3>今天下一步</h3>
-            <p>把系统建议收敛成明确动作，不让用户面对一堆信息却不知道先做什么。</p>
+            <p>把建议收敛成 2 到 3 个动作，不让用户面对一堆信息却不知道先点哪里。</p>
           </div>
         </div>
-        <div v-if="nextActions.length" class="action-list">
-          <article v-for="item in nextActions" :key="item.title" class="action-item">
+        <div v-if="heroNextActions.length" class="action-list">
+          <article v-for="item in heroNextActions" :key="item.title" class="action-item">
             <div>
               <strong>{{ item.title }}</strong>
               <p>{{ item.copy }}</p>
@@ -108,65 +72,44 @@
           v-else
           tone="info"
           title="今天的关键动作都已经铺开了"
-          description="可以继续补记录，或者回到报表页做阶段复盘。"
+          description="可以继续补记录，或者直接去菜谱库挑一顿更合适的下一餐。"
           compact
         />
       </article>
+    </div>
 
-      <article class="panel">
-        <div class="panel-header">
-          <div>
-            <h3>当前目标</h3>
-            <p>优先关注一项正在推进的目标，避免页面里全是概念却没有行动。</p>
-          </div>
-          <el-button text @click="router.push('/goals')">去目标页</el-button>
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h3>推荐菜谱</h3>
+          <p>优先展示更适合你当前目标和饮食约束的选择，让“下一餐吃什么”更容易落地。</p>
         </div>
-        <div v-if="activeGoal" class="focus-box">
-          <div class="focus-topline">
-            <strong>{{ goalTypeLabel(activeGoal.goal_type) }}</strong>
-            <span class="focus-badge">{{ goalProgressLabel }}</span>
-          </div>
-          <p>{{ activeGoal.description || "已创建目标，建议继续补录进展。" }}</p>
-          <div class="progress-line">
-            <span>当前 {{ formatDecimal(activeGoal.current_value) }}</span>
-            <span>目标 {{ formatDecimal(activeGoal.target_value) }}</span>
-          </div>
-          <el-progress :percentage="goalProgressPercent" :stroke-width="10" :show-text="false" />
+        <div class="head-actions">
+          <el-button plain @click="loadDashboard">刷新推荐</el-button>
+          <el-button plain @click="router.push('/recipes')">去菜谱库</el-button>
         </div>
-        <PageStateBlock
-          v-else
-          tone="empty"
-          title="你还没有正在进行的目标"
-          description="先创建一个最明确的健康目标，首页才会形成真正的工作台。"
-          action-label="去创建目标"
-          compact
-          @action="router.push('/goals')"
-        />
-      </article>
+      </div>
 
-      <article class="panel">
-        <div class="panel-header">
-          <div>
-            <h3>最新报表</h3>
-            <p>最近生成的报表会沉淀在这里，方便你快速回到复盘环节。</p>
+      <div v-if="recommendations.length" class="recommend-list">
+        <article v-for="item in recommendations" :key="item.recipe_id">
+          <div class="row">
+            <strong>{{ item.title }}</strong>
+            <div class="recommend-actions">
+              <el-button text @click="openRecipeDetail(item)">查看详情</el-button>
+              <el-button text @click="showReason(item.recipe_id)">为什么推荐</el-button>
+            </div>
           </div>
-          <el-button text @click="router.push('/reports')">去报表页</el-button>
-        </div>
-        <div v-if="latestReport" class="focus-box">
-          <strong>{{ reportTypeLabel(latestReport.report_type) }} · {{ reportStatusLabel(latestReport.status) }}</strong>
-          <p>{{ formatDateRange(latestReport.start_date, latestReport.end_date) }}</p>
-          <a v-if="latestReport.file_url" :href="latestReport.file_url" target="_blank" rel="noreferrer">打开最新报表</a>
-        </div>
-        <PageStateBlock
-          v-else
-          tone="empty"
-          title="还没有生成过报表"
-          description="当记录累计起来后，再做周报和月报才有复盘价值。"
-          action-label="去报表页"
-          compact
-          @action="router.push('/reports')"
-        />
-      </article>
+          <p>{{ item.reason_text }}</p>
+        </article>
+      </div>
+      <PageStateBlock
+        v-else
+        tone="empty"
+        title="当前还没有可展示的推荐"
+        description="先完善健康档案或补充几条饮食记录，系统才能逐步学到你的偏好。"
+        action-label="去完善资料"
+        @action="router.push('/profile')"
+      />
     </div>
 
     <div class="secondary-grid">
@@ -230,38 +173,105 @@
       </article>
     </div>
 
-    <div class="panel">
+    <div class="workbench-grid">
+      <article class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>最近7天热量节奏</h3>
+            <p>把今天放回最近一周里看，才更容易判断是偶发还是持续偏移。</p>
+          </div>
+          <el-button text @click="router.push('/records')">去记录</el-button>
+        </div>
+        <TrendMiniBars
+          v-if="weekEnergyBars.length"
+          title="最近7天热量节奏"
+          description="看一眼最近几天的整体摄入强弱，判断今天是不是明显偏高或偏低。"
+          badge="近7天"
+          tone="energy"
+          compact
+          :items="weekEnergyBars"
+        />
+        <PageStateBlock
+          v-else
+          tone="empty"
+          title="最近还没有趋势数据"
+          description="先记录几餐，热量节奏和趋势判断才会开始出现。"
+          compact
+        />
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>当前目标</h3>
+            <p>优先关注一项正在推进的目标，避免页面里全是概念却没有行动。</p>
+          </div>
+          <el-button text @click="router.push('/goals')">去目标页</el-button>
+        </div>
+        <div v-if="activeGoal" class="focus-box">
+          <div class="focus-topline">
+            <strong>{{ goalTypeLabel(activeGoal.goal_type) }}</strong>
+            <span class="focus-badge">{{ goalProgressLabel }}</span>
+          </div>
+          <p>{{ activeGoal.description || "已创建目标，建议继续补录进展。" }}</p>
+          <div class="progress-line">
+            <span>当前 {{ formatDecimal(activeGoal.current_value) }}</span>
+            <span>目标 {{ formatDecimal(activeGoal.target_value) }}</span>
+          </div>
+          <el-progress :percentage="goalProgressPercent" :stroke-width="10" :show-text="false" />
+        </div>
+        <PageStateBlock
+          v-else
+          tone="empty"
+          title="你还没有正在进行的目标"
+          description="先创建一个最明确的健康目标，首页才会形成真正的工作台。"
+          action-label="去创建目标"
+          compact
+          @action="router.push('/goals')"
+        />
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>最新报表</h3>
+            <p>最近生成的报表会沉淀在这里，方便你快速回到复盘环节。</p>
+          </div>
+          <el-button text @click="router.push('/reports')">去报表页</el-button>
+        </div>
+        <div v-if="latestReport" class="focus-box">
+          <strong>{{ reportTypeLabel(latestReport.report_type) }} · {{ reportStatusLabel(latestReport.status) }}</strong>
+          <p>{{ formatDateRange(latestReport.start_date, latestReport.end_date) }}</p>
+          <a v-if="latestReport.file_url" :href="latestReport.file_url" target="_blank" rel="noreferrer">打开最新报表</a>
+        </div>
+        <PageStateBlock
+          v-else
+          tone="empty"
+          title="还没有生成过报表"
+          description="当记录累计起来后，再做周报和月报才有复盘价值。"
+          action-label="去报表页"
+          compact
+          @action="router.push('/reports')"
+        />
+      </article>
+    </div>
+
+    <div v-if="onboardingSteps.length" class="panel onboarding-panel">
       <div class="panel-header">
         <div>
-          <h3>推荐菜谱</h3>
-          <p>优先展示更适合你当前目标和饮食约束的选择。</p>
-        </div>
-        <div class="head-actions">
-          <el-button plain @click="loadDashboard">刷新推荐</el-button>
-          <el-button plain @click="router.push('/recipes')">去菜谱库</el-button>
+          <h3>起步引导</h3>
+          <p>只有在关键基础还没铺开时才显示，把资料、记录和报表先走通一遍就够了。</p>
         </div>
       </div>
-
-      <div v-if="recommendations.length" class="recommend-list">
-        <article v-for="item in recommendations" :key="item.recipe_id">
-          <div class="row">
+      <div class="onboarding-list">
+        <article v-for="item in onboardingSteps" :key="item.title" class="onboarding-item">
+          <div>
             <strong>{{ item.title }}</strong>
-            <div class="recommend-actions">
-              <el-button text @click="openRecipeDetail(item)">查看详情</el-button>
-              <el-button text @click="showReason(item.recipe_id)">为什么推荐</el-button>
-            </div>
+            <p>{{ item.copy }}</p>
           </div>
-          <p>{{ item.reason_text }}</p>
+          <el-button plain @click="router.push(item.to)">{{ item.cta }}</el-button>
         </article>
       </div>
-      <PageStateBlock
-        v-else
-        tone="empty"
-        title="当前还没有可展示的推荐"
-        description="先完善健康档案或补充几条饮食记录，系统才能逐步学到你的偏好。"
-        action-label="去完善资料"
-        @action="router.push('/profile')"
-      />
     </div>
 
     <RecipeDetailDialog
@@ -409,6 +419,23 @@ const todayMetricCards = computed(() => {
       copy: actual > 0 ? "今日已有摄入记录" : "今天还没有相关摄入数据",
     };
   });
+});
+const focusMetricCards = computed(() => todayMetricCards.value.slice(0, 2));
+const heroNextActions = computed(() => nextActions.value.slice(0, 3));
+const todayProgressSummary = computed(() => {
+  if (!hasTodayRecord.value) {
+    return "今天还没有任何记录，先记下一餐，系统才知道你现在差多少。";
+  }
+  if (proteinTargetNumber.value > 0 && proteinGap.value >= 18) {
+    return `今天蛋白质还差约 ${formatMetric(proteinGap.value, "g")}，下一餐更适合优先补高蛋白。`;
+  }
+  if (calorieTargetNumber.value > 0 && todayMetrics.energy > calorieTargetNumber.value * 1.15) {
+    return "今天热量已经明显偏高，后续一餐更适合轻负担一点。";
+  }
+  if (calorieTargetNumber.value > 0 && energyGap.value > 0) {
+    return `距离今日热量目标还差约 ${formatMetric(energyGap.value, "kcal")}，可以继续补一餐或补记录。`;
+  }
+  return "今天主要指标已经接近目标，可以把注意力放到记录连续性和下一餐质量。";
 });
 const weekEnergyBars = computed(() => {
   return weekTrend.value.slice(-7).map((item, index, source) => ({
@@ -798,7 +825,7 @@ onMounted(loadDashboard);
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  grid-template-columns: minmax(0, 1.15fr) repeat(2, minmax(280px, 0.8fr));
   gap: 20px;
 }
 
@@ -842,6 +869,51 @@ h2 {
 
 .cta-row {
   margin-top: 24px;
+}
+
+.hero-status-strip,
+.hero-meta-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.hero-status-strip {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.hero-status-strip span {
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(247, 251, 255, 0.92);
+  border: 1px solid rgba(16, 34, 42, 0.06);
+  color: #24566a;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.hero-meta-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.hero-meta-grid article {
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(247, 251, 255, 0.92);
+  border: 1px solid rgba(16, 34, 42, 0.06);
+}
+
+.hero-meta-grid strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 22px;
+}
+
+.hero-meta-grid p {
+  margin: 8px 0 0;
+  color: #476072;
+  line-height: 1.6;
 }
 
 .summary-grid,
@@ -1021,6 +1093,8 @@ h2 {
 
   .summary-grid,
   .metric-grid,
+  .hero-status-strip,
+  .hero-meta-grid,
   .workbench-grid,
   .secondary-grid {
     grid-template-columns: 1fr;
