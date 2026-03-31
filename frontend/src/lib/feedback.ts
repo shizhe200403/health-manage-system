@@ -11,16 +11,17 @@ const FEEDBACK_MESSAGE_CLASS = "app-feedback-message";
 function showFeedbackMessage(options: { message: string; type: "success" | "error" | "warning" }) {
   ElMessage({
     ...options,
-    offset: 20,
-    duration: 3000,
+    offset: 24,
+    duration: 3200,
     showClose: true,
+    grouping: true,
     customClass: FEEDBACK_MESSAGE_CLASS,
   });
 }
 
 export function notifyLoadError(subject: string) {
   showFeedbackMessage({
-    message: `加载${subject}失败，请稍后重试`,
+    message: `${subject}刚刚没有顺利加载出来，稍后再试一次`,
     type: "error",
   });
 }
@@ -34,7 +35,7 @@ export function notifyActionSuccess(message: string) {
 
 export function notifyActionError(action: string) {
   showFeedbackMessage({
-    message: `${action}失败，请稍后重试`,
+    message: `${action}这次没有完成，再试一次就好`,
     type: "error",
   });
 }
@@ -53,7 +54,7 @@ export function notifyErrorMessage(message: string) {
   });
 }
 
-export function extractApiErrorMessage(error: unknown, fallback = "操作失败，请稍后重试") {
+export function extractApiErrorMessage(error: unknown, fallback = "这次没有处理成功，稍后再试一次") {
   const responseData = (error as { response?: { data?: any } })?.response?.data;
 
   if (typeof responseData === "string" && responseData.trim()) {

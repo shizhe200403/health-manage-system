@@ -39,10 +39,10 @@ const emit = defineEmits<{
 
 const toneLabel = computed(() => {
   return {
-    loading: "加载中",
-    empty: "暂无内容",
+    loading: "正在跟进",
+    empty: "还没铺开",
     error: "需要处理",
-    info: "提示",
+    info: "给你个提示",
   }[props.tone];
 });
 </script>
@@ -53,9 +53,12 @@ const toneLabel = computed(() => {
   gap: 10px;
   padding: 20px;
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.9);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 251, 255, 0.94)),
+    radial-gradient(circle at top right, rgba(87, 181, 231, 0.1), transparent 30%);
   border: 1px solid rgba(16, 34, 42, 0.08);
   box-shadow: 0 18px 50px rgba(15, 30, 39, 0.08);
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
 }
 
 .state-block.is-compact {
@@ -72,6 +75,12 @@ const toneLabel = computed(() => {
   text-transform: uppercase;
   color: #24566a;
   background: #e8f1f7;
+}
+
+.state-block:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 54px rgba(15, 30, 39, 0.12);
+  border-color: rgba(16, 34, 42, 0.12);
 }
 
 .state-block strong {
