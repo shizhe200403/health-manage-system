@@ -202,6 +202,24 @@
           @primary="saveRecord"
           @secondary="resetForm"
         />
+        <div v-if="lastSavedFollowUp" class="save-follow-up">
+          <div class="save-follow-up-copy">
+            <span class="save-follow-up-badge">{{ lastSavedFollowUp.badge }}</span>
+            <strong>{{ lastSavedFollowUp.title }}</strong>
+            <p>{{ lastSavedFollowUp.description }}</p>
+          </div>
+          <div class="save-follow-up-actions">
+            <el-button
+              v-for="action in lastSavedFollowUp.actions"
+              :key="action.label"
+              :type="action.primary ? 'primary' : 'default'"
+              :plain="!action.primary"
+              @click="runFollowUpAction(action)"
+            >
+              {{ action.label }}
+            </el-button>
+          </div>
+        </div>
       </el-form>
     </div>
 
@@ -324,6 +342,17 @@ const deletingId = ref<number | null>(null);
 const editingRecordId = ref<number | null>(null);
 const loadingRecords = ref(false);
 const records = ref<any[]>([]);
+const lastSavedFollowUp = ref<null | {
+  badge: string;
+  title: string;
+  description: string;
+  actions: Array<{
+    label: string;
+    primary?: boolean;
+    to?: string;
+    mealType?: "breakfast" | "lunch" | "dinner" | "snack";
+  }>;
+}>(null);
 const recipeOptions = ref<Array<Record<string, any>>>([]);
 const stats = reactive({
   summary: null as null | Record<string, any>,
@@ -506,6 +535,7 @@ function todayString() {
 }
 
 function resetForm() {
+  lastSavedFollowUp.value = null;
   editingRecordId.value = null;
   form.record_date = todayString();
   form.meal_type = "lunch";
@@ -518,6 +548,7 @@ function applyToday() {
 }
 
 function applyQuickMeal(mealType: "breakfast" | "lunch" | "dinner" | "snack") {
+  lastSavedFollowUp.value = null;
   editingRecordId.value = null;
   form.record_date = todayString();
   form.meal_type = mealType;
@@ -625,6 +656,7 @@ function syncTodaySummary() {
 }
 
 function applyRecipeShortcut(item: { recipe_id: number; title: string; meal_type?: string }) {
+  lastSavedFollowUp.value = null;
   form.recipe_id = item.recipe_id;
   form.note = item.title;
   form.meal_type = item.meal_type || form.meal_type;
@@ -639,6 +671,102 @@ function copyYesterdayMeal() {
     return;
   }
   reuseRecord(yesterdaySameMealRecord.value);
+}
+
+function nextMealType(mealType: string): "breakfast" | "lunch" | "dinner" | "snack" {
+  return (
+    {
+      breakfast: "lunch",
+      lunch: "dinner",
+      dinner: "snack",
+      snack: "dinner",
+    }[mealType] || "lunch"
+  ) as "breakfast" | "lunch" | "dinner" | "snack";
+}
+
+function followUpLibraryLabel() {
+  return recentRecipeShortcuts.value.length || frequentRecipeShortcuts.value.length ? "从常用菜谱里选" : "去菜谱库找一餐";
+}
+
+function followUpLibraryTarget() {
+  return recentRecipeShortcuts.value.length || frequentRecipeShortcuts.value.length ? "/favorites" : "/recipes";
+}
+
+function buildFollowUp(recordDate: string, mealType: string, mode: "create" | "update") {
+  const badge = mode === "update" ? "已更新" : "已保存";
+  const isToday = recordDate === todayString();
+  const nextMeal = nextMealType(mealType);
+
+  if (!isToday) {
+    return {
+      badge,
+      title: `${mealTypeLabel(mealType)}已同步到 ${recordDate}`,
+      description: "这条记录已经归档到对应日期。现在可以补今天的一餐，或者回看最近记录确认整体节奏。",
+      actions: [
+        { label: `快速记${mealTypeLabel(nextMeal)}`, primary: true, mealType: nextMeal },
+        { label: "查看最近记录", to: "/records" },
+      ],
+    };
+  }
+
+  const proteinGap = Math.max(0, proteinTarget.value - todaySummary.protein);
+  const energyGap = Math.max(0, energyTarget.value - todaySummary.energy);
+
+  if (proteinTarget.value > 0 && proteinGap >= 18) {
+    return {
+      badge,
+      title: `今天蛋白还差 ${proteinGap.toFixed(1)} g`,
+      description: `当前${mealTypeLabel(mealType)}已经记上了。下一步更适合补一份高蛋白选择，而不是继续盲目加量。`,
+      actions: [
+        { label: followUpLibraryLabel(), primary: true, to: followUpLibraryTarget() },
+        { label: `继续记${mealTypeLabel(nextMeal)}`, mealType: nextMeal },
+      ],
+    };
+  }
+
+  if (energyTarget.value > 0 && todaySummary.energy > energyTarget.value * 1.15) {
+    return {
+      badge,
+      title: "今天热量已经明显偏高",
+      description: "后续一餐更适合轻负担、低油低糖一点，先避免继续上冲，再回看整体趋势。",
+      actions: [
+        { label: "去菜谱库看轻负担", primary: true, to: "/recipes" },
+        { label: "查看今天记录", to: "/records" },
+      ],
+    };
+  }
+
+  if (energyTarget.value > 0 && energyGap > 0) {
+    return {
+      badge,
+      title: `距离今日热量目标还差 ${energyGap.toFixed(0)} kcal`,
+      description: "今天的记录已经在推进，继续补下一餐，热量和蛋白会更接近目标。",
+      actions: [
+        { label: `继续记${mealTypeLabel(nextMeal)}`, primary: true, mealType: nextMeal },
+        { label: followUpLibraryLabel(), to: followUpLibraryTarget() },
+      ],
+    };
+  }
+
+  return {
+    badge,
+    title: "这一餐已经记上，今天节奏基本正常",
+    description: "可以继续补下一餐，或者回看趋势和报表，确认这几天是不是都在稳定推进。",
+    actions: [
+      { label: "看看报表", primary: true, to: "/reports" },
+      { label: `继续记${mealTypeLabel(nextMeal)}`, mealType: nextMeal },
+    ],
+  };
+}
+
+function runFollowUpAction(action: { to?: string; mealType?: "breakfast" | "lunch" | "dinner" | "snack" }) {
+  if (action.mealType) {
+    applyQuickMeal(action.mealType);
+    return;
+  }
+  if (action.to) {
+    router.push(action.to);
+  }
 }
 
 async function loadRecords() {
@@ -693,6 +821,8 @@ async function createRecord() {
     }
 
     saving.value = true;
+    const recordDate = form.record_date;
+    const mealType = form.meal_type;
     await createMealRecord({
       record_date: form.record_date,
       meal_type: form.meal_type,
@@ -707,6 +837,7 @@ async function createRecord() {
     notifyActionSuccess("记录已保存");
     resetForm();
     await loadRecords();
+    lastSavedFollowUp.value = buildFollowUp(recordDate, mealType, "create");
   } catch (error) {
     notifyActionError("保存记录");
   } finally {
@@ -737,6 +868,8 @@ async function updateRecord() {
     }
 
     saving.value = true;
+    const recordDate = form.record_date;
+    const mealType = form.meal_type;
     await updateMealRecord(editingRecordId.value, {
       record_date: form.record_date,
       meal_type: form.meal_type,
@@ -751,6 +884,7 @@ async function updateRecord() {
     notifyActionSuccess("记录已更新");
     resetForm();
     await loadRecords();
+    lastSavedFollowUp.value = buildFollowUp(recordDate, mealType, "update");
   } catch (error) {
     notifyActionError("更新记录");
   } finally {
@@ -759,6 +893,7 @@ async function updateRecord() {
 }
 
 function editRecord(record: Record<string, any>) {
+  lastSavedFollowUp.value = null;
   editingRecordId.value = Number(record.id);
   form.record_date = record.record_date || todayString();
   form.meal_type = record.meal_type || "lunch";
@@ -768,6 +903,7 @@ function editRecord(record: Record<string, any>) {
 }
 
 function reuseRecord(record: Record<string, any>) {
+  lastSavedFollowUp.value = null;
   editingRecordId.value = null;
   form.record_date = todayString();
   form.meal_type = record.meal_type || "lunch";
@@ -973,6 +1109,53 @@ h2 {
   line-height: 1.6;
 }
 
+.save-follow-up {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(224, 247, 238, 0.72);
+  border: 1px solid rgba(31, 120, 89, 0.16);
+}
+
+.save-follow-up-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.save-follow-up-badge {
+  justify-self: flex-start;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(31, 120, 89, 0.12);
+  color: #1f6a4c;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.save-follow-up strong {
+  font-size: 18px;
+  color: #173042;
+}
+
+.save-follow-up p {
+  margin: 0;
+  color: #476072;
+  line-height: 1.65;
+}
+
+.save-follow-up-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .shortcut-panel {
   margin-bottom: 16px;
   padding: 16px;
@@ -1172,7 +1355,8 @@ h2 {
   .preview-head,
   .progress-top,
   .quick-helpers,
-  .helper-panel {
+  .helper-panel,
+  .save-follow-up {
     flex-direction: column;
   }
 
@@ -1199,6 +1383,16 @@ h2 {
 
   .shortcut-card {
     min-width: min(78vw, 240px);
+  }
+
+  .save-follow-up-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .save-follow-up-actions :deep(.el-button) {
+    width: 100%;
+    margin-left: 0;
   }
 }
 </style>
