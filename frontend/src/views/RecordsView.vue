@@ -241,6 +241,16 @@
             <span>碳水 {{ formatMetric(selectedRecipe.nutrition_summary?.per_serving_carbohydrate, "g") }}</span>
           </div>
         </div>
+        <div v-if="savePreview" class="save-preview">
+          <div class="save-preview-copy">
+            <span class="save-preview-badge">{{ savePreview.badge }}</span>
+            <strong>{{ savePreview.title }}</strong>
+            <p>{{ savePreview.description }}</p>
+          </div>
+          <div class="save-preview-highlights">
+            <span v-for="item in savePreview.highlights" :key="item">{{ item }}</span>
+          </div>
+        </div>
         <FormActionBar
           :tone="saving ? 'saving' : recordFormTone"
           :title="recordFormTitle"
@@ -257,6 +267,9 @@
             <span class="save-follow-up-badge">{{ lastSavedFollowUp.badge }}</span>
             <strong>{{ lastSavedFollowUp.title }}</strong>
             <p>{{ lastSavedFollowUp.description }}</p>
+            <div v-if="lastSavedFollowUp.highlights.length" class="save-follow-up-highlights">
+              <span v-for="item in lastSavedFollowUp.highlights" :key="item">{{ item }}</span>
+            </div>
           </div>
           <div class="save-follow-up-actions">
             <el-button
@@ -396,6 +409,7 @@ const lastSavedFollowUp = ref<null | {
   badge: string;
   title: string;
   description: string;
+  highlights: string[];
   actions: Array<{
     label: string;
     primary?: boolean;
@@ -636,6 +650,72 @@ const workbenchDescription = computed(() => {
   }
   return "先选一个最接近当前场景的餐次，把今天的记录连续性补起来。";
 });
+const savePreview = computed<null | { badge: string; title: string; description: string; highlights: string[] }>(() => {
+  if (!form.record_date || (!form.recipe_id && !form.note.trim())) {
+    return null;
+  }
+
+  const recordDate = form.record_date;
+  const mealType = form.meal_type;
+  const isToday = recordDate === todayString();
+  const isEditing = Boolean(editingRecordId.value);
+  const selectedRecipeEnergy = numericValue(selectedRecipe.value?.nutrition_summary?.per_serving_energy);
+  const selectedRecipeProtein = numericValue(selectedRecipe.value?.nutrition_summary?.per_serving_protein);
+  const dateRecords = records.value.filter((record) => record.record_date === recordDate);
+  const existingSameMealRecord = dateRecords.find(
+    (record) => record.meal_type === mealType && Number(record.id) !== Number(editingRecordId.value || 0),
+  );
+  const projectedMealCount = new Set([
+    ...dateRecords
+      .filter((record) => Number(record.id) !== Number(editingRecordId.value || 0))
+      .map((record) => record.meal_type),
+    mealType,
+  ]).size;
+  const nextMeal = nextMealType(mealType);
+
+  if (!isToday) {
+    return {
+      badge: isEditing ? "修改预览" : "保存预览",
+      title: `${mealTypeLabel(mealType)}会归档到 ${recordDate}`,
+      description: existingSameMealRecord
+        ? "这个日期同餐次已经有记录，保存后会以当前内容覆盖它。"
+        : "保存后这条记录会进入对应日期，不会影响今天的即时进度卡片。",
+      highlights: [
+        `归档日期 ${recordDate}`,
+        existingSameMealRecord ? "同餐次将被覆盖" : `当日将累计 ${projectedMealCount} 餐`,
+        `完成后可继续补${mealTypeLabel(nextMeal)}`,
+      ],
+    };
+  }
+
+  if (!form.recipe_id) {
+    return {
+      badge: isEditing ? "修改预览" : "保存预览",
+      title: `${mealTypeLabel(mealType)}会先作为备注记录保存`,
+      description: "这能先把今天的连续性补上，但不会自动增加热量和蛋白统计，后续最好补成正式菜谱。",
+      highlights: [
+        `今日将累计 ${projectedMealCount} / 4 餐`,
+        "营养统计暂不增加",
+        `下一步建议补${mealTypeLabel(nextMeal)}`,
+      ],
+    };
+  }
+
+  const projectedEnergy = todaySummary.energy + selectedRecipeEnergy;
+  const projectedProtein = todaySummary.protein + selectedRecipeProtein;
+  return {
+    badge: isEditing ? "修改预览" : "保存预览",
+    title: `${mealTypeLabel(mealType)}保存后会直接进入今日统计`,
+    description: existingSameMealRecord
+      ? "当前餐次今天已经有记录，保存后会覆盖同餐次内容，并更新下方趋势与今日进度。"
+      : "保存后今日进度、趋势和后续建议会一起刷新，你可以直接顺着下一步继续记。",
+    highlights: [
+      `今日将累计 ${projectedMealCount} / 4 餐`,
+      `热量预计 ${formatMetric(projectedEnergy, "kcal")}`,
+      `蛋白预计 ${formatMetric(projectedProtein, "g")}`,
+    ],
+  };
+});
 
 function todayString() {
   const date = new Date();
@@ -862,6 +942,24 @@ function followUpLibraryTarget() {
   return recentRecipeShortcuts.value.length || frequentRecipeShortcuts.value.length ? "/favorites" : "/recipes";
 }
 
+function buildFollowUpHighlights(recordDate: string, mealType: string) {
+  const isToday = recordDate === todayString();
+  const completedMeals = mealChecklist.value.filter((item) => item.done).length;
+  const proteinGap = proteinTarget.value > 0 ? Math.max(0, proteinTarget.value - todaySummary.protein) : 0;
+  const energyGap = energyTarget.value > 0 ? energyTarget.value - todaySummary.energy : 0;
+  const nextMissingMeal = mealChecklist.value.find((item) => !item.done)?.label || mealTypeLabel(nextMealType(mealType));
+
+  if (!isToday) {
+    return [`归档到 ${recordDate}`, "已同步到历史记录", `下一步可补${mealTypeLabel(nextMealType(mealType))}`];
+  }
+
+  return [
+    `今日已记录 ${completedMeals} / 4 餐`,
+    energyTarget.value > 0 ? (energyGap > 0 ? `热量还差 ${formatMetric(energyGap, "kcal")}` : "热量已达到目标") : `热量 ${formatMetric(todaySummary.energy, "kcal")}`,
+    proteinTarget.value > 0 ? (proteinGap > 0 ? `蛋白还差 ${formatMetric(proteinGap, "g")}` : "蛋白已达到目标") : `下一步建议补${nextMissingMeal}`,
+  ];
+}
+
 function buildFollowUp(recordDate: string, mealType: string, mode: "create" | "update") {
   const badge = mode === "update" ? "已更新" : "已保存";
   const isToday = recordDate === todayString();
@@ -872,6 +970,7 @@ function buildFollowUp(recordDate: string, mealType: string, mode: "create" | "u
       badge,
       title: `${mealTypeLabel(mealType)}已同步到 ${recordDate}`,
       description: "这条记录已经归档到对应日期。现在可以补今天的一餐，或者回看最近记录确认整体节奏。",
+      highlights: buildFollowUpHighlights(recordDate, mealType),
       actions: [
         { label: `快速记${mealTypeLabel(nextMeal)}`, primary: true, mealType: nextMeal },
         { label: "查看最近记录", to: "/records" },
@@ -887,6 +986,7 @@ function buildFollowUp(recordDate: string, mealType: string, mode: "create" | "u
       badge,
       title: `今天蛋白还差 ${proteinGap.toFixed(1)} g`,
       description: `当前${mealTypeLabel(mealType)}已经记上了。下一步更适合补一份高蛋白选择，而不是继续盲目加量。`,
+      highlights: buildFollowUpHighlights(recordDate, mealType),
       actions: [
         { label: followUpLibraryLabel(), primary: true, to: followUpLibraryTarget() },
         { label: `继续记${mealTypeLabel(nextMeal)}`, mealType: nextMeal },
@@ -899,6 +999,7 @@ function buildFollowUp(recordDate: string, mealType: string, mode: "create" | "u
       badge,
       title: "今天热量已经明显偏高",
       description: "后续一餐更适合轻负担、低油低糖一点，先避免继续上冲，再回看整体趋势。",
+      highlights: buildFollowUpHighlights(recordDate, mealType),
       actions: [
         { label: "去菜谱库看轻负担", primary: true, to: "/recipes" },
         { label: "查看今天记录", to: "/records" },
@@ -911,6 +1012,7 @@ function buildFollowUp(recordDate: string, mealType: string, mode: "create" | "u
       badge,
       title: `距离今日热量目标还差 ${energyGap.toFixed(0)} kcal`,
       description: "今天的记录已经在推进，继续补下一餐，热量和蛋白会更接近目标。",
+      highlights: buildFollowUpHighlights(recordDate, mealType),
       actions: [
         { label: `继续记${mealTypeLabel(nextMeal)}`, primary: true, mealType: nextMeal },
         { label: followUpLibraryLabel(), to: followUpLibraryTarget() },
@@ -922,6 +1024,7 @@ function buildFollowUp(recordDate: string, mealType: string, mode: "create" | "u
     badge,
     title: "这一餐已经记上，今天节奏基本正常",
     description: "可以继续补下一餐，或者回看趋势和报表，确认这几天是不是都在稳定推进。",
+    highlights: buildFollowUpHighlights(recordDate, mealType),
     actions: [
       { label: "看看报表", primary: true, to: "/reports" },
       { label: `继续记${mealTypeLabel(nextMeal)}`, mealType: nextMeal },
@@ -1362,6 +1465,7 @@ h2 {
   line-height: 1.6;
 }
 
+.save-preview,
 .save-follow-up {
   display: flex;
   justify-content: space-between;
@@ -1370,36 +1474,90 @@ h2 {
   margin-top: 16px;
   padding: 16px 18px;
   border-radius: 18px;
+}
+
+.save-preview {
+  background: rgba(255, 245, 231, 0.72);
+  border: 1px solid rgba(185, 115, 38, 0.16);
+}
+
+.save-follow-up {
   background: rgba(224, 247, 238, 0.72);
   border: 1px solid rgba(31, 120, 89, 0.16);
 }
 
+.save-preview-copy,
 .save-follow-up-copy {
   display: grid;
   gap: 8px;
 }
 
+.save-preview-badge,
 .save-follow-up-badge {
   justify-self: flex-start;
   padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(31, 120, 89, 0.12);
-  color: #1f6a4c;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
+.save-preview-badge {
+  background: rgba(185, 115, 38, 0.12);
+  color: #9a5f17;
+}
+
+.save-follow-up-badge {
+  background: rgba(31, 120, 89, 0.12);
+  color: #1f6a4c;
+}
+
+.save-preview strong,
 .save-follow-up strong {
   font-size: 18px;
   color: #173042;
 }
 
+.save-preview p,
 .save-follow-up p {
   margin: 0;
   color: #476072;
   line-height: 1.65;
+}
+
+.save-preview-highlights,
+.save-follow-up-highlights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.save-preview-highlights span,
+.save-follow-up-highlights span {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.save-preview-highlights {
+  justify-content: flex-end;
+}
+
+.save-preview-highlights span {
+  background: rgba(255, 255, 255, 0.78);
+  color: #8d5818;
+  border: 1px solid rgba(185, 115, 38, 0.12);
+}
+
+.save-follow-up-highlights span {
+  background: rgba(255, 255, 255, 0.78);
+  color: #1f6a4c;
+  border: 1px solid rgba(31, 120, 89, 0.12);
 }
 
 .save-follow-up-actions {
@@ -1609,6 +1767,7 @@ h2 {
   .progress-top,
   .quick-helpers,
   .helper-panel,
+  .save-preview,
   .save-follow-up,
   .workbench-hero,
   .workbench-actions,
@@ -1645,6 +1804,11 @@ h2 {
   .save-follow-up-actions {
     width: 100%;
     justify-content: stretch;
+  }
+
+  .save-preview-highlights,
+  .save-follow-up-highlights {
+    width: 100%;
   }
 
   .save-follow-up-actions :deep(.el-button) {
