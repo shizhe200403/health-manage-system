@@ -35,6 +35,104 @@
     </div>
 
     <div class="grid">
+      <div class="card review-stage-card">
+        <div class="review-stage-head">
+          <div>
+            <p class="section-kicker">Stage Review</p>
+            <h3>阶段复盘</h3>
+            <p>先看结论，再决定是补记录、回看旧报表，还是生成新的周期复盘。</p>
+          </div>
+          <span class="status-pill" :class="reviewStageTone">{{ reviewStageLabel }}</span>
+        </div>
+
+        <div class="review-hero">
+          <div class="review-hero-copy">
+            <span>当前最该关注</span>
+            <strong>{{ reviewHeadline }}</strong>
+            <p>{{ reviewSummary }}</p>
+          </div>
+          <div class="review-hero-actions">
+            <el-button v-if="primaryReviewSuggestion" type="primary" @click="handleReportSuggestion(primaryReviewSuggestion)">{{ primaryReviewSuggestion.cta }}</el-button>
+            <el-button v-else type="primary" @click="triggerRecommendedGeneration(reviewFallbackType)">
+              {{ reviewFallbackType === "monthly" ? "生成推荐月报" : "生成推荐周报" }}
+            </el-button>
+            <a v-if="latestCompletedTask?.file_url" class="review-link" :href="latestCompletedTask.file_url" target="_blank" rel="noreferrer">打开最新报表</a>
+          </div>
+        </div>
+
+        <div class="review-metrics">
+          <article v-for="item in reviewMetrics" :key="item.label" class="review-metric">
+            <span>{{ item.label }}</span>
+            <strong>{{ item.value }}</strong>
+            <p>{{ item.hint }}</p>
+          </article>
+        </div>
+
+        <div class="review-conclusions">
+          <article v-for="item in reviewConclusions" :key="item.label" class="review-conclusion" :class="`tone-${item.tone}`">
+            <span>{{ item.label }}</span>
+            <strong>{{ item.title }}</strong>
+            <p>{{ item.copy }}</p>
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>建议动作</h3>
+            <p>只保留当前最值得执行的动作，避免用户面对很多状态却不知道下一步是什么。</p>
+          </div>
+        </div>
+
+        <div v-if="reportActionSuggestions.length" class="action-list">
+          <article v-for="item in reportActionSuggestions" :key="item.key" class="action-item">
+            <div class="action-copy">
+              <strong>{{ item.title }}</strong>
+              <p>{{ item.copy }}</p>
+            </div>
+            <el-button plain @click="handleReportSuggestion(item)">{{ item.cta }}</el-button>
+          </article>
+        </div>
+        <PageStateBlock
+          v-else
+          tone="info"
+          title="当前建议已经比较明确"
+          description="可以继续查看最新报表，或者按推荐周期发起新的复盘。"
+          compact
+        />
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>饮食观察</h3>
+            <p>把最近的记录整理成更容易理解的提示，帮助你判断本周吃得怎么样。</p>
+          </div>
+        </div>
+
+        <div v-if="reportInsights.length" class="status-list">
+          <article v-for="item in reportInsights" :key="item.title" class="status-item">
+            <div class="status-line">
+              <strong>{{ item.title }}</strong>
+              <span class="status-pill" :class="item.tone">{{ item.badge }}</span>
+            </div>
+            <p>{{ item.copy }}</p>
+          </article>
+        </div>
+        <PageStateBlock
+          v-else
+          tone="empty"
+          title="当前还没有足够记录可以分析"
+          description="先记录几餐，系统才知道该提醒你复盘什么。"
+          compact
+        />
+      </div>
+    </div>
+
+    <div class="grid">
       <div class="card">
         <div class="card-head">
           <div>
@@ -89,52 +187,41 @@
       <div class="card">
         <div class="card-head">
           <div>
-            <h3>饮食观察</h3>
-            <p>把最近的记录整理成更容易理解的提示，帮助你判断本周吃得怎么样。</p>
+            <h3>最新报表</h3>
+            <p>优先回看最近一次结果，不必每次都重新生成，先看现成结论更省事。</p>
           </div>
         </div>
 
-        <div v-if="reportInsights.length" class="status-list">
-          <article v-for="item in reportInsights" :key="item.title" class="status-item">
-            <div class="status-line">
-              <strong>{{ item.title }}</strong>
-              <span class="status-pill" :class="item.tone">{{ item.badge }}</span>
+        <div v-if="latestTask" class="report-overview">
+          <div class="status-row">
+            <div class="status-pill" :class="statusClass(latestTask.status)">{{ taskStatusLabel(latestTask.status) }}</div>
+            <span class="overview-tip">{{ latestTask.file_url ? "文件已可下载" : "暂未生成文件" }}</span>
+          </div>
+          <div class="meta">
+            <div>
+              <span>报表类型</span>
+              <strong>{{ taskTypeLabel(latestTask.report_type) }}</strong>
             </div>
-            <p>{{ item.copy }}</p>
-          </article>
+            <div>
+              <span>覆盖时间</span>
+              <strong>{{ formatDateRange(latestTask.start_date, latestTask.end_date) }}</strong>
+            </div>
+            <div>
+              <span>生成时间</span>
+              <strong>{{ formatDateTime(latestTask.generated_at) }}</strong>
+            </div>
+          </div>
+          <div class="download" v-if="latestTask.file_url">
+            <a :href="latestTask.file_url" target="_blank" rel="noreferrer">打开最新报表</a>
+          </div>
         </div>
         <PageStateBlock
           v-else
           tone="empty"
-          title="当前还没有足够记录可以分析"
-          description="先记录几餐，系统才知道该提醒你复盘什么。"
-          compact
-        />
-      </div>
-
-      <div class="card">
-        <div class="card-head">
-          <div>
-            <h3>建议动作</h3>
-            <p>只保留当前最值得执行的动作，避免用户面对很多状态却不知道下一步是什么。</p>
-          </div>
-        </div>
-
-        <div v-if="reportActionSuggestions.length" class="action-list">
-          <article v-for="item in reportActionSuggestions" :key="item.key" class="action-item">
-            <div class="action-copy">
-              <strong>{{ item.title }}</strong>
-              <p>{{ item.copy }}</p>
-            </div>
-            <el-button plain @click="handleReportSuggestion(item)">{{ item.cta }}</el-button>
-          </article>
-        </div>
-        <PageStateBlock
-          v-else
-          tone="info"
-          title="当前建议已经比较明确"
-          description="可以继续查看最新报表，或者按推荐周期发起新的复盘。"
-          compact
+          title="还没有生成过报表"
+          description="先生成一份周报或月报，后续历史记录和复盘中心才会真正形成资产。"
+          action-label="生成推荐周报"
+          @action="applyRecommendedPreset('weekly')"
         />
       </div>
     </div>
@@ -223,41 +310,6 @@
     </div>
 
     <div class="card">
-      <h3>最新报表</h3>
-      <div v-if="latestTask" class="report-overview">
-        <div class="status-row">
-          <div class="status-pill" :class="statusClass(latestTask.status)">{{ taskStatusLabel(latestTask.status) }}</div>
-          <span class="overview-tip">{{ latestTask.file_url ? "文件已可下载" : "暂未生成文件" }}</span>
-        </div>
-        <div class="meta">
-          <div>
-            <span>报表类型</span>
-            <strong>{{ taskTypeLabel(latestTask.report_type) }}</strong>
-          </div>
-          <div>
-            <span>覆盖时间</span>
-            <strong>{{ formatDateRange(latestTask.start_date, latestTask.end_date) }}</strong>
-          </div>
-          <div>
-            <span>生成时间</span>
-            <strong>{{ formatDateTime(latestTask.generated_at) }}</strong>
-          </div>
-        </div>
-        <div class="download" v-if="latestTask.file_url">
-          <a :href="latestTask.file_url" target="_blank" rel="noreferrer">打开最新报表</a>
-        </div>
-      </div>
-      <PageStateBlock
-        v-else
-        tone="empty"
-        title="还没有生成过报表"
-        description="先生成一份周报或月报，后续历史记录和复盘中心才会真正形成资产。"
-        action-label="生成推荐周报"
-        @action="applyRecommendedPreset('weekly')"
-      />
-    </div>
-
-    <div class="card">
       <div class="history-head">
         <div>
           <h3>历史记录</h3>
@@ -309,6 +361,27 @@ import { exportReport, deleteReportTask, listReportTasks, monthlyReport, weeklyR
 import { trackEvent } from "../api/behavior";
 import { listMealRecords, mealStatistics } from "../api/tracking";
 
+type ReportSuggestionAction =
+  | { type: "route"; to: string }
+  | { type: "refresh" }
+  | { type: "open"; url: string }
+  | { type: "generate"; reportType: "weekly" | "monthly" };
+
+type ReportSuggestion = {
+  key: string;
+  title: string;
+  copy: string;
+  cta: string;
+  action: ReportSuggestionAction;
+};
+
+type ReviewConclusion = {
+  label: string;
+  title: string;
+  copy: string;
+  tone: "warm" | "success" | "accent";
+};
+
 const router = useRouter();
 const generating = ref(false);
 const loadingTasks = ref(false);
@@ -333,6 +406,8 @@ const latestCompletedTask = computed(() => reportTasks.value.find((task) => task
 const latestWeeklyTask = computed(() => reportTasks.value.find((task) => task.report_type === "weekly" && task.status === "completed" && task.file_url) ?? null);
 const latestMonthlyTask = computed(() => reportTasks.value.find((task) => task.report_type === "monthly" && task.status === "completed" && task.file_url) ?? null);
 const processingTasks = computed(() => reportTasks.value.filter((task) => ["pending", "processing"].includes(task.status)));
+const latestWeeklyAgeDays = computed(() => taskAgeDays(latestWeeklyTask.value));
+const latestMonthlyAgeDays = computed(() => taskAgeDays(latestMonthlyTask.value));
 const showReportsSkeleton = computed(() => {
   return (loadingTasks.value || loadingReadiness.value) && !reportTasks.value.length && !readiness.week.meals && !readiness.month.meals;
 });
@@ -446,27 +521,15 @@ const reportInsights = computed(() => {
 
   return insights.slice(0, 3);
 });
-const latestWeeklyAgeDays = computed(() => taskAgeDays(latestWeeklyTask.value));
-const latestMonthlyAgeDays = computed(() => taskAgeDays(latestMonthlyTask.value));
-const reportActionSuggestions = computed(() => {
-  const actions: Array<{
-    key: string;
-    title: string;
-    copy: string;
-    cta: string;
-    action:
-      | { type: "route"; to: string }
-      | { type: "refresh" }
-      | { type: "open"; url: string }
-      | { type: "generate"; reportType: "weekly" | "monthly" };
-  }> = [];
+const reportActionSuggestions = computed<ReportSuggestion[]>(() => {
+  const actions: ReportSuggestion[] = [];
 
   const registerAction = (
     key: string,
     title: string,
     copy: string,
     cta: string,
-    action: { type: "route"; to: string } | { type: "refresh" } | { type: "open"; url: string } | { type: "generate"; reportType: "weekly" | "monthly" },
+    action: ReportSuggestionAction,
   ) => {
     if (actions.some((item) => item.key === key)) {
       return;
@@ -544,8 +607,142 @@ const reportActionSuggestions = computed(() => {
     );
   }
 
-  return actions.slice(0, 4);
+  return actions.slice(0, 3);
 });
+const primaryReviewSuggestion = computed<ReportSuggestion | null>(() => reportActionSuggestions.value[0] ?? null);
+const reviewStageLabel = computed(() => {
+  if (readiness.month.activeDays >= 10) {
+    return "阶段复盘窗口";
+  }
+  if (readiness.week.activeDays >= 4) {
+    return "周复盘窗口";
+  }
+  return "先补记录";
+});
+const reviewStageTone = computed(() => {
+  if (readiness.month.activeDays >= 10) {
+    return "is-completed";
+  }
+  if (readiness.week.activeDays >= 4) {
+    return "is-processing";
+  }
+  return "is-pending";
+});
+const reviewHeadline = computed(() => {
+  if (readiness.week.activeDays < 4 || readiness.week.meals < 8) {
+    return "先把记录补连续，比急着导出更重要";
+  }
+  if (weekAverageProtein.value > 0 && weekAverageProtein.value < 65) {
+    return "这周先补蛋白，比再看更多数字更关键";
+  }
+  if (!processingTasks.value.length && readiness.month.activeDays >= 10 && (!latestMonthlyTask.value || (latestMonthlyAgeDays.value ?? 999) >= 28)) {
+    return "现在值得做一次月度复盘";
+  }
+  if (!processingTasks.value.length && readiness.week.activeDays >= 4 && (!latestWeeklyTask.value || (latestWeeklyAgeDays.value ?? 999) >= 7)) {
+    return "这一周已经可以沉淀成一份新周报";
+  }
+  if (latestCompletedTask.value?.file_url) {
+    return "先回看最新报表，再决定要不要重新生成";
+  }
+  return readinessHeadline.value;
+});
+const reviewSummary = computed(() => {
+  if (readiness.week.activeDays < 4 || readiness.week.meals < 8) {
+    return `最近 7 天只有 ${readiness.week.activeDays} 天、${readiness.week.meals} 餐有效记录。先补齐输入，再生成报表，结论会更像真实复盘。`;
+  }
+  if (weekAverageProtein.value > 0 && weekAverageProtein.value < 65) {
+    return `按活跃天估算，最近一周日均蛋白约 ${weekAverageProtein.value.toFixed(1)} g。下一步优先把几顿主餐拉到更稳的蛋白水平。`;
+  }
+  if (!processingTasks.value.length && readiness.month.activeDays >= 10 && (!latestMonthlyTask.value || (latestMonthlyAgeDays.value ?? 999) >= 28)) {
+    return `最近 30 天已有 ${readiness.month.activeDays} 天活跃记录，阶段样本已经够用，适合看一次月报而不只是单周波动。`;
+  }
+  if (!processingTasks.value.length && readiness.week.activeDays >= 4 && (!latestWeeklyTask.value || (latestWeeklyAgeDays.value ?? 999) >= 7)) {
+    return `最近 7 天已有 ${readiness.week.activeDays} 天活跃记录，可以把这周的输入沉淀成一份更容易回看的周复盘。`;
+  }
+  if (latestCompletedTask.value?.file_url) {
+    return "你已经有可回看的报表资产，先打开最新结果看结论，再决定是否需要重新导出。";
+  }
+  return readinessCopy.value;
+});
+const reviewMetrics = computed(() => [
+  {
+    label: "最近7天活跃",
+    value: `${readiness.week.activeDays} 天`,
+    hint: readiness.week.activeDays >= 4 ? "周报条件基本够用" : "还差一点连续性",
+  },
+  {
+    label: "最近7天餐次",
+    value: `${readiness.week.meals} 餐`,
+    hint: readiness.week.meals >= 8 ? "输入量足够看趋势" : "样本还偏少",
+  },
+  {
+    label: "日均蛋白",
+    value: weekAverageProtein.value > 0 ? `${weekAverageProtein.value.toFixed(1)} g` : "待累计",
+    hint: weekAverageProtein.value >= 65 ? "主餐结构相对稳" : "可以继续补强",
+  },
+]);
+const reviewConclusions = computed<ReviewConclusion[]>(() => {
+  const issue: ReviewConclusion =
+    readiness.week.activeDays < 4 || readiness.week.meals < 8
+      ? {
+          label: "最大问题",
+          title: "记录覆盖度还不够连续",
+          copy: `现在先补记录更划算，至少补到 4 天活跃、8 餐以上，再看周报会更有意义。`,
+          tone: "warm",
+        }
+      : weekAverageProtein.value > 0 && weekAverageProtein.value < 65
+        ? {
+            label: "最大问题",
+            title: "蛋白摄入偏弱",
+            copy: `最近一周日均蛋白约 ${weekAverageProtein.value.toFixed(1)} g，下一阶段优先把一日一餐换成更高蛋白的组合。`,
+            tone: "warm",
+          }
+        : {
+            label: "最大问题",
+            title: "当前更缺明确复盘动作",
+            copy: "数据已经在累积，下一步不是继续观望，而是尽快生成或回看一份报表，把结论落到行动上。",
+            tone: "warm",
+          };
+
+  const keep: ReviewConclusion =
+    readiness.week.activeDays >= 5
+      ? {
+          label: "值得保留",
+          title: "最近一周记录节奏是稳定的",
+          copy: `你已经连续记录了 ${readiness.week.activeDays} 天，这种输入习惯本身就是后续复盘有用的基础。`,
+          tone: "success",
+        }
+      : latestCompletedTask.value?.file_url
+        ? {
+            label: "值得保留",
+            title: "已经开始积累可回看的报表资产",
+            copy: "不需要每次都从零分析，已有报表会让后续比较不同阶段时更省力。",
+            tone: "success",
+          }
+        : {
+            label: "值得保留",
+            title: "当前记录习惯已经开始形成",
+            copy: "哪怕现在还不够完整，也建议继续保持每天至少记录一餐，别让输入节奏断掉。",
+            tone: "success",
+          };
+
+  const next: ReviewConclusion = primaryReviewSuggestion.value
+    ? {
+        label: "下一步",
+        title: primaryReviewSuggestion.value.title,
+        copy: primaryReviewSuggestion.value.copy,
+        tone: "accent",
+      }
+    : {
+        label: "下一步",
+        title: "先打开推荐周期",
+        copy: "如果当前没有明显阻塞，直接从推荐周报或月报开始，通常已经足够。",
+        tone: "accent",
+      };
+
+  return [issue, keep, next];
+});
+const reviewFallbackType = computed<"weekly" | "monthly">(() => (readiness.month.activeDays >= 10 ? "monthly" : "weekly"));
 const weekCoverageBars = computed(() => {
   return readiness.week.trend.slice(-7).map((item, index, source) => ({
     label: String(item.date || "").slice(5),
@@ -660,7 +857,7 @@ async function triggerRecommendedGeneration(kind: "weekly" | "monthly") {
 }
 
 async function handleReportSuggestion(item: {
-  action: { type: "route"; to: string } | { type: "refresh" } | { type: "open"; url: string } | { type: "generate"; reportType: "weekly" | "monthly" };
+  action: ReportSuggestionAction;
 }) {
   if (item.action.type === "route") {
     router.push(item.action.to);
@@ -823,6 +1020,7 @@ onBeforeUnmount(() => {
 
 .head,
 .card-head,
+.review-stage-head,
 .history-head,
 .history-top,
 .status-line,
@@ -852,6 +1050,10 @@ h2 {
 
 .desc,
 .card-head p,
+.review-stage-head p,
+.review-hero-copy p,
+.review-metric p,
+.review-conclusion p,
 .empty-state p,
 .history-item p,
 .history-meta,
@@ -884,6 +1086,13 @@ h2 {
   margin-top: 14px;
 }
 
+.review-stage-card {
+  grid-column: 1 / -1;
+  background:
+    radial-gradient(circle at top right, rgba(134, 197, 178, 0.22), transparent 30%),
+    linear-gradient(135deg, rgba(250, 252, 255, 0.98), rgba(242, 248, 251, 0.96));
+}
+
 .summary-grid article,
 .card,
 .coverage-grid article {
@@ -897,12 +1106,23 @@ h2 {
 .summary-grid span,
 .coverage-grid span,
 .meta span,
-.head-tip span {
+.head-tip span,
+.review-hero-copy span,
+.review-metric span,
+.review-conclusion span {
   display: block;
   font-size: 12px;
   color: #5a7a8a;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.section-kicker {
+  margin: 0 0 8px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-size: 12px;
+  color: #2f6672;
 }
 
 .summary-grid strong {
@@ -925,7 +1145,9 @@ h2 {
 .report-overview,
 .empty-state,
 .history-item,
-.status-item {
+.status-item,
+.review-metric,
+.review-conclusion {
   margin-top: 14px;
   padding: 18px;
   border-radius: 18px;
@@ -937,8 +1159,88 @@ h2 {
 .meta strong,
 .empty-state strong,
 .history-item strong,
-.status-item strong {
+.status-item strong,
+.review-hero-copy strong,
+.review-metric strong,
+.review-conclusion strong {
   font-size: 18px;
+}
+
+.review-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  margin-top: 18px;
+  padding: 20px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(16, 34, 42, 0.08);
+}
+
+.review-hero-copy strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 28px;
+  line-height: 1.3;
+}
+
+.review-hero-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 180px;
+}
+
+.review-link {
+  color: #173042;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.review-metrics,
+.review-conclusions {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.review-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.review-conclusions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.review-metric {
+  margin-top: 0;
+}
+
+.review-metric strong,
+.review-conclusion strong {
+  display: block;
+  margin-top: 10px;
+}
+
+.review-conclusion {
+  margin-top: 0;
+}
+
+.review-conclusion.tone-warm {
+  background: rgba(255, 248, 241, 0.96);
+  border-color: rgba(185, 115, 38, 0.18);
+}
+
+.review-conclusion.tone-success {
+  background: rgba(241, 252, 247, 0.96);
+  border-color: rgba(29, 111, 95, 0.16);
+}
+
+.review-conclusion.tone-accent {
+  background: rgba(240, 248, 255, 0.96);
+  border-color: rgba(62, 109, 127, 0.16);
 }
 
 .actions {
@@ -1036,7 +1338,9 @@ h2 {
 
 @media (max-width: 960px) {
   .grid,
-  .coverage-grid {
+  .coverage-grid,
+  .review-metrics,
+  .review-conclusions {
     grid-template-columns: 1fr;
   }
 }
@@ -1056,12 +1360,21 @@ h2 {
 
   .head,
   .card-head,
+  .review-stage-head,
   .history-head,
   .history-top,
   .status-line,
   .status-row,
   .action-item {
     flex-direction: column;
+  }
+
+  .review-hero {
+    flex-direction: column;
+  }
+
+  .review-hero-copy strong {
+    font-size: 22px;
   }
 
   .actions {
