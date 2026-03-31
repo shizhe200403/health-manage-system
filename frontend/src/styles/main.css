@@ -53,6 +53,34 @@ a {
   color: inherit;
 }
 
+a[href],
+button,
+[role="button"],
+summary,
+.el-button,
+.el-switch,
+.el-radio-button,
+.el-checkbox,
+.el-pagination button,
+.el-select__wrapper,
+.el-date-editor,
+.el-cascader,
+.el-upload,
+.mobile-rail-link,
+.extension-tab,
+.template-card,
+.shortcut-card {
+  cursor: pointer !important;
+}
+
+input,
+textarea,
+.el-input__inner,
+.el-textarea__inner,
+.el-input-number .el-input__inner {
+  cursor: text !important;
+}
+
 ::selection {
   background: rgba(87, 181, 231, 0.24);
   color: #10202c;
@@ -203,6 +231,12 @@ video {
   transform: translateY(-1px);
 }
 
+.el-button:not(.is-disabled):active,
+button:not(:disabled):active,
+a[href]:active {
+  transform: translateY(0) scale(0.975);
+}
+
 .el-button--primary {
   box-shadow: 0 14px 28px rgba(23, 48, 66, 0.16);
 }
@@ -238,6 +272,28 @@ video {
 .el-date-editor .el-input__wrapper:hover {
   transform: translateY(-1px);
   box-shadow: 0 0 0 1px rgba(16, 34, 42, 0.12), 0 12px 24px rgba(15, 30, 39, 0.06) !important;
+}
+
+.el-switch,
+.el-radio-button__inner,
+.el-checkbox__inner {
+  transition:
+    transform var(--app-ease),
+    box-shadow var(--app-ease),
+    border-color var(--app-ease),
+    background var(--app-ease) !important;
+}
+
+.el-switch:hover,
+.el-radio-button__inner:hover,
+.el-checkbox__inner:hover {
+  transform: translateY(-1px);
+}
+
+.el-switch:active,
+.el-radio-button__inner:active,
+.el-checkbox__inner:active {
+  transform: scale(0.97);
 }
 
 .el-input__wrapper.is-focus,

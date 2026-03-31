@@ -38,7 +38,7 @@
       </article>
     </div>
 
-    <div class="focus-strip">
+    <div class="focus-strip interactive-focus-strip">
       <div>
         <strong>{{ activeGoal ? `${goalTypeLabel(activeGoal.goal_type)}阶段推荐` : "当前未设置重点目标" }}</strong>
         <p>{{ goalFocusedCopy }}</p>
@@ -46,7 +46,7 @@
       <el-button v-if="goalSuggestedFilter !== 'all'" plain @click="sceneFilter = goalSuggestedFilter">应用目标筛选</el-button>
     </div>
 
-    <div class="creator-strip">
+    <div class="creator-strip interactive-creator-strip">
       <div class="creator-copy">
         <strong>先把自己的菜谱沉淀进系统</strong>
         <p>当前已去掉外部菜谱与外部食物依赖。常吃什么就先上传什么，后面的记录、收藏和报表会更稳定。</p>
@@ -124,7 +124,7 @@
           <strong>{{ recipeWorkbenchHeadline }}</strong>
           <p>{{ recipeWorkbenchDescription }}</p>
         </div>
-        <article class="decision-primary-card">
+        <article class="decision-primary-card interactive-decision-card">
           <div class="card-head">
             <strong>{{ workbenchPrimaryRecipe.title }}</strong>
             <span class="pick-badge">{{ quickPickLabel(workbenchPrimaryRecipe) }}</span>
@@ -143,7 +143,7 @@
       </div>
 
       <div v-if="decisionSupportCards.length" class="decision-support-grid">
-        <article v-for="item in decisionSupportCards" :key="item.key" class="decision-support-card">
+        <article v-for="item in decisionSupportCards" :key="item.key" class="decision-support-card interactive-decision-card">
           <span class="support-label">{{ item.label }}</span>
           <strong>{{ item.recipe.title }}</strong>
           <p>{{ item.copy }}</p>
@@ -161,7 +161,7 @@
     </div>
 
     <div v-if="quickPicks.length" class="quick-picks">
-      <article v-for="recipe in quickPicks" :key="recipe.id">
+      <article v-for="recipe in quickPicks" :key="recipe.id" class="interactive-quick-pick">
         <div class="card-head">
           <strong>{{ recipe.title }}</strong>
           <span class="pick-badge">{{ quickPickLabel(recipe) }}</span>
@@ -175,7 +175,7 @@
     </div>
 
     <div v-if="filteredRecipes.length" class="grid">
-      <article v-for="recipe in filteredRecipes" :key="recipe.id">
+      <article v-for="recipe in filteredRecipes" :key="recipe.id" class="interactive-recipe-card">
         <div class="card-head">
           <strong>{{ recipe.title }}</strong>
           <el-button text :loading="favoriteLoadingId === recipe.id" @click="toggleFavorite(recipe)">
@@ -1328,6 +1328,33 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
+.interactive-focus-strip,
+.interactive-creator-strip,
+.interactive-decision-card,
+.interactive-quick-pick,
+.interactive-recipe-card,
+.recipe-follow-up,
+.vision-result,
+.creator-row {
+  transition:
+    transform 0.34s cubic-bezier(0.22, 1.2, 0.36, 1),
+    box-shadow 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.28s ease,
+    background 0.28s ease;
+}
+
+.interactive-focus-strip:hover,
+.interactive-creator-strip:hover,
+.interactive-decision-card:hover,
+.interactive-quick-pick:hover,
+.interactive-recipe-card:hover,
+.recipe-follow-up:hover,
+.vision-result:hover,
+.creator-row:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 24px 46px rgba(15, 30, 39, 0.12);
+}
+
 .footer-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1421,10 +1448,19 @@ h2 {
 
 .focus-strip {
   align-items: center;
+  background:
+    radial-gradient(circle at top right, rgba(87, 181, 231, 0.16), transparent 34%),
+    rgba(255, 255, 255, 0.88);
 }
 
 .creator-copy {
   flex: 1;
+}
+
+.creator-strip {
+  background:
+    radial-gradient(circle at top right, rgba(255, 236, 210, 0.18), transparent 34%),
+    rgba(255, 255, 255, 0.9);
 }
 
 .recipe-follow-up {
@@ -1529,6 +1565,22 @@ h2 {
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.86);
   border: 1px solid rgba(16, 34, 42, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.decision-primary-card::after,
+.decision-support-card::after,
+.interactive-quick-pick::after,
+.interactive-recipe-card::after {
+  content: "";
+  position: absolute;
+  inset: auto -24% -52% auto;
+  width: 150px;
+  height: 150px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  pointer-events: none;
 }
 
 .decision-support-grid {
@@ -1587,6 +1639,7 @@ h2 {
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
 .feature-tag.is-favorite {
@@ -1661,6 +1714,7 @@ h2 {
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(16, 34, 42, 0.08);
+  box-shadow: 0 12px 28px rgba(15, 30, 39, 0.06);
 }
 
 .vision-preview {
@@ -1715,6 +1769,10 @@ h2 {
 .creator-row {
   grid-template-columns: minmax(0, 2.2fr) minmax(148px, 0.9fr) minmax(112px, 0.7fr) max-content auto;
   align-items: center;
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(16, 34, 42, 0.05);
 }
 
 .creator-row > * {

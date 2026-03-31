@@ -9,6 +9,11 @@
         <p class="desc">
           先看今天还差什么，再决定下一餐怎么吃、怎么记，不把首页做成一块只读看板。
         </p>
+        <article class="hero-pulse-card">
+          <span>今日一句话</span>
+          <strong>{{ todayWorkbenchHeadline }}</strong>
+          <p>{{ todayProgressSummary }}</p>
+        </article>
         <div class="hero-status-strip">
           <span>{{ profileReady ? "档案已完善" : "先补档案" }}</span>
           <span>{{ activeGoal ? `${goalTypeLabel(activeGoal.goal_type)}进行中` : "还没有重点目标" }}</span>
@@ -98,8 +103,8 @@
         </div>
       </div>
 
-      <div v-if="recommendations.length" class="recommend-list">
-        <article v-for="item in featuredRecommendations" :key="item.recipe_id">
+        <div v-if="recommendations.length" class="recommend-list">
+        <article v-for="item in featuredRecommendations" :key="item.recipe_id" class="recommend-card">
           <div class="row">
             <strong>{{ item.title }}</strong>
             <div class="recommend-actions">
@@ -155,7 +160,7 @@
       </article>
 
       <div v-if="extensionTab === 'favorites'" class="extension-body shortcut-list">
-        <article v-for="item in favoriteShortcuts" :key="item.id" class="shortcut-item">
+        <article v-for="item in favoriteShortcuts" :key="item.id" class="shortcut-item interactive-shortcut-item">
           <div>
             <strong>{{ item.title }}</strong>
             <p>{{ item.description || "已收藏，可直接加入记录。" }}</p>
@@ -177,7 +182,7 @@
       </div>
 
       <div v-else-if="extensionTab === 'records'" class="extension-body record-list">
-        <article v-for="record in recentRecords.slice(0, 4)" :key="record.id" class="record-item">
+        <article v-for="record in recentRecords.slice(0, 4)" :key="record.id" class="record-item interactive-record-item">
           <div>
             <strong>{{ record.record_date }} · {{ mealTypeLabel(record.meal_type) }}</strong>
             <p>{{ record.items?.[0]?.recipe_title || record.note || "已记录一餐" }}</p>
@@ -264,7 +269,7 @@
         </div>
       </div>
       <div class="onboarding-list">
-        <article v-for="item in onboardingSteps" :key="item.title" class="onboarding-item">
+        <article v-for="item in onboardingSteps" :key="item.title" class="onboarding-item interactive-onboarding-item">
           <div>
             <strong>{{ item.title }}</strong>
             <p>{{ item.copy }}</p>
@@ -1110,8 +1115,72 @@ h2 {
   flex-wrap: wrap;
 }
 
+.hero-pulse-card,
+.recommend-card,
+.interactive-shortcut-item,
+.interactive-record-item,
+.interactive-onboarding-item,
+.meal-progress-card,
+.metric-card,
+.today-suggest-card,
+.extension-spotlight,
+.extension-tab,
+.summary-grid article {
+  transition:
+    transform 0.34s cubic-bezier(0.22, 1.2, 0.36, 1),
+    box-shadow 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.28s ease,
+    background 0.28s ease;
+}
+
 .cta-row {
   margin-top: 24px;
+}
+
+.hero-pulse-card {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 244, 222, 0.72), transparent 36%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(247, 251, 255, 0.94));
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  box-shadow: 0 16px 34px rgba(15, 30, 39, 0.08);
+}
+
+.hero-pulse-card span {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #627f8e;
+}
+
+.hero-pulse-card strong {
+  font-size: 20px;
+  line-height: 1.35;
+  color: #173042;
+}
+
+.hero-pulse-card p {
+  margin: 0;
+  color: #476072;
+  line-height: 1.7;
+}
+
+.hero-pulse-card:hover,
+.recommend-card:hover,
+.interactive-shortcut-item:hover,
+.interactive-record-item:hover,
+.interactive-onboarding-item:hover,
+.meal-progress-card:hover,
+.metric-card:hover,
+.today-suggest-card:hover,
+.extension-spotlight:hover,
+.summary-grid article:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 26px 48px rgba(15, 30, 39, 0.12);
 }
 
 .hero-status-strip,
@@ -1134,6 +1203,7 @@ h2 {
   font-size: 12px;
   font-weight: 700;
   line-height: 1.5;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.64);
 }
 
 .hero-meta-grid {
@@ -1226,6 +1296,7 @@ h2 {
 .meal-progress-card.active {
   background: rgba(255, 245, 231, 0.92);
   border-color: rgba(185, 115, 38, 0.16);
+  box-shadow: 0 18px 34px rgba(185, 115, 38, 0.1);
 }
 
 .today-lower-grid {
@@ -1300,15 +1371,16 @@ h2 {
   text-align: left;
   cursor: pointer;
   transition:
-    transform 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    background 0.18s ease;
+    transform 0.28s cubic-bezier(0.22, 1.2, 0.36, 1),
+    border-color 0.22s ease,
+    box-shadow 0.28s ease,
+    background 0.24s ease;
 }
 
 .extension-tab:hover {
-  transform: translateY(-1px);
+  transform: translateY(-3px) scale(1.01);
   border-color: rgba(23, 48, 66, 0.16);
+  box-shadow: 0 20px 34px rgba(15, 30, 39, 0.1);
 }
 
 .extension-tab span,
@@ -1441,6 +1513,21 @@ h2 {
   border-radius: 18px;
   background: rgba(247, 251, 255, 0.92);
   border: 1px solid rgba(16, 34, 42, 0.06);
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-card::after,
+.today-suggest-card::after,
+.recommend-card::after {
+  content: "";
+  position: absolute;
+  inset: auto -18% -48% auto;
+  width: 140px;
+  height: 140px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  pointer-events: none;
 }
 
 .metric-top,

@@ -127,7 +127,7 @@
             v-for="item in recentRecordTemplates"
             :key="item.id"
             type="button"
-            class="template-card"
+            class="template-card interactive-template-card"
             @click="applyRecordTemplate(item)"
           >
             <span>{{ mealTypeLabel(item.meal_type || "lunch") }}</span>
@@ -145,6 +145,18 @@
           <p>选择菜谱后会自动带出营养统计；如果只填备注，记录会保存，但不会产生热量和营养汇总。</p>
         </div>
       </div>
+
+      <article class="form-rhythm-banner" :class="{ 'is-ready': !recordSubmitDisabled, 'is-editing': !!editingRecordId }">
+        <div class="form-rhythm-copy">
+          <span>{{ editingRecordId ? "正在编辑" : "当前输入状态" }}</span>
+          <strong>{{ recordFormTitle }}</strong>
+          <p>{{ recordFormDescription }}</p>
+        </div>
+        <div class="form-rhythm-meta">
+          <span>{{ mealTypeLabel(form.meal_type) }}</span>
+          <span>{{ form.record_date || "待选日期" }}</span>
+        </div>
+      </article>
 
       <el-form :model="form" label-position="top">
         <el-row :gutter="16">
@@ -223,7 +235,7 @@
           <div v-if="recentRecipeShortcuts.length" class="shortcut-block">
             <span class="shortcut-label">最近吃过</span>
             <div class="shortcut-list mobile-scroll-row">
-              <button v-for="item in recentRecipeShortcuts" :key="`recent-${item.recipe_id}`" type="button" class="shortcut-card" @click="applyRecipeShortcut(item)">
+              <button v-for="item in recentRecipeShortcuts" :key="`recent-${item.recipe_id}`" type="button" class="shortcut-card interactive-shortcut-card" @click="applyRecipeShortcut(item)">
                 <strong>{{ item.title }}</strong>
                 <small>{{ mealTypeLabel(item.meal_type || 'lunch') }} · {{ item.last_used_date }}</small>
               </button>
@@ -233,7 +245,7 @@
           <div v-if="frequentRecipeShortcuts.length" class="shortcut-block">
             <span class="shortcut-label">常吃</span>
             <div class="shortcut-list mobile-scroll-row">
-              <button v-for="item in frequentRecipeShortcuts" :key="`frequent-${item.recipe_id}`" type="button" class="shortcut-card" @click="applyRecipeShortcut(item)">
+              <button v-for="item in frequentRecipeShortcuts" :key="`frequent-${item.recipe_id}`" type="button" class="shortcut-card interactive-shortcut-card" @click="applyRecipeShortcut(item)">
                 <strong>{{ item.title }}</strong>
                 <small>{{ item.count }} 次记录 · {{ mealTypeLabel(item.meal_type || 'lunch') }}</small>
               </button>
@@ -323,7 +335,7 @@
           </div>
         </div>
 
-        <article v-for="record in group.records" :key="record.id">
+        <article v-for="record in group.records" :key="record.id" class="history-record-card">
           <div class="record-head">
             <div>
               <strong>{{ mealTypeLabel(record.meal_type) }}</strong>
@@ -1421,6 +1433,39 @@ h2 {
   box-shadow: 0 18px 50px rgba(15, 30, 39, 0.08);
 }
 
+.form-rhythm-banner,
+.interactive-template-card,
+.interactive-shortcut-card,
+.history-record-card,
+.progress-card,
+.meal-chip,
+.recipe-preview,
+.helper-panel,
+.record-handoff,
+.save-preview,
+.save-follow-up {
+  transition:
+    transform 0.34s cubic-bezier(0.22, 1.2, 0.36, 1),
+    box-shadow 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.28s ease,
+    background 0.28s ease;
+}
+
+.form-rhythm-banner:hover,
+.interactive-template-card:hover,
+.interactive-shortcut-card:hover,
+.history-record-card:hover,
+.progress-card:hover,
+.meal-chip:hover,
+.recipe-preview:hover,
+.helper-panel:hover,
+.record-handoff:hover,
+.save-preview:hover,
+.save-follow-up:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 24px 44px rgba(15, 30, 39, 0.12);
+}
+
 .overview-grid,
 .progress-grid,
 .summary-grid {
@@ -1450,6 +1495,76 @@ h2 {
   border-radius: 18px;
   background: rgba(247, 251, 255, 0.92);
   border: 1px solid rgba(16, 34, 42, 0.06);
+}
+
+.form-rhythm-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin: 18px 0 16px;
+  padding: 18px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at top right, rgba(87, 181, 231, 0.16), transparent 34%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(247, 251, 255, 0.96));
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  box-shadow: 0 18px 38px rgba(15, 30, 39, 0.08);
+}
+
+.form-rhythm-banner.is-ready {
+  background:
+    radial-gradient(circle at top right, rgba(210, 245, 229, 0.34), transparent 34%),
+    linear-gradient(135deg, rgba(248, 255, 252, 0.94), rgba(244, 251, 248, 0.96));
+  border-color: rgba(31, 120, 89, 0.12);
+}
+
+.form-rhythm-banner.is-editing {
+  background:
+    radial-gradient(circle at top right, rgba(255, 236, 210, 0.42), transparent 34%),
+    linear-gradient(135deg, rgba(255, 252, 247, 0.94), rgba(251, 247, 241, 0.96));
+  border-color: rgba(185, 115, 38, 0.14);
+}
+
+.form-rhythm-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.form-rhythm-copy span,
+.form-rhythm-meta span {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #607d8b;
+}
+
+.form-rhythm-copy strong {
+  font-size: 22px;
+  line-height: 1.35;
+  color: #173042;
+}
+
+.form-rhythm-copy p {
+  margin: 0;
+  color: #476072;
+  line-height: 1.65;
+}
+
+.form-rhythm-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.form-rhythm-meta span {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(16, 34, 42, 0.08);
 }
 
 .summary-grid span,
@@ -1517,6 +1632,12 @@ h2 {
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.84);
   border: 1px solid rgba(16, 34, 42, 0.08);
+  transition: transform 0.34s cubic-bezier(0.22, 1.2, 0.36, 1), box-shadow 0.3s ease;
+}
+
+.workbench-hero:hover {
+  transform: translateY(-4px) scale(1.005);
+  box-shadow: 0 24px 44px rgba(15, 30, 39, 0.12);
 }
 
 .workbench-copy strong {
@@ -1561,6 +1682,7 @@ h2 {
   background: rgba(255, 255, 255, 0.82);
   text-align: left;
   cursor: pointer;
+  box-shadow: 0 10px 22px rgba(15, 30, 39, 0.05);
 }
 
 .template-card strong {
@@ -1787,6 +1909,8 @@ h2 {
   border: 1px solid rgba(16, 34, 42, 0.08);
   background: rgba(255, 255, 255, 0.82);
   text-align: left;
+  cursor: pointer;
+  box-shadow: 0 10px 22px rgba(15, 30, 39, 0.05);
 }
 
 .shortcut-card strong {
@@ -1876,6 +2000,13 @@ h2 {
   gap: 12px;
 }
 
+.history-record-card {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(247, 251, 255, 0.78);
+  border: 1px solid rgba(16, 34, 42, 0.06);
+}
+
 .first-run-guide {
   display: grid;
   gap: 10px;
@@ -1955,7 +2086,8 @@ h2 {
   .save-follow-up,
   .workbench-hero,
   .workbench-actions,
-  .template-head {
+  .template-head,
+  .form-rhythm-banner {
     flex-direction: column;
   }
 
