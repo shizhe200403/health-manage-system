@@ -42,9 +42,24 @@
         <div v-if="!currentConvId" class="chat-placeholder">
           <div class="placeholder-inner">
             <p class="placeholder-icon">🥗</p>
-            <strong>和 AI 营养师开始对话</strong>
-            <p>点击「新建对话」，告诉我你的饮食困惑或营养问题，我会结合你的健康档案给出个性化建议。</p>
-            <el-button type="primary" @click="startNewConversation" :loading="creating">开始对话</el-button>
+            <strong>先从一个具体任务开始</strong>
+            <p>比起空白聊天，更推荐直接从“今天下一步、这餐怎么记、菜谱怎么补、这周怎么复盘”这些真实任务进入。</p>
+            <div class="task-starter-grid">
+              <button
+                v-for="task in starterTasks"
+                :key="task.key"
+                type="button"
+                class="task-starter-card"
+                @click="launchTaskPrompt(task.source, task.prompt)"
+              >
+                <span>{{ task.badge }}</span>
+                <strong>{{ task.title }}</strong>
+                <p>{{ task.description }}</p>
+              </button>
+            </div>
+            <div class="placeholder-actions">
+              <el-button type="primary" @click="startNewConversation" :loading="creating">新建空白对话</el-button>
+            </div>
           </div>
         </div>
 
@@ -53,6 +68,18 @@
             <span>{{ activeTaskContext.badge }}</span>
             <strong>{{ activeTaskContext.title }}</strong>
             <p>{{ activeTaskContext.description }}</p>
+          </div>
+          <div v-if="taskFollowUpActions.length" class="task-follow-up-row">
+            <el-button
+              v-for="item in taskFollowUpActions"
+              :key="item.label"
+              plain
+              size="small"
+              :disabled="streaming"
+              @click="sendTaskFollowUp(item.prompt)"
+            >
+              {{ item.label }}
+            </el-button>
           </div>
           <div class="messages" ref="messagesEl">
             <div v-if="loadingMessages" class="msg-loading">加载中...</div>
@@ -101,7 +128,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { chatSSE, createConversation, deleteConversation, getConversation, listConversations } from "../api/assistant";
 import { notifyActionError, notifyActionSuccess } from "../lib/feedback";
@@ -109,6 +136,14 @@ import { ElMessageBox } from "element-plus";
 
 interface Conversation { id: number; title: string; created_at: string; updated_at: string }
 interface Message { id: number; role: string; content: string; created_at: string }
+type AssistantTask = {
+  key: string;
+  source: string;
+  badge: string;
+  title: string;
+  description: string;
+  prompt: string;
+};
 
 const route = useRoute();
 const router = useRouter();
@@ -125,7 +160,83 @@ const messagesEl = ref<HTMLElement | null>(null);
 const autoLaunching = ref(false);
 const handledPromptToken = ref("");
 const taskConversationId = ref<number | null>(null);
+const activeTaskSource = ref("");
 const activeTaskContext = ref<null | { badge: string; title: string; description: string }>(null);
+const starterTasks = computed<AssistantTask[]>(() => [
+  {
+    key: "home",
+    source: "home_today_workbench",
+    badge: "首页任务",
+    title: "解释今天下一步",
+    description: "适合先判断今天还差什么、下一餐该怎么补。",
+    prompt: [
+      "请基于我的饮食系统当前状态，用非常直接、可执行的话告诉我今天下一步怎么做。",
+      "请输出三部分：1）一句话结论；2）为什么；3）我现在最该点哪个页面里的哪个动作。",
+    ].join("\n"),
+  },
+  {
+    key: "record",
+    source: "records_next_step",
+    badge: "记录任务",
+    title: "帮我判断先记什么",
+    description: "适合还没决定该补哪一餐、是复制还是新记的时候。",
+    prompt: [
+      "请帮我判断记录页里下一步最该做什么。",
+      "请输出三部分：1）优先动作；2）最省事做法；3）如果只花 30 秒，应该怎么完成。",
+    ].join("\n"),
+  },
+  {
+    key: "recipe",
+    source: "recipes_creator_draft",
+    badge: "菜谱任务",
+    title: "帮我补全菜谱草稿",
+    description: "适合已经有菜名或食材，但不确定描述和录入粒度的时候。",
+    prompt: [
+      "请帮我补全一份即将上传到饮食系统的菜谱草稿。",
+      "请输出三部分：1）这道菜适合什么场景；2）最值得补齐的字段；3）给我一版可直接粘贴的描述文案。",
+    ].join("\n"),
+  },
+  {
+    key: "report",
+    source: "reports_review_explain",
+    badge: "报表任务",
+    title: "解释这周复盘重点",
+    description: "适合快速看清这周最大问题、保留习惯和下周动作。",
+    prompt: [
+      "请基于我的饮食复盘场景，用直接、可执行的语言解释这次阶段复盘。",
+      "请输出三部分：1）最大问题；2）值得保留；3）下周只改一件事先改什么。",
+    ].join("\n"),
+  },
+]);
+const taskFollowUpActions = computed(() => {
+  return {
+    home_today_workbench: [
+      { label: "给我一句结论", prompt: "把刚才的建议压缩成一句最短、最明确的结论。" },
+      { label: "拆成 3 步", prompt: "把刚才的建议拆成 3 个最容易执行的步骤。" },
+      { label: "最省事版本", prompt: "如果我现在只想用最省事的方式完成今天下一步，具体怎么做？" },
+    ],
+    records_next_step: [
+      { label: "先点哪个", prompt: "直接告诉我现在先点哪个按钮、为什么。" },
+      { label: "30 秒完成", prompt: "如果我只想 30 秒内完成这一条记录，怎么做最快？" },
+      { label: "还差多少", prompt: "基于当前记录思路，再告诉我今天最可能还差什么。" },
+    ],
+    records_meal_draft: [
+      { label: "先保存还是先补", prompt: "直接告诉我这条记录应该先保存，还是先补成正式菜谱。" },
+      { label: "缺什么信息", prompt: "只告诉我这条记录最缺的 3 个信息字段。" },
+      { label: "生成可填备注", prompt: "按当前草稿，帮我生成一版更清楚的备注文案。" },
+    ],
+    recipes_creator_draft: [
+      { label: "补描述", prompt: "基于当前草稿，给我一版可直接粘贴到描述栏的成品文案。" },
+      { label: "补字段优先级", prompt: "只告诉我当前最值得先补的 3 个字段，以及原因。" },
+      { label: "适合什么场景", prompt: "直接判断这道菜更适合什么场景和什么目标。" },
+    ],
+    reports_review_explain: [
+      { label: "一句话结论", prompt: "把这次复盘压缩成一句最重要的结论。" },
+      { label: "下周只改一件事", prompt: "如果下周只改一件事，优先改什么，为什么？" },
+      { label: "保留哪些习惯", prompt: "只列出这次复盘里最值得保留的习惯和原因。" },
+    ],
+  }[activeTaskSource.value] || [];
+});
 
 function renderContent(text: string) {
   return text
@@ -155,7 +266,10 @@ async function loadConversations() {
 async function selectConversation(conv: Conversation) {
   currentConvId.value = conv.id;
   if (taskConversationId.value !== conv.id) {
+    activeTaskSource.value = "";
     activeTaskContext.value = null;
+  } else if (activeTaskSource.value) {
+    activeTaskContext.value = taskContextFromSource(activeTaskSource.value);
   }
   loadingMessages.value = true;
   try {
@@ -178,6 +292,7 @@ async function startNewConversation() {
     currentConvId.value = conv.id;
     messages.value = [];
     taskConversationId.value = null;
+    activeTaskSource.value = "";
     activeTaskContext.value = null;
   } catch {
     notifyActionError("创建对话");
@@ -197,6 +312,9 @@ async function removeConversation(id: number) {
     if (currentConvId.value === id) {
       currentConvId.value = null;
       messages.value = [];
+      taskConversationId.value = null;
+      activeTaskSource.value = "";
+      activeTaskContext.value = null;
     }
     notifyActionSuccess("对话已删除");
   } catch {
@@ -291,6 +409,13 @@ function sendPrompt(text: string) {
   );
 }
 
+function sendTaskFollowUp(prompt: string) {
+  if (!prompt || !currentConvId.value || streaming.value) {
+    return;
+  }
+  sendPrompt(prompt);
+}
+
 async function sendMessage() {
   const text = inputText.value.trim();
   if (!text || streaming.value) return;
@@ -301,9 +426,7 @@ async function sendMessage() {
   sendPrompt(text);
 }
 
-async function launchPromptFromRoute() {
-  const prompt = String(route.query.prompt || "").trim();
-  const source = String(route.query.source || "").trim();
+async function launchTaskPrompt(source: string, prompt: string, consumeRoute = false) {
   const token = `${source}::${prompt}`;
   if (!prompt || handledPromptToken.value === token || autoLaunching.value || streaming.value) {
     return;
@@ -314,18 +437,27 @@ async function launchPromptFromRoute() {
   try {
     const convId = await ensureConversation(true);
     taskConversationId.value = convId;
+    activeTaskSource.value = source;
     activeTaskContext.value = taskContextFromSource(source);
     sendPrompt(prompt);
-    const nextQuery = { ...route.query };
-    delete nextQuery.prompt;
-    delete nextQuery.source;
-    router.replace({ path: route.path, query: nextQuery });
+    if (consumeRoute) {
+      const nextQuery = { ...route.query };
+      delete nextQuery.prompt;
+      delete nextQuery.source;
+      router.replace({ path: route.path, query: nextQuery });
+    }
   } catch {
     handledPromptToken.value = "";
     notifyActionError("初始化任务对话");
   } finally {
     autoLaunching.value = false;
   }
+}
+
+async function launchPromptFromRoute() {
+  const prompt = String(route.query.prompt || "").trim();
+  const source = String(route.query.source || "").trim();
+  await launchTaskPrompt(source, prompt, true);
 }
 
 onMounted(async () => {
@@ -487,14 +619,81 @@ h2 { margin: 0; font-size: 30px; }
 }
 
 .placeholder-inner {
-  text-align: center;
-  max-width: 320px;
+  width: min(760px, 100%);
   padding: 32px;
 }
 
-.placeholder-icon { font-size: 48px; margin: 0 0 16px; }
-.placeholder-inner strong { display: block; font-size: 18px; margin-bottom: 10px; }
-.placeholder-inner p { color: #476072; line-height: 1.65; margin: 0 0 20px; }
+.placeholder-icon { font-size: 48px; margin: 0 0 16px; text-align: center; }
+.placeholder-inner strong { display: block; font-size: 18px; margin-bottom: 10px; text-align: center; }
+.placeholder-inner p { color: #476072; line-height: 1.65; margin: 0 0 20px; text-align: center; }
+
+.task-starter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.task-starter-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  background: rgba(247, 251, 255, 0.88);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.task-starter-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(23, 48, 66, 0.16);
+  box-shadow: 0 12px 24px rgba(15, 30, 39, 0.08);
+}
+
+.task-starter-card span {
+  justify-self: flex-start;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(23, 48, 66, 0.08);
+  color: #173042;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.task-starter-card strong,
+.task-starter-card p {
+  margin: 0;
+  text-align: left;
+}
+
+.task-starter-card strong {
+  font-size: 16px;
+  color: #173042;
+}
+
+.task-starter-card p {
+  color: #476072;
+  line-height: 1.65;
+}
+
+.placeholder-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.task-follow-up-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 16px 0;
+}
 
 .messages {
   flex: 1;
@@ -595,6 +794,20 @@ h2 { margin: 0; font-size: 30px; }
 
   .placeholder-inner {
     padding: 24px 16px;
+  }
+
+  .task-starter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .placeholder-actions,
+  .task-follow-up-row {
+    justify-content: stretch;
+  }
+
+  .task-follow-up-row :deep(.el-button) {
+    width: 100%;
+    margin-left: 0;
   }
 
   .bubble {
