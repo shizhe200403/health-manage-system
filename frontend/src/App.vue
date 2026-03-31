@@ -8,12 +8,11 @@
             <span class="brand-date">{{ todayStamp }}</span>
           </div>
           <h1>饮食执行助手</h1>
-          <p class="subtitle">把“今天还差什么、下一餐吃什么、顺手怎么记”压成一条更轻、更快的执行链路。</p>
+          <p class="subtitle">今天先看缺口，再把下一餐顺手记上。</p>
         </div>
         <nav class="nav shell-surface" aria-label="主导航">
           <RouterLink v-for="item in primaryNavItems" :key="item.to" :to="item.to">
             <span>{{ item.label }}</span>
-            <small>{{ item.copy }}</small>
           </RouterLink>
         </nav>
         <div class="user-box">
@@ -59,20 +58,19 @@
     <main class="content" :class="{ 'with-mobile-nav': showChrome, 'with-mobile-nav-open': showChrome && mobileNavOpen }">
       <div class="content-inner">
         <Transition name="ribbon-float" mode="out-in">
-          <article v-if="showChrome" :key="route.path" v-spotlight class="floating-ribbon interactive-spotlight">
-            <div class="floating-ribbon-copy">
-              <span>{{ currentRouteMoment.badge }}</span>
-              <strong>{{ currentRouteMoment.title }}</strong>
-              <p>{{ currentRouteMoment.copy }}</p>
+          <article v-if="showChrome" :key="route.path" class="floating-ribbon news-ticker">
+            <div class="ticker-label">
+              <span class="ribbon-status-dot" aria-hidden="true" />
+              <strong>实时建议</strong>
             </div>
-            <div class="floating-ribbon-actions">
-              <div class="ribbon-status">
-                <span class="ribbon-status-dot" aria-hidden="true" />
-                <strong>{{ currentRouteMoment.hint }}</strong>
+            <div class="ticker-viewport" aria-label="实时建议播报">
+              <div class="ticker-track">
+                <span v-for="(message, index) in tickerLoopMessages" :key="`${route.path}-${index}-${message}`" class="ticker-item">
+                  {{ message }}
+                </span>
               </div>
-              <RouterLink class="ribbon-link" :to="currentRouteMoment.to">{{ currentRouteMoment.cta }}</RouterLink>
-              <p class="ribbon-meta">{{ auth.user ? `继续中：${auth.user?.nickname || auth.user?.username}` : "欢迎回来，继续把今天推进一点点" }}</p>
             </div>
+            <RouterLink class="ticker-action" :to="currentRouteMoment.to">{{ currentRouteMoment.cta }}</RouterLink>
           </article>
         </Transition>
         <RouterView v-slot="{ Component, route: currentRoute }">
@@ -171,6 +169,13 @@ const primaryNavItems = computed(() => navItems.filter((item) => primaryNavPaths
 const secondaryNavItems = computed(() => navItems.filter((item) => !primaryNavPaths.includes(item.to)));
 const currentTitle = computed(() => navItems.find((item) => item.to === route.path)?.label || "营养饮食助手");
 const currentRouteMoment = computed(() => routeMoments.find((item) => item.path === route.path) ?? routeMoments[0]);
+const tickerMessages = computed(() => [
+  currentRouteMoment.value.title,
+  currentRouteMoment.value.hint,
+  `当前页：${currentTitle.value}，${currentRouteMoment.value.copy}`,
+  auth.user ? `继续保持，${auth.user?.nickname || auth.user?.username}，先完成一个最小动作就够了` : "先完成一个最小动作，今天就会更顺一点",
+]);
+const tickerLoopMessages = computed(() => [...tickerMessages.value, ...tickerMessages.value]);
 const todayStamp = computed(() =>
   new Intl.DateTimeFormat("zh-CN", {
     month: "long",
@@ -244,7 +249,7 @@ function resetShellPointer() {
   position: sticky;
   top: 0;
   z-index: 40;
-  padding: 24px 32px 16px;
+  padding: 14px 20px 10px;
   background: rgba(247, 251, 255, 0.7);
   border-bottom: 1px solid rgba(16, 34, 42, 0.08);
   box-shadow: 0 14px 40px rgba(18, 32, 44, 0.06);
@@ -279,7 +284,9 @@ function resetShellPointer() {
 
 .brand {
   display: grid;
-  gap: 6px;
+  flex: 0 0 248px;
+  gap: 4px;
+  min-width: 0;
 }
 
 .brand-topline {
@@ -311,34 +318,43 @@ function resetShellPointer() {
 
 h1 {
   margin: 0;
-  font-size: clamp(24px, 3vw, 34px);
+  font-size: clamp(21px, 2vw, 26px);
   line-height: 1.1;
 }
 
 .subtitle {
-  margin: 8px 0 0;
+  margin: 4px 0 0;
   color: #476072;
-  line-height: 1.6;
-  max-width: 620px;
+  line-height: 1.45;
+  max-width: 280px;
+  font-size: 13px;
 }
 
 .nav {
-  flex-wrap: wrap;
-  padding: 8px;
-  border-radius: 24px;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 20px;
   background: rgba(255, 255, 255, 0.5);
   border: 1px solid rgba(16, 34, 42, 0.05);
   backdrop-filter: blur(14px);
 }
 
 .nav a {
-  display: grid;
-  gap: 2px;
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: #234;
   text-decoration: none;
-  font-weight: 600;
-  padding: 12px 14px;
-  border-radius: 18px;
+  font-weight: 700;
+  white-space: nowrap;
+  padding: 10px 12px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.52);
   border: 1px solid transparent;
   backdrop-filter: blur(12px);
@@ -346,13 +362,9 @@ h1 {
 }
 
 .nav a span {
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 14px;
-}
-
-.nav a small {
-  color: #6b8694;
-  font-size: 11px;
-  font-weight: 600;
 }
 
 .nav a:hover {
@@ -456,7 +468,11 @@ h1 {
 }
 
 .user-box {
+  flex: 0 0 auto;
   font-weight: 600;
+  gap: 10px;
+  white-space: nowrap;
+  font-size: 13px;
 }
 
 .ghost,
@@ -464,7 +480,7 @@ h1 {
   border: 1px solid rgba(23, 48, 66, 0.18);
   background: rgba(255, 255, 255, 0.55);
   color: #173042;
-  padding: 10px 14px;
+  padding: 8px 12px;
   border-radius: 999px;
   transition: transform 0.22s ease, background 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
 }
@@ -478,7 +494,7 @@ h1 {
 }
 
 .content {
-  padding: 18px 24px 44px;
+  padding: 10px 18px 44px;
 }
 
 .content.with-mobile-nav {
@@ -490,109 +506,105 @@ h1 {
 }
 
 .content-inner {
-  width: min(100%, 1360px);
+  width: min(100%, 1440px);
   margin: 0 auto;
   min-width: 0;
 }
 
 .floating-ribbon {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 20px;
-  margin: 0 0 18px;
-  padding: 18px 20px;
-  border-radius: 24px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 10px;
+  padding: 8px 14px;
+  border-radius: 16px;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(244, 249, 252, 0.9)),
     radial-gradient(circle at top right, rgba(87, 181, 231, 0.14), transparent 34%);
   border: 1px solid rgba(16, 34, 42, 0.08);
-  box-shadow: 0 20px 42px rgba(15, 30, 39, 0.08);
+  box-shadow: 0 14px 28px rgba(15, 30, 39, 0.07);
   backdrop-filter: blur(18px);
   animation: shell-soft-in 0.5s cubic-bezier(0.22, 1.2, 0.36, 1);
 }
 
-.floating-ribbon-copy {
-  display: grid;
-  gap: 8px;
+.ticker-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 4px;
 }
 
-.floating-ribbon-copy span,
-.ribbon-meta {
-  color: #5b7888;
+.ticker-label strong {
   font-size: 12px;
+  color: #284c5d;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
-.floating-ribbon-copy strong {
-  font-size: clamp(18px, 2.2vw, 24px);
-  line-height: 1.2;
-  color: #10202c;
+.ticker-viewport {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent 0, #000 5%, #000 95%, transparent 100%);
 }
 
-.floating-ribbon-copy p,
-.ribbon-meta {
-  margin: 0;
-  line-height: 1.65;
+.ticker-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 28px;
+  min-width: max-content;
+  animation: ticker-scroll 34s linear infinite;
 }
 
-.floating-ribbon-copy p {
-  color: #476072;
-  max-width: 760px;
-}
-
-.floating-ribbon-actions {
-  display: grid;
-  justify-items: end;
-  gap: 12px;
-  min-width: 220px;
-}
-
-.ribbon-status {
+.ticker-item {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
+  white-space: nowrap;
+  color: #476072;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.ticker-item::before {
+  content: "";
+  width: 6px;
+  height: 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(16, 34, 42, 0.08);
-  box-shadow: 0 10px 24px rgba(15, 30, 39, 0.08);
+  background: rgba(23, 48, 66, 0.22);
 }
 
-.ribbon-status strong {
-  font-size: 12px;
-  color: #284c5d;
-  letter-spacing: 0.02em;
-}
-
-.ribbon-status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #57b5e7, #22c55e);
-  box-shadow: 0 0 0 6px rgba(87, 181, 231, 0.14);
-  animation: ribbon-status-pulse 2.4s ease-in-out infinite;
-}
-
-.ribbon-link {
+.ticker-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 42px;
-  padding: 0 16px;
+  min-height: 34px;
+  padding: 0 12px;
   border-radius: 999px;
   background: #173042;
   color: #fff;
   text-decoration: none;
+  font-size: 12px;
   font-weight: 700;
-  box-shadow: 0 14px 26px rgba(23, 48, 66, 0.24);
+  white-space: nowrap;
+  box-shadow: 0 10px 20px rgba(23, 48, 66, 0.2);
   transition: transform 0.22s ease, box-shadow 0.22s ease;
 }
 
-.ribbon-link:hover {
+.ribbon-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #57b5e7, #22c55e);
+  box-shadow: 0 0 0 5px rgba(87, 181, 231, 0.14);
+  animation: ribbon-status-pulse 2.4s ease-in-out infinite;
+}
+
+.ticker-action:hover {
   transform: translateY(-1px);
-  box-shadow: 0 18px 30px rgba(23, 48, 66, 0.28);
+  box-shadow: 0 14px 24px rgba(23, 48, 66, 0.24);
 }
 
 .mobile-subtitle {
@@ -635,6 +647,15 @@ h1 {
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-50% - 14px));
   }
 }
 
@@ -832,24 +853,33 @@ h1 {
   }
 
   .floating-ribbon {
-    flex-direction: column;
-    gap: 12px;
+    grid-template-columns: 1fr;
+    gap: 10px;
     margin-bottom: 14px;
-    padding: 16px;
-    border-radius: 20px;
+    padding: 12px;
+    border-radius: 16px;
   }
 
-  .floating-ribbon-actions {
-    min-width: 0;
-    justify-items: stretch;
+  .ticker-label {
+    padding-right: 0;
   }
 
-  .ribbon-status {
-    justify-content: center;
+  .ticker-viewport {
+    mask-image: none;
   }
 
-  .ribbon-link {
+  .ticker-track {
+    gap: 24px;
+    animation-duration: 26s;
+  }
+
+  .ticker-item {
+    font-size: 12px;
+  }
+
+  .ticker-action {
     width: 100%;
+    min-height: 36px;
   }
 
   .ghost,
