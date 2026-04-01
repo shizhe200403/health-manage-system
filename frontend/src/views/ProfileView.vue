@@ -30,6 +30,15 @@
 
     <div class="card">
       <h3>账号信息</h3>
+      <div class="avatar-row">
+        <div class="avatar-wrap" @click="triggerAvatarUpload" title="点击更换头像">
+          <img v-if="account.avatar_url" :src="account.avatar_url" class="avatar-img" alt="头像" />
+          <div v-else class="avatar-placeholder">{{ avatarInitial }}</div>
+          <div class="avatar-overlay">更换</div>
+        </div>
+        <input ref="avatarInput" type="file" accept="image/*" style="display:none" @change="onAvatarChange" />
+        <span class="avatar-hint">支持 JPG / PNG，最大 5MB</span>
+      </div>
       <el-form :model="account" label-position="top">
         <el-row :gutter="16">
           <el-col :span="12">
@@ -270,7 +279,7 @@ import { ElMessageBox } from "element-plus";
 import { useRouter } from "vue-router";
 import FormActionBar from "../components/FormActionBar.vue";
 import { notifyActionError, notifyActionSuccess, notifyLoadError } from "../lib/feedback";
-import { getMe, updateFullProfile, changePassword, deleteAccount } from "../api/auth";
+import { getMe, updateFullProfile, changePassword, deleteAccount, uploadAvatar } from "../api/auth";
 import { trackEvent } from "../api/behavior";
 import { useAuthStore } from "../stores/auth";
 
@@ -286,6 +295,7 @@ const account = reactive({
   phone: "",
   nickname: "",
   signature: "",
+  avatar_url: "",
 });
 
 const profile = reactive({
@@ -380,6 +390,7 @@ async function loadProfile() {
       phone: user.phone || "",
       nickname: user.nickname || "",
       signature: user.signature || "",
+      avatar_url: user.avatar_url || "",
     });
 
     Object.assign(profile, {
@@ -434,6 +445,32 @@ async function saveAll() {
     notifyActionError("保存资料");
   } finally {
     saving.value = false;
+  }
+}
+
+const avatarInitial = computed(() => {
+  const name = account.nickname || account.username;
+  return name ? name.charAt(0).toUpperCase() : "?";
+});
+
+const avatarInput = ref<HTMLInputElement | null>(null);
+
+function triggerAvatarUpload() {
+  avatarInput.value?.click();
+}
+
+async function onAvatarChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  try {
+    const res = await uploadAvatar(file);
+    account.avatar_url = res.avatar_url;
+    if (auth.user) auth.user.avatar_url = res.avatar_url;
+    notifyActionSuccess("头像已更新");
+  } catch {
+    notifyActionError("上传头像");
+  } finally {
+    if (avatarInput.value) avatarInput.value.value = "";
   }
 }
 
@@ -566,8 +603,68 @@ h2 {
   margin-bottom: 18px;
 }
 
-.field-error {
-  margin-top: 4px;
+.avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.avatar-wrap {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #d0e8f5;
+  color: #2d6a8a;
+  font-size: 28px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.38);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.avatar-wrap:hover .avatar-overlay {
+  opacity: 1;
+}
+
+.avatar-hint {
+  font-size: 13px;
+  color: #7a9aaa;
+}
+
+.field-error {  margin-top: 4px;
   font-size: 12px;
   color: #cf1322;
 }

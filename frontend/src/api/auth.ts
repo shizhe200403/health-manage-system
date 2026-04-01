@@ -45,3 +45,12 @@ export async function deleteAccount(payload: { password: string }) {
   return data;
 }
 
+export async function uploadAvatar(file: File) {
+  const form = new FormData();
+  form.append("avatar", file);
+  const { data } = await http.post("/accounts/me/avatar/", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
+

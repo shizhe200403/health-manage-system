@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import permissions, serializers, status
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -260,6 +261,35 @@ class FullProfileView(APIView):
                 },
             }
         )
+
+
+class AvatarUploadView(APIView):
+    parser_classes = [MultiPartParser]
+
+    @extend_schema(
+        request=inline_serializer(name="AvatarUploadRequest", fields={"avatar": serializers.ImageField()}),
+        responses=inline_serializer(name="AvatarUploadResponse", fields={"code": serializers.IntegerField(), "message": serializers.CharField(), "avatar_url": serializers.CharField()}),
+    )
+    def post(self, request):
+        file = request.FILES.get("avatar")
+        if not file:
+            return Response({"code": 1, "message": "请选择图片文件"}, status=status.HTTP_400_BAD_REQUEST)
+        if file.size > 5 * 1024 * 1024:
+            return Response({"code": 1, "message": "图片大小不能超过 5MB"}, status=status.HTTP_400_BAD_REQUEST)
+        if not file.content_type.startswith("image/"):
+            return Response({"code": 1, "message": "只支持图片格式"}, status=status.HTTP_400_BAD_REQUEST)
+
+        import os, uuid
+        ext = os.path.splitext(file.name)[1].lower() or ".jpg"
+        filename = f"{uuid.uuid4().hex}{ext}"
+        save_dir = os.path.join("avatars")
+        from django.core.files.storage import default_storage
+        path = default_storage.save(os.path.join(save_dir, filename), file)
+        avatar_url = f"/media/{path}"
+
+        request.user.avatar_url = avatar_url
+        request.user.save(update_fields=["avatar_url"])
+        return Response({"code": 0, "message": "头像已更新", "avatar_url": avatar_url})
 
 
 class ChangePasswordView(APIView):
