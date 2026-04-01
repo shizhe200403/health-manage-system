@@ -12,30 +12,29 @@
         <button :class="{ active: isRegisterMode }" @click="switchMode('register')">注册</button>
       </div>
 
-      <el-form :model="form" label-position="top" class="form">
+      <el-form :model="form" label-position="top" class="form" @keyup.enter="submit">
         <el-form-item :label="isRegisterMode ? '用户名' : '账号'">
           <el-input
             v-model.trim="form.account"
             :placeholder="isRegisterMode ? '用于登录和个人展示，例如：shizhe01' : '请输入用户名、邮箱或手机号'"
-            @keyup.enter="submit"
           />
         </el-form-item>
 
         <template v-if="isRegisterMode">
           <el-form-item label="邮箱">
-            <el-input v-model.trim="form.email" placeholder="用于接收通知，可选" @keyup.enter="submit" />
+            <el-input v-model.trim="form.email" placeholder="用于接收通知，可选" />
           </el-form-item>
           <el-form-item label="手机号">
-            <el-input v-model.trim="form.phone" placeholder="用于联系或后续验证码登录，可选" @keyup.enter="submit" />
+            <el-input v-model.trim="form.phone" placeholder="用于联系或后续验证码登录，可选" />
           </el-form-item>
         </template>
 
         <el-form-item label="密码">
-          <el-input v-model="form.password" type="password" show-password placeholder="请输入密码" @keyup.enter="submit" />
+          <el-input v-model="form.password" type="password" show-password placeholder="请输入密码" />
         </el-form-item>
 
         <el-form-item v-if="isRegisterMode" label="确认密码">
-          <el-input v-model="form.confirmPassword" type="password" show-password placeholder="请再次输入密码" @keyup.enter="submit" />
+          <el-input v-model="form.confirmPassword" type="password" show-password placeholder="请再次输入密码" />
           <div class="password-rules">
             <span :class="ruleClass(passwordRules.length)">✓ 至少 8 位</span>
             <span :class="ruleClass(passwordRules.hasLetter)">✓ 包含字母</span>
