@@ -8,7 +8,7 @@
       </div>
       <div class="head-actions">
         <el-button plain @click="resetFilters">重置筛选</el-button>
-        <el-button type="primary" :loading="loadingRecipes" @click="loadRecipes">刷新列表</el-button>
+        <el-button type="primary" :loading="loadingRecipes" @click="applyFilters">应用筛选</el-button>
         <el-button plain @click="router.push('/recipes')">去前台菜谱页</el-button>
       </div>
     </div>
