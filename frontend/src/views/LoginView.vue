@@ -137,7 +137,7 @@ async function handleLogin() {
 
   await auth.login(form.account, form.password);
   notifyActionSuccess("登录成功");
-  const isAdminUser = Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser));
+  const isAdminUser = Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser || auth.user.is_staff));
   router.push(isAdminUser ? "/ops" : "/");
 }
 

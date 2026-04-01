@@ -339,7 +339,7 @@ const recipeDraft = reactive({
   source_name: "",
 });
 
-const isAdminUser = computed(() => Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser)));
+const isAdminUser = computed(() => Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser || auth.user.is_staff)));
 const pendingAuditCount = computed(() => recipes.value.filter((item) => item.audit_status === "pending").length);
 const draftLikeCount = computed(() => recipes.value.filter((item) => item.status !== "published").length);
 const incompleteCount = computed(() => recipes.value.filter((item) => recipeCompleteness(item) < 70).length);

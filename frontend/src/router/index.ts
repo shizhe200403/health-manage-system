@@ -3,7 +3,8 @@ import { createRouter, createWebHistory } from "vue-router";
 function resolveDefaultRoute() {
   const role = localStorage.getItem("user_role");
   const isSuperuser = localStorage.getItem("user_is_superuser") === "true";
-  return role === "admin" || isSuperuser ? "/ops" : "/";
+  const isStaff = localStorage.getItem("user_is_staff") === "true";
+  return role === "admin" || isSuperuser || isStaff ? "/ops" : "/";
 }
 
 const router = createRouter({
@@ -21,6 +22,7 @@ const router = createRouter({
     { path: "/assistant", component: () => import("../views/AssistantView.vue") },
     { path: "/ops", component: () => import("../views/AdminDashboardView.vue"), meta: { requiresAdmin: true } },
     { path: "/ops/community", component: () => import("../views/AdminCommunityView.vue"), meta: { requiresAdmin: true } },
+    { path: "/ops/reports", component: () => import("../views/AdminOpsReportsView.vue"), meta: { requiresAdmin: true } },
     { path: "/ops/recipes", component: () => import("../views/AdminRecipesView.vue"), meta: { requiresAdmin: true } },
     { path: "/ops/users", component: () => import("../views/AdminUsersView.vue"), meta: { requiresAdmin: true } },
   ],
@@ -37,7 +39,8 @@ router.beforeEach((to) => {
   if (to.meta.requiresAdmin) {
     const role = localStorage.getItem("user_role");
     const isSuperuser = localStorage.getItem("user_is_superuser") === "true";
-    if ((role || isSuperuser) && role !== "admin" && !isSuperuser) {
+    const isStaff = localStorage.getItem("user_is_staff") === "true";
+    if ((role || isSuperuser || isStaff) && role !== "admin" && !isSuperuser && !isStaff) {
       return "/";
     }
   }

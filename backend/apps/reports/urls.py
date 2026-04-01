@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import ExportReportView, MonthlyReportView, ReportTaskListView, ReportTaskView, WeeklyReportView
+from .views import AdminOperationsOverviewView, ExportReportView, MonthlyReportView, ReportTaskListView, ReportTaskView, WeeklyReportView
 
 urlpatterns = [
     path("reports/weekly/", WeeklyReportView.as_view(), name="report-weekly"),
@@ -8,4 +8,5 @@ urlpatterns = [
     path("reports/export/", ExportReportView.as_view(), name="report-export"),
     path("reports/tasks/", ReportTaskListView.as_view(), name="report-task-list"),
     path("reports/tasks/<int:task_id>/", ReportTaskView.as_view(), name="report-task"),
+    path("reports/admin/overview/", AdminOperationsOverviewView.as_view(), name="report-admin-overview"),
 ]

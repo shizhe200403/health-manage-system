@@ -7,6 +7,7 @@
         <p class="desc">先看今天最值得处理的管理动作，再进入具体模块，避免后台也变成信息堆叠页。</p>
       </div>
       <div class="head-actions">
+        <RouterLink class="ghost-link" to="/ops/reports">进入运营复核</RouterLink>
         <RouterLink class="ghost-link" to="/ops/community">进入社区审核</RouterLink>
         <RouterLink class="ghost-link" to="/ops/recipes">进入菜谱管理</RouterLink>
         <RouterLink class="ghost-link" to="/ops/users">进入用户管理</RouterLink>
@@ -120,6 +121,10 @@
               <strong>用户管理</strong>
               <span>查看账号状态、角色边界、资料完整度与健康约束。</span>
             </RouterLink>
+            <RouterLink class="action-link" to="/ops/reports">
+              <strong>运营复核</strong>
+              <span>看整体活跃度、内容处理节奏和报表任务健康度，判断后台当前最该补哪里。</span>
+            </RouterLink>
             <RouterLink class="action-link" to="/ops/community">
               <strong>社区审核</strong>
               <span>处理帖子审核、举报进度和评论隐藏，减少风险内容继续暴露。</span>
@@ -194,7 +199,7 @@ const loading = ref(false);
 const totalUsers = ref(0);
 const recentUsers = ref<any[]>([]);
 
-const isAdminUser = computed(() => Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser)));
+const isAdminUser = computed(() => Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser || auth.user.is_staff)));
 const disabledInSample = computed(() => recentUsers.value.filter((item) => item.status === "disabled").length);
 const profileReadyInSample = computed(() => recentUsers.value.filter((item) => Number(item.profile_completion || 0) >= 70).length);
 const pendingInSample = computed(() => recentUsers.value.filter((item) => item.status === "pending").length);
@@ -253,6 +258,14 @@ const moduleCards = computed(() => [
   },
   {
     state: "已成型",
+    title: "运营复核",
+    copy: "管理员已经能从后台看整体活跃、内容处理节奏和报表任务状态，不用再借道前台报表。",
+    cta: "进入模块",
+    to: "/ops/reports",
+    tone: "ready",
+  },
+  {
+    state: "已成型",
     title: "社区审核",
     copy: "帖子审核、举报处理和评论隐藏已经进入后台主线，适合下一步继续扩细。",
     cta: "进入模块",
@@ -269,10 +282,10 @@ const moduleCards = computed(() => [
   },
   {
     state: "下一步",
-    title: "报表与运营复核",
-    copy: "下一轮适合把运营复盘、异常趋势和任务完成情况也收回后台，而不是继续借道前台。",
-    cta: "查看前台报表",
-    to: "/reports",
+    title: "操作日志",
+    copy: "再下一轮更适合把管理员的处理动作也沉淀成后台日志，方便回看是谁改了什么。",
+    cta: "先回后台总览",
+    to: "/ops",
     tone: "next",
   },
 ]);

@@ -453,7 +453,7 @@ const healthDraft = reactive({
 const allergyOptions = ["花生", "牛奶", "鸡蛋", "海鲜", "坚果"];
 const avoidFoodOptions = ["辛辣", "油炸", "高糖", "高盐", "酒精"];
 
-const isAdminUser = computed(() => Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser)));
+const isAdminUser = computed(() => Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser || auth.user.is_staff)));
 const adminCount = computed(() => users.value.filter((item) => item.role === "admin").length);
 const disabledCount = computed(() => users.value.filter((item) => item.status === "disabled").length);
 const profileReadyCount = computed(() => users.value.filter((item) => Number(item.profile_completion || 0) >= 70).length);

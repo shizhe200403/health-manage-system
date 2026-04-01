@@ -1,5 +1,6 @@
 import shutil
 import tempfile
+from datetime import date
 from pathlib import Path
 
 from django.contrib.auth import get_user_model
@@ -230,6 +231,51 @@ class ProductApiSmokeTests(APITestCase):
 
         self.assertEqual(post_response.status_code, 403)
         self.assertEqual(report_response.status_code, 403)
+
+    def test_admin_can_view_operations_report_overview(self):
+        admin_user = self._create_user(username="opsreport", email="opsreport@example.com", phone="13800000013")
+        admin_user.role = "admin"
+        admin_user.is_staff = True
+        admin_user.save(update_fields=["role", "is_staff"])
+
+        normal_user = self._create_user(username="tracked", email="tracked@example.com", phone="13800000014")
+        recipe = self._create_recipe_bundle(normal_user, title="Ops Recipe")
+        recipe.audit_status = "pending"
+        recipe.save(update_fields=["audit_status"])
+
+        post = Post.objects.create(
+            user=normal_user,
+            title="Ops Post",
+            content="Need moderation",
+            status="published",
+            audit_status="pending",
+        )
+        PostComment.objects.create(post=post, user=normal_user, content="Hidden risk", status="hidden")
+        ContentReport.objects.create(reporter=normal_user, target_type="post", target_id=post.id, reason="ops review")
+
+        MealRecord.objects.create(user=normal_user, record_date=date.today(), meal_type="lunch")
+        ReportTask.objects.create(user=normal_user, report_type="weekly", status="completed")
+
+        self._login("opsreport@example.com")
+
+        response = self.client.get("/api/v1/reports/admin/overview/")
+        self.assertEqual(response.status_code, 200)
+        summary = response.data["data"]["summary"]
+        self.assertGreaterEqual(summary["users_total"], 2)
+        self.assertGreaterEqual(summary["recipes_pending"], 1)
+        self.assertGreaterEqual(summary["posts_pending"], 1)
+        self.assertGreaterEqual(summary["pending_reports"], 1)
+        self.assertGreaterEqual(summary["hidden_comments"], 1)
+        self.assertGreaterEqual(summary["meal_records_last_7_days"], 1)
+        self.assertGreaterEqual(summary["report_tasks_completed"], 1)
+        self.assertGreaterEqual(len(response.data["data"]["recent_tasks"]), 1)
+
+    def test_regular_user_cannot_access_operations_report_overview(self):
+        self._create_user()
+        self._login("alice")
+
+        response = self.client.get("/api/v1/reports/admin/overview/")
+        self.assertEqual(response.status_code, 403)
 
     def test_recipe_recommendation_and_favorite_flow(self):
         user = self._create_user()

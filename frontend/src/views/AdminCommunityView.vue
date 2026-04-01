@@ -430,7 +430,7 @@ const postDraft = reactive({
   audit_status: "pending",
 });
 
-const isAdminUser = computed(() => Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser)));
+const isAdminUser = computed(() => Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser || auth.user.is_staff)));
 const showSkeleton = computed(() => (loadingPosts || loadingReports) && !posts.value.length && !reports.value.length);
 const pendingPostCount = computed(() => posts.value.filter((item) => item.audit_status === "pending").length);
 const rejectedPostCount = computed(() => posts.value.filter((item) => item.audit_status === "rejected").length);
