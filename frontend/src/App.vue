@@ -1050,66 +1050,6 @@ h1,
   min-height: calc(100vh - 52px);
 }
 
-
-  gap: 12px;
-  padding: 14px;
-}
-
-.admin-nav-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  background: rgba(113, 175, 214, 0.14);
-  color: #e9f4ff;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.admin-nav-copy {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-}
-
-.admin-nav-copy strong,
-.admin-subnav-link span {
-  color: #f0f8ff;
-  font-size: 14px;
-  line-height: 1.35;
-}
-
-.admin-nav-copy small,
-.admin-subnav-link small {
-  color: rgba(212, 230, 244, 0.64);
-  line-height: 1.45;
-  font-size: 12px;
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.admin-subnav-link {
-  padding: 12px 14px;
-}
-
-.admin-nav-link:hover,
-.admin-subnav-link:hover {
-  border-color: rgba(161, 197, 223, 0.2);
-  background: rgba(20, 38, 54, 0.94);
-  box-shadow: 0 12px 22px rgba(4, 10, 17, 0.18);
-}
-
-.admin-nav-link.router-link-active,
-.admin-subnav-link.router-link-active {
-  border-color: rgba(122, 191, 234, 0.28);
-  background: linear-gradient(135deg, rgba(27, 60, 85, 0.92), rgba(18, 38, 55, 0.96));
-  box-shadow: inset 0 0 0 1px rgba(122, 191, 234, 0.08);
-}
-
 .admin-content {
   min-width: 0;
   padding: 16px 20px 32px;
