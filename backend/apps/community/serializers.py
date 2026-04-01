@@ -1,9 +1,17 @@
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from rest_framework import serializers
 
 from .models import ContentReport, Post, PostComment
 
 User = get_user_model()
+
+
+def admin_report_assignee_queryset():
+    return User.objects.filter(
+        Q(is_superuser=True) | Q(is_staff=True) | Q(role__in=["admin", "auditor"]),
+        status="active",
+    ).order_by("role", "username", "id")
 
 
 class UserBriefSerializer(serializers.ModelSerializer):
@@ -157,6 +165,7 @@ class ContentReportSerializer(serializers.ModelSerializer):
 class AdminContentReportListSerializer(serializers.ModelSerializer):
     reporter_info = UserBriefSerializer(source="reporter", read_only=True)
     processed_by_info = UserBriefSerializer(source="processed_by", read_only=True)
+    assigned_to_info = UserBriefSerializer(source="assigned_to", read_only=True)
     target_post_title = serializers.SerializerMethodField()
 
     class Meta:
@@ -170,10 +179,16 @@ class AdminContentReportListSerializer(serializers.ModelSerializer):
             "target_post_title",
             "reason",
             "status",
+            "priority",
+            "assigned_to",
+            "assigned_to_info",
+            "internal_note",
+            "follow_up_at",
             "processed_by",
             "processed_by_info",
             "processed_at",
             "created_at",
+            "updated_at",
         ]
 
     def get_target_post_title(self, obj):
@@ -185,9 +200,10 @@ class AdminContentReportListSerializer(serializers.ModelSerializer):
 
 class AdminContentReportDetailSerializer(AdminContentReportListSerializer):
     target_post = serializers.SerializerMethodField()
+    assignable_users = serializers.SerializerMethodField()
 
     class Meta(AdminContentReportListSerializer.Meta):
-        fields = AdminContentReportListSerializer.Meta.fields + ["target_post"]
+        fields = AdminContentReportListSerializer.Meta.fields + ["target_post", "assignable_users"]
 
     def get_target_post(self, obj):
         if obj.target_type != "post":
@@ -195,8 +211,19 @@ class AdminContentReportDetailSerializer(AdminContentReportListSerializer):
         post = Post.objects.select_related("user").prefetch_related("comments__user").filter(id=obj.target_id).first()
         return AdminPostDetailSerializer(post).data if post else None
 
+    def get_assignable_users(self, obj):
+        return UserBriefSerializer(admin_report_assignee_queryset(), many=True).data
+
 
 class AdminContentReportUpdateSerializer(serializers.ModelSerializer):
+    assigned_to = serializers.PrimaryKeyRelatedField(
+        queryset=admin_report_assignee_queryset(),
+        required=False,
+        allow_null=True,
+    )
+    internal_note = serializers.CharField(required=False, allow_blank=True)
+    follow_up_at = serializers.DateTimeField(required=False, allow_null=True)
+
     class Meta:
         model = ContentReport
-        fields = ["status"]
+        fields = ["status", "priority", "assigned_to", "internal_note", "follow_up_at"]

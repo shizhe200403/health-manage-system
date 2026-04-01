@@ -1,5 +1,5 @@
 from django.utils import timezone
-from django.db import models
+from django.db import models, transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, extend_schema_view, inline_serializer
 from rest_framework import permissions, serializers, status, viewsets
@@ -29,6 +29,187 @@ from .serializers import (
     PostCommentSerializer,
     PostSerializer,
 )
+
+
+REPORT_FIELD_LABELS = {
+    "status": "举报状态",
+    "priority": "优先级",
+    "assigned_to": "指派处理人",
+    "internal_note": "内部备注",
+    "follow_up_at": "跟进时间",
+    "processed_by": "处理人",
+    "processed_at": "处理时间",
+}
+POST_FIELD_LABELS = {
+    "status": "帖子状态",
+    "audit_status": "审核结论",
+}
+
+
+def user_display(user):
+    if not user:
+        return None
+    return user.nickname or user.username
+
+
+def snapshot_report_fields(report):
+    return {
+        "status": report.status,
+        "priority": report.priority,
+        "assigned_to": user_display(report.assigned_to),
+        "internal_note": report.internal_note,
+        "follow_up_at": report.follow_up_at.isoformat() if report.follow_up_at else None,
+        "processed_by": user_display(report.processed_by),
+        "processed_at": report.processed_at.isoformat() if report.processed_at else None,
+    }
+
+
+class IsAdminModerator(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return IsAdminOperatorPermission().has_permission(request, view)
+
+
+class AdminPostBulkRequestSerializer(serializers.Serializer):
+    ids = serializers.ListField(child=serializers.IntegerField(min_value=1), allow_empty=False)
+    action = serializers.ChoiceField(choices=[("approve", "approve"), ("reject", "reject"), ("archive", "archive")])
+
+
+class AdminPostBulkResponseSerializer(serializers.Serializer):
+    code = serializers.IntegerField()
+    message = serializers.CharField()
+    data = inline_serializer(
+        name="AdminPostBulkData",
+        fields={
+            "updated_count": serializers.IntegerField(),
+            "ids": serializers.ListField(child=serializers.IntegerField()),
+            "action": serializers.CharField(),
+        },
+    )
+
+
+class AdminReportBulkRequestSerializer(serializers.Serializer):
+    ids = serializers.ListField(child=serializers.IntegerField(min_value=1), allow_empty=False)
+    action = serializers.ChoiceField(choices=[("processed", "processed"), ("rejected", "rejected")])
+
+
+class AdminReportBulkResponseSerializer(serializers.Serializer):
+    code = serializers.IntegerField()
+    message = serializers.CharField()
+    data = inline_serializer(
+        name="AdminReportBulkData",
+        fields={
+            "updated_count": serializers.IntegerField(),
+            "ids": serializers.ListField(child=serializers.IntegerField()),
+            "action": serializers.CharField(),
+        },
+    )
+
+
+
+
+class AdminCommunityPostBulkActionView(APIView):
+    permission_classes = [IsAdminModerator]
+
+    @transaction.atomic
+    @extend_schema(request=AdminPostBulkRequestSerializer, responses=AdminPostBulkResponseSerializer)
+    def post(self, request):
+        serializer = AdminPostBulkRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ids = list(dict.fromkeys(serializer.validated_data["ids"]))
+        action_name = serializer.validated_data["action"]
+        posts = list(Post.objects.filter(id__in=ids).order_by("id"))
+        found_ids = [post.id for post in posts]
+
+        for post in posts:
+            before = snapshot_model_fields(post, ["status", "audit_status"])
+            if action_name == "approve":
+                post.audit_status = "approved"
+                post.status = "published"
+            elif action_name == "reject":
+                post.audit_status = "rejected"
+            else:
+                post.status = "archived"
+            post.save(update_fields=["status", "audit_status", "updated_at"])
+            create_admin_operation_log(
+                actor=request.user,
+                module="community",
+                action="bulk_moderate_post",
+                target_type="post",
+                target_id=post.id,
+                target_label=post.title,
+                summary=f"批量处理了帖子《{post.title}》",
+                changes=build_change_entries(before, snapshot_model_fields(post, ["status", "audit_status"]), POST_FIELD_LABELS, section="帖子处理"),
+                metadata={"author_id": post.user_id, "bulk_action": action_name, "related_target_type": "post", "related_target_id": post.id},
+            )
+
+        create_admin_operation_log(
+            actor=request.user,
+            module="community",
+            action="bulk_moderate_post",
+            target_type="post_batch",
+            target_label=f"{len(found_ids)} 条帖子",
+            summary=f"批量执行帖子{action_name}，共处理 {len(found_ids)} 条",
+            metadata={"ids": found_ids, "requested_ids": ids, "action": action_name},
+        )
+        return Response(
+            {"code": 0, "message": "success", "data": {"updated_count": len(found_ids), "ids": found_ids, "action": action_name}},
+            status=status.HTTP_200_OK,
+        )
+
+
+class AdminCommunityReportBulkActionView(APIView):
+    permission_classes = [IsAdminModerator]
+
+    @transaction.atomic
+    @extend_schema(request=AdminReportBulkRequestSerializer, responses=AdminReportBulkResponseSerializer)
+    def post(self, request):
+        serializer = AdminReportBulkRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ids = list(dict.fromkeys(serializer.validated_data["ids"]))
+        action_name = serializer.validated_data["action"]
+        reports = list(ContentReport.objects.select_related("reporter", "processed_by", "assigned_to").filter(id__in=ids).order_by("id"))
+        found_ids = [report.id for report in reports]
+
+        for report in reports:
+            before = snapshot_report_fields(report)
+            report.status = action_name
+            report.processed_by = request.user
+            report.processed_at = timezone.now()
+            report.save(update_fields=["status", "processed_by", "processed_at", "updated_at"])
+            create_admin_operation_log(
+                actor=request.user,
+                module="community",
+                action="bulk_review_report",
+                target_type="content_report",
+                target_id=report.id,
+                target_label=f"举报 #{report.id}",
+                summary=f"批量更新了举报 #{report.id} 的处理结果",
+                changes=build_change_entries(before, snapshot_report_fields(report), REPORT_FIELD_LABELS, section="举报处理"),
+                metadata={
+                    "reporter_id": report.reporter_id,
+                    "assigned_to_id": report.assigned_to_id,
+                    "priority": report.priority,
+                    "target_type": report.target_type,
+                    "target_id": report.target_id,
+                    "bulk_action": action_name,
+                    "related_target_type": report.target_type,
+                    "related_target_id": report.target_id,
+                },
+            )
+
+        create_admin_operation_log(
+            actor=request.user,
+            module="community",
+            action="bulk_review_report",
+            target_type="content_report_batch",
+            target_label=f"{len(found_ids)} 条举报",
+            summary=f"批量执行举报{action_name}，共处理 {len(found_ids)} 条",
+            metadata={"ids": found_ids, "requested_ids": ids, "action": action_name},
+        )
+        return Response(
+            {"code": 0, "message": "success", "data": {"updated_count": len(found_ids), "ids": found_ids, "action": action_name}},
+            status=status.HTTP_200_OK,
+        )
 
 
 class PostViewSet(EnvelopeModelViewSet):
@@ -133,11 +314,6 @@ class ContentReportViewSet(EnvelopeModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save()
-
-
-class IsAdminModerator(permissions.BasePermission):
-    def has_permission(self, request, view):
-        return IsAdminOperatorPermission().has_permission(request, view)
 
 
 class AdminPostPagination(PageNumberPagination):
@@ -291,21 +467,32 @@ class AdminContentReportListView(APIView):
 
     @extend_schema(responses=AdminContentReportListEnvelopeSerializer)
     def get(self, request):
-        queryset = ContentReport.objects.select_related("reporter", "processed_by").order_by("-created_at", "-id")
+        queryset = ContentReport.objects.select_related("reporter", "processed_by", "assigned_to").order_by("-created_at", "-id")
 
         keyword = request.query_params.get("keyword", "").strip()
         status_value = request.query_params.get("status", "").strip()
         target_type = request.query_params.get("target_type", "").strip()
+        priority = request.query_params.get("priority", "").strip()
+        assigned_to = request.query_params.get("assigned_to", "").strip()
 
         if status_value:
             queryset = queryset.filter(status=status_value)
         if target_type:
             queryset = queryset.filter(target_type=target_type)
+        if priority:
+            queryset = queryset.filter(priority=priority)
+        if assigned_to == "unassigned":
+            queryset = queryset.filter(assigned_to__isnull=True)
+        elif assigned_to:
+            queryset = queryset.filter(assigned_to_id=assigned_to)
         if keyword:
             queryset = queryset.filter(
                 models.Q(reason__icontains=keyword)
+                | models.Q(internal_note__icontains=keyword)
                 | models.Q(reporter__username__icontains=keyword)
                 | models.Q(reporter__nickname__icontains=keyword)
+                | models.Q(assigned_to__username__icontains=keyword)
+                | models.Q(assigned_to__nickname__icontains=keyword)
             )
 
         paginator = self.pagination_class()
@@ -318,7 +505,7 @@ class AdminContentReportDetailView(APIView):
     permission_classes = [IsAdminModerator]
 
     def get_object(self, report_id):
-        return get_object_or_404(ContentReport.objects.select_related("reporter", "processed_by"), pk=report_id)
+        return get_object_or_404(ContentReport.objects.select_related("reporter", "processed_by", "assigned_to"), pk=report_id)
 
     @extend_schema(responses=AdminContentReportDetailEnvelopeSerializer)
     def get(self, request, report_id):
@@ -329,13 +516,18 @@ class AdminContentReportDetailView(APIView):
     @extend_schema(request=AdminContentReportUpdateSerializer, responses=AdminContentReportDetailEnvelopeSerializer)
     def patch(self, request, report_id):
         report = self.get_object(report_id)
-        before = snapshot_model_fields(report, ["status", "processed_by_id", "processed_at"])
+        before = snapshot_report_fields(report)
         serializer = AdminContentReportUpdateSerializer(report, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        report = serializer.save(
-            processed_by=request.user if serializer.validated_data.get("status") in {"processed", "rejected"} else None,
-            processed_at=timezone.now() if serializer.validated_data.get("status") in {"processed", "rejected"} else None,
-        )
+        status_value = serializer.validated_data.get("status", report.status)
+        update_kwargs = {}
+        if status_value in {"processed", "rejected"}:
+            update_kwargs["processed_by"] = request.user
+            update_kwargs["processed_at"] = timezone.now()
+        elif "status" in serializer.validated_data and status_value == "pending":
+            update_kwargs["processed_by"] = None
+            update_kwargs["processed_at"] = None
+        report = serializer.save(**update_kwargs)
         create_admin_operation_log(
             actor=request.user,
             module="community",
@@ -343,18 +535,17 @@ class AdminContentReportDetailView(APIView):
             target_type="content_report",
             target_id=report.id,
             target_label=f"举报 #{report.id}",
-            summary=f"更新了举报 #{report.id} 的处理结论",
+            summary=f"更新了举报 #{report.id} 的处理协作信息",
             changes=build_change_entries(
                 before,
-                snapshot_model_fields(report, ["status", "processed_by_id", "processed_at"]),
-                {
-                    "status": "举报状态",
-                    "processed_by_id": "处理人",
-                    "processed_at": "处理时间",
-                },
+                snapshot_report_fields(report),
+                REPORT_FIELD_LABELS,
                 section="举报处理",
             ),
             metadata={
+                "reporter_id": report.reporter_id,
+                "assigned_to_id": report.assigned_to_id,
+                "priority": report.priority,
                 "target_type": report.target_type,
                 "target_id": report.target_id,
                 "related_target_type": report.target_type,

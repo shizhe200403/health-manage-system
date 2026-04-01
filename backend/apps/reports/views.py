@@ -77,6 +77,31 @@ class AdminRecentReportTaskSerializer(serializers.Serializer):
     user = AdminUserMiniSerializer()
 
 
+class AdminWorkbenchLinkSerializer(serializers.Serializer):
+    path = serializers.CharField()
+    query = serializers.JSONField(default=dict)
+
+
+class AdminQueueSummarySerializer(serializers.Serializer):
+    key = serializers.CharField()
+    label = serializers.CharField()
+    count = serializers.IntegerField()
+    tone = serializers.CharField()
+    title = serializers.CharField()
+    description = serializers.CharField()
+    link = AdminWorkbenchLinkSerializer()
+
+
+class AdminRecentWorkItemSerializer(serializers.Serializer):
+    key = serializers.CharField()
+    label = serializers.CharField()
+    title = serializers.CharField()
+    description = serializers.CharField()
+    tone = serializers.CharField()
+    created_at = serializers.DateTimeField(allow_null=True)
+    link = AdminWorkbenchLinkSerializer()
+
+
 class AdminOperationsSummarySerializer(serializers.Serializer):
     users_total = serializers.IntegerField()
     users_active = serializers.IntegerField()
@@ -99,6 +124,8 @@ class AdminOperationsSummarySerializer(serializers.Serializer):
 
 class AdminOperationsOverviewSerializer(serializers.Serializer):
     summary = AdminOperationsSummarySerializer()
+    queue_summaries = AdminQueueSummarySerializer(many=True)
+    recent_work_items = AdminRecentWorkItemSerializer(many=True)
     recent_tasks = AdminRecentReportTaskSerializer(many=True)
 
 
@@ -132,6 +159,24 @@ def _build_report_response(user, report_type, start_date, end_date):
         task.status = "failed"
         task.save(update_fields=["status", "updated_at"])
         raise
+
+
+def _user_display_name(user):
+    return user.nickname or user.username
+
+
+def _short_text(value, limit=46):
+    text = str(value or "").strip()
+    if len(text) <= limit:
+        return text
+    return f"{text[: limit - 1]}…"
+
+
+def _link(path, **query):
+    return {
+        "path": path,
+        "query": {key: value for key, value in query.items() if value not in {None, ""}},
+    }
 
 
 class WeeklyReportView(APIView):
@@ -240,10 +285,15 @@ class AdminOperationsOverviewView(APIView):
         today = timezone.localdate()
         last_week = today - timedelta(days=6)
 
-        recent_tasks_qs = (
-            ReportTask.objects.select_related("user")
-            .order_by("-created_at", "-id")[:8]
-        )
+        pending_users_qs = User.objects.filter(status="pending").order_by("-date_joined", "-id")
+        pending_recipes_qs = Recipe.objects.exclude(status="archived").filter(audit_status="pending").order_by("-updated_at", "-id")
+        rejected_recipes_count = Recipe.objects.exclude(status="archived").filter(audit_status="rejected").count()
+        pending_posts_qs = Post.objects.exclude(status="archived").filter(audit_status="pending").order_by("-updated_at", "-id")
+        rejected_posts_count = Post.objects.exclude(status="archived").filter(audit_status="rejected").count()
+        pending_reports_qs = ContentReport.objects.filter(status="pending").order_by("-created_at", "-id")
+        failed_tasks_qs = ReportTask.objects.select_related("user").filter(status="failed").order_by("-updated_at", "-id")
+        recent_tasks_qs = ReportTask.objects.select_related("user").order_by("-created_at", "-id")[:8]
+
         recent_tasks = [
             {
                 "task_id": task.id,
@@ -257,7 +307,7 @@ class AdminOperationsOverviewView(APIView):
                     "id": task.user_id,
                     "username": task.user.username,
                     "nickname": task.user.nickname,
-                    "display_name": task.user.nickname or task.user.username,
+                    "display_name": _user_display_name(task.user),
                 },
             }
             for task in recent_tasks_qs
@@ -268,24 +318,164 @@ class AdminOperationsOverviewView(APIView):
             users=Count("user_id", distinct=True),
         )
 
+        users_total = User.objects.count()
+        users_active = User.objects.filter(status="active").count()
+        users_pending = pending_users_qs.count()
+        recipes_total = Recipe.objects.exclude(status="archived").count()
+        recipes_pending = pending_recipes_qs.count()
+        posts_total = Post.objects.exclude(status="archived").count()
+        posts_pending = pending_posts_qs.count()
+        pending_reports = pending_reports_qs.count()
+        hidden_comments = PostComment.objects.filter(status="hidden").count()
+        report_tasks_total = ReportTask.objects.count()
+        report_tasks_processing = ReportTask.objects.filter(status="processing").count()
+        report_tasks_failed = failed_tasks_qs.count()
+        report_tasks_completed = ReportTask.objects.filter(status="completed").count()
+
         summary = {
-            "users_total": User.objects.count(),
-            "users_active": User.objects.filter(status="active").count(),
-            "users_pending": User.objects.filter(status="pending").count(),
-            "recipes_total": Recipe.objects.exclude(status="archived").count(),
-            "recipes_pending": Recipe.objects.exclude(status="archived").filter(audit_status="pending").count(),
-            "recipes_rejected": Recipe.objects.exclude(status="archived").filter(audit_status="rejected").count(),
-            "posts_total": Post.objects.exclude(status="archived").count(),
-            "posts_pending": Post.objects.exclude(status="archived").filter(audit_status="pending").count(),
-            "posts_rejected": Post.objects.exclude(status="archived").filter(audit_status="rejected").count(),
-            "pending_reports": ContentReport.objects.filter(status="pending").count(),
-            "hidden_comments": PostComment.objects.filter(status="hidden").count(),
+            "users_total": users_total,
+            "users_active": users_active,
+            "users_pending": users_pending,
+            "recipes_total": recipes_total,
+            "recipes_pending": recipes_pending,
+            "recipes_rejected": rejected_recipes_count,
+            "posts_total": posts_total,
+            "posts_pending": posts_pending,
+            "posts_rejected": rejected_posts_count,
+            "pending_reports": pending_reports,
+            "hidden_comments": hidden_comments,
             "meal_records_last_7_days": meal_record_stats["total"] or 0,
             "active_record_users_last_7_days": meal_record_stats["users"] or 0,
-            "report_tasks_total": ReportTask.objects.count(),
-            "report_tasks_processing": ReportTask.objects.filter(status="processing").count(),
-            "report_tasks_failed": ReportTask.objects.filter(status="failed").count(),
-            "report_tasks_completed": ReportTask.objects.filter(status="completed").count(),
+            "report_tasks_total": report_tasks_total,
+            "report_tasks_processing": report_tasks_processing,
+            "report_tasks_failed": report_tasks_failed,
+            "report_tasks_completed": report_tasks_completed,
         }
 
-        return Response({"code": 0, "message": "success", "data": {"summary": summary, "recent_tasks": recent_tasks}})
+        queue_summaries = [
+            {
+                "key": "failed_report_tasks",
+                "label": "失败报表任务",
+                "count": report_tasks_failed,
+                "tone": "risk",
+                "title": "先处理报表失败任务",
+                "description": "失败任务会直接影响复盘链路稳定性，最好先确认是数据问题还是生成链路问题。",
+                "link": _link("/ops/reports"),
+            },
+            {
+                "key": "pending_reports",
+                "label": "待处理举报",
+                "count": pending_reports,
+                "tone": "warning",
+                "title": "社区举报仍在积压",
+                "description": "举报积压意味着风险内容仍在暴露，适合先回到社区处理结论。",
+                "link": _link("/ops/community", preset="pending_reports", report_status="pending"),
+            },
+            {
+                "key": "pending_posts",
+                "label": "待审核帖子",
+                "count": posts_pending,
+                "tone": "warning",
+                "title": "帖子审核队列待清理",
+                "description": "先给帖子补齐审核结论，避免社区内容长期停在半开放状态。",
+                "link": _link("/ops/community", preset="pending_posts", post_audit_status="pending"),
+            },
+            {
+                "key": "pending_recipes",
+                "label": "待审核菜谱",
+                "count": recipes_pending,
+                "tone": "warning",
+                "title": "菜谱审核还没压平",
+                "description": "这批菜谱更适合直接落到待审核视角处理，而不是停留在概览页。",
+                "link": _link("/ops/recipes", preset="pending", audit_status="pending"),
+            },
+            {
+                "key": "pending_users",
+                "label": "待处理账号",
+                "count": users_pending,
+                "tone": "info",
+                "title": "账号队列需要人工确认",
+                "description": "待处理账号通常意味着资料缺口或状态异常，适合 manager 先处理。",
+                "link": _link("/ops/users", preset="pending", status="pending"),
+            },
+        ]
+
+        recent_work_items = []
+
+        for task in failed_tasks_qs[:2]:
+            recent_work_items.append(
+                {
+                    "key": f"failed-task-{task.id}",
+                    "label": "失败报表",
+                    "title": f"{_user_display_name(task.user)} 的{task.get_report_type_display() or task.report_type}生成失败",
+                    "description": "先检查最近失败任务，确认是生成链路异常还是数据侧问题。",
+                    "tone": "risk",
+                    "created_at": task.updated_at,
+                    "link": _link("/ops/reports"),
+                }
+            )
+
+        for report in pending_reports_qs[:2]:
+            recent_work_items.append(
+                {
+                    "key": f"pending-report-{report.id}",
+                    "label": "待处理举报",
+                    "title": f"举报 #{report.id} 仍待处理",
+                    "description": f"{_short_text(report.reason, 40)}，建议直接进入举报队列给出处理结论。",
+                    "tone": "warning",
+                    "created_at": report.created_at,
+                    "link": _link("/ops/community", preset="pending_reports", report_status="pending"),
+                }
+            )
+
+        for post in pending_posts_qs[:2]:
+            recent_work_items.append(
+                {
+                    "key": f"pending-post-{post.id}",
+                    "label": "待审核帖子",
+                    "title": _short_text(post.title or f"帖子 #{post.id}", 36),
+                    "description": "帖子仍是待审核状态，适合直接落到社区页完成审核结论。",
+                    "tone": "warning",
+                    "created_at": post.updated_at,
+                    "link": _link("/ops/community", preset="pending_posts", post_audit_status="pending"),
+                }
+            )
+
+        for recipe in pending_recipes_qs[:2]:
+            recent_work_items.append(
+                {
+                    "key": f"pending-recipe-{recipe.id}",
+                    "label": "待审核菜谱",
+                    "title": _short_text(recipe.title or f"菜谱 #{recipe.id}", 36),
+                    "description": "菜谱还没完成审核，建议直接进入待审核视角处理。",
+                    "tone": "warning",
+                    "created_at": recipe.updated_at,
+                    "link": _link("/ops/recipes", preset="pending", audit_status="pending"),
+                }
+            )
+
+        for user in pending_users_qs[:2]:
+            recent_work_items.append(
+                {
+                    "key": f"pending-user-{user.id}",
+                    "label": "待处理账号",
+                    "title": _user_display_name(user),
+                    "description": "账号仍在待处理状态，适合直接进入用户队列确认资料或状态。",
+                    "tone": "info",
+                    "created_at": user.date_joined,
+                    "link": _link("/ops/users", preset="pending", status="pending"),
+                }
+            )
+
+        return Response(
+            {
+                "code": 0,
+                "message": "success",
+                "data": {
+                    "summary": summary,
+                    "queue_summaries": queue_summaries,
+                    "recent_work_items": recent_work_items[:8],
+                    "recent_tasks": recent_tasks,
+                },
+            }
+        )

@@ -54,10 +54,11 @@
         </div>
 
         <div class="ops-alert-strip">
-          <article v-for="item in opsAlerts" :key="item.label" class="ops-alert-card" v-spotlight>
+          <article v-for="item in queueSummaries" :key="item.key" class="ops-alert-card" :class="`tone-${item.tone}`" v-spotlight>
             <span>{{ item.label }}</span>
-            <strong>{{ item.value }}</strong>
-            <p>{{ item.copy }}</p>
+            <strong>{{ item.count }}</strong>
+            <p>{{ item.description }}</p>
+            <el-button text type="primary" @click="goToWorkbench(item.link)">{{ item.title }}</el-button>
           </article>
         </div>
 
@@ -66,7 +67,7 @@
             <div class="card-head">
               <div>
                 <h3>当前后台判断</h3>
-                <p>先把后台今天更像“拉活跃”“补内容”还是“清积压”判断清楚，再安排动作。</p>
+                <p>先把后台今天最值得值守的入口选出来，再进入具体处理页面。</p>
               </div>
             </div>
             <article class="review-stage-card">
@@ -75,7 +76,7 @@
                 <strong>{{ operationsStage.title }}</strong>
                 <p>{{ operationsStage.copy }}</p>
               </div>
-              <el-button type="primary" @click="router.push(operationsStage.to)">{{ operationsStage.cta }}</el-button>
+              <el-button type="primary" @click="goToWorkbench(operationsStage.link)">{{ operationsStage.cta }}</el-button>
             </article>
 
             <div class="conclusion-list">
@@ -90,20 +91,30 @@
           <article class="card console-card" v-spotlight>
             <div class="card-head">
               <div>
-                <h3>模块健康度</h3>
-                <p>把后台当前的主要模块并排看，先找出最容易拖累用户体验的那一块。</p>
+                <h3>最近待处理对象</h3>
+                <p>从这里直接落到具体队列，而不是停在说明性总览里。</p>
               </div>
             </div>
-            <div class="health-list">
-              <article v-for="item in moduleHealthCards" :key="item.label" class="health-item">
+            <div v-if="recentWorkItems.length" class="health-list">
+              <article v-for="item in recentWorkItems" :key="item.key" class="health-item">
                 <div class="health-copy">
                   <span>{{ item.label }}</span>
-                  <strong>{{ item.value }}</strong>
-                  <p>{{ item.copy }}</p>
+                  <strong>{{ item.title }}</strong>
+                  <p>{{ item.description }}</p>
                 </div>
-                <RouterLink :to="item.to">{{ item.cta }}</RouterLink>
+                <div class="health-actions">
+                  <small>{{ formatDateTime(item.created_at || undefined) }}</small>
+                  <el-button text type="primary" @click="goToWorkbench(item.link)">直接处理</el-button>
+                </div>
               </article>
             </div>
+            <PageStateBlock
+              v-else
+              tone="empty"
+              title="当前没有额外待处理对象"
+              description="如果队列已经压平，可以继续看最近报表任务或回到其他模块复核。"
+              compact
+            />
           </article>
         </div>
 
@@ -120,13 +131,13 @@
                 <div class="task-head">
                   <div>
                     <strong>{{ task.user.display_name }}</strong>
-                    <span>{{ reportTypeLabel(task.report_type) }} · {{ formatDateRange(task.start_date, task.end_date) }}</span>
+                    <span>{{ reportTypeLabel(task.report_type) }} · {{ formatDateRange(task.start_date || undefined, task.end_date || undefined) }}</span>
                   </div>
                   <el-tag :type="taskStatusTagType(task.status)" effect="light">{{ taskStatusLabel(task.status) }}</el-tag>
                 </div>
                 <p>{{ taskInsight(task) }}</p>
                 <div class="task-meta">
-                  <span>生成时间：{{ formatDateTime(task.generated_at) }}</span>
+                  <span>生成时间：{{ formatDateTime(task.generated_at || undefined) }}</span>
                   <a v-if="task.file_url" :href="task.file_url" target="_blank" rel="noreferrer">打开文件</a>
                 </div>
               </article>
@@ -182,6 +193,7 @@ import { useRouter } from "vue-router";
 import CollectionSkeleton from "../components/CollectionSkeleton.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
+import type { AdminOperationsOverviewData, AdminOperationsSummary, AdminQueueSummary, AdminRecentReportTask, AdminRecentWorkItem, AdminWorkbenchLink } from "../api/adminReports";
 import { getAdminOperationsOverview } from "../api/adminReports";
 import { hasOpsAccess, isOpsManager } from "../lib/opsAccess";
 import { notifyLoadError } from "../lib/feedback";
@@ -191,11 +203,9 @@ const router = useRouter();
 const auth = useAuthStore();
 
 const loading = ref(false);
-const overview = ref<any | null>(null);
+const overview = ref<AdminOperationsOverviewData | null>(null);
 
-const hasOpsUser = computed(() => hasOpsAccess(auth.user));
-const isManagerUser = computed(() => isOpsManager(auth.user));
-const summary = computed(() => overview.value?.summary ?? {
+const emptySummary: AdminOperationsSummary = {
   users_total: 0,
   users_active: 0,
   users_pending: 0,
@@ -213,43 +223,24 @@ const summary = computed(() => overview.value?.summary ?? {
   report_tasks_processing: 0,
   report_tasks_failed: 0,
   report_tasks_completed: 0,
-});
-const recentTasks = computed(() => overview.value?.recent_tasks ?? []);
+};
+
+const hasOpsUser = computed(() => hasOpsAccess(auth.user));
+const isManagerUser = computed(() => isOpsManager(auth.user));
+const summary = computed(() => overview.value?.summary ?? emptySummary);
+const queueSummaries = computed<AdminQueueSummary[]>(() => overview.value?.queue_summaries ?? []);
+const recentWorkItems = computed<AdminRecentWorkItem[]>(() => overview.value?.recent_work_items ?? []);
+const recentTasks = computed<AdminRecentReportTask[]>(() => overview.value?.recent_tasks ?? []);
 const moderationBacklog = computed(() => summary.value.recipes_pending + summary.value.posts_pending + summary.value.pending_reports);
-const opsAlerts = computed(() => [
-  {
-    label: "用户待处理",
-    value: summary.value.users_pending,
-    copy: summary.value.users_pending > 0 ? "先确认这些账号是资料未完善还是人工待处理。" : "当前没有明显待处理账号积压。",
-  },
-  {
-    label: "内容待审核",
-    value: summary.value.recipes_pending + summary.value.posts_pending,
-    copy: moderationBacklog.value > 0 ? "这部分会直接影响前台用户看到的内容质量。" : "当前内容审核队列相对平稳。",
-  },
-  {
-    label: "举报待处理",
-    value: summary.value.pending_reports,
-    copy: summary.value.pending_reports > 0 ? "举报积压会让风险内容继续暴露。" : "当前举报队列没有明显积压。",
-  },
-]);
 const operationsStage = computed(() => {
-  if (summary.value.report_tasks_failed > 0) {
+  if (queueSummaries.value.length > 0) {
+    const top = queueSummaries.value[0];
     return {
-      badge: "Risk First",
-      title: "先补报表链路稳定性",
-      copy: "已经出现失败报表任务，这会直接影响用户对系统复盘能力的信任。",
-      cta: "先看最近任务",
-      to: "/ops/reports",
-    };
-  }
-  if (moderationBacklog.value > 0) {
-    return {
-      badge: "Moderation Load",
-      title: "后台当前更偏向清内容积压",
-      copy: "待审核菜谱、待审核帖子和待处理举报都在叠加，先把内容处理队列压下来。",
-      cta: "去社区审核",
-      to: summary.value.pending_reports > 0 || summary.value.posts_pending > 0 ? "/ops/community" : "/ops/recipes",
+      badge: top.count > 0 ? "Queue First" : "Stable",
+      title: top.title,
+      copy: top.description,
+      cta: top.count > 0 ? "进入处理队列" : "查看当前值守页",
+      link: top.link,
     };
   }
   if (summary.value.active_record_users_last_7_days < Math.max(1, Math.floor(summary.value.users_active / 3))) {
@@ -258,7 +249,7 @@ const operationsStage = computed(() => {
       title: "活跃用户和真实记录量之间有落差",
       copy: "后台这时更适合回看前台链路，判断是不是记录动作仍然太重或报表触发点不够清楚。",
       cta: "回前台记录页看链路",
-      to: "/records",
+      link: { path: "/records", query: {} },
     };
   }
   return {
@@ -266,7 +257,7 @@ const operationsStage = computed(() => {
     title: "当前后台节奏相对稳定",
     copy: "活跃、内容处理和报表任务都没有明显失衡，适合继续补细节而不是紧急救火。",
     cta: isManagerUser.value ? "回后台总览" : "留在运营复核",
-    to: isManagerUser.value ? "/ops" : "/ops/reports",
+    link: { path: isManagerUser.value ? "/ops" : "/ops/reports", query: {} },
   };
 });
 const operationConclusions = computed(() => [
@@ -295,29 +286,6 @@ const operationConclusions = computed(() => [
     tone: summary.value.report_tasks_failed > 0 ? "risk" : "good",
   },
 ]);
-const moduleHealthCards = computed(() => [
-  {
-    label: "用户侧",
-    value: `${summary.value.users_active}/${summary.value.users_total}`,
-    copy: summary.value.users_pending > 0 ? `还有 ${summary.value.users_pending} 个待处理账号，适合继续压实资料与权限边界。` : "账号状态整体比较稳定，后台不必先从这里救火。",
-    cta: "去用户管理",
-    to: "/ops/users",
-  },
-  {
-    label: "菜谱侧",
-    value: `${summary.value.recipes_pending} 待审核`,
-    copy: summary.value.recipes_rejected > 0 ? `还有 ${summary.value.recipes_rejected} 条已驳回菜谱，适合复核是否需要继续保留。` : "菜谱主要压力集中在待审核，而不是驳回尾单。",
-    cta: "去菜谱管理",
-    to: "/ops/recipes",
-  },
-  {
-    label: "社区侧",
-    value: `${summary.value.pending_reports} 举报`,
-    copy: summary.value.hidden_comments > 0 ? `当前累计已有 ${summary.value.hidden_comments} 条隐藏评论，说明社区风险并不是空的。` : "当前社区评论区风险感较低，可以主要看帖子审核与举报队列。",
-    cta: "去社区审核",
-    to: "/ops/community",
-  },
-]);
 
 onMounted(() => {
   if (hasOpsUser.value) {
@@ -336,6 +304,10 @@ async function loadOverview() {
   } finally {
     loading.value = false;
   }
+}
+
+function goToWorkbench(link: AdminWorkbenchLink) {
+  router.push({ path: link.path, query: link.query ?? {} });
 }
 
 function reportTypeLabel(value: string) {

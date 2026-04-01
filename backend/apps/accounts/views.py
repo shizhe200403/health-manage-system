@@ -26,6 +26,10 @@ from .serializers import (
 
 
 User = get_user_model()
+USER_STATUS_LABELS = {
+    "active": "正常",
+    "disabled": "已停用",
+}
 ACCOUNT_FIELD_LABELS = {
     "username": "用户名",
     "email": "邮箱",
@@ -137,6 +141,24 @@ class AdminUserRequestSerializer(serializers.Serializer):
     account = AdminUserUpdateSerializer(required=False)
     profile = UserProfileSerializer(required=False)
     health_condition = UserHealthConditionSerializer(required=False)
+
+
+class AdminUserBulkRequestSerializer(serializers.Serializer):
+    ids = serializers.ListField(child=serializers.IntegerField(min_value=1), allow_empty=False)
+    status = serializers.ChoiceField(choices=[("active", "active"), ("disabled", "disabled")])
+
+
+class AdminUserBulkResponseSerializer(serializers.Serializer):
+    code = serializers.IntegerField()
+    message = serializers.CharField()
+    data = inline_serializer(
+        name="AdminUserBulkData",
+        fields={
+            "updated_count": serializers.IntegerField(),
+            "ids": serializers.ListField(child=serializers.IntegerField()),
+            "status": serializers.CharField(),
+        },
+    )
 
 
 class IsAdminManager(permissions.BasePermission):
@@ -290,6 +312,52 @@ class AdminUserListView(APIView):
         page = paginator.paginate_queryset(queryset, request, view=self)
         serializer = AdminUserListSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
+
+
+
+
+class AdminUserBulkActionView(APIView):
+    permission_classes = [IsAdminManager]
+
+    @transaction.atomic
+    @extend_schema(request=AdminUserBulkRequestSerializer, responses=AdminUserBulkResponseSerializer)
+    def post(self, request):
+        serializer = AdminUserBulkRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ids = list(dict.fromkeys(serializer.validated_data["ids"]))
+        target_status = serializer.validated_data["status"]
+        users = list(User.objects.filter(id__in=ids).order_by("id"))
+        found_ids = [user.id for user in users]
+
+        for user in users:
+            before = snapshot_model_fields(user, ["status"])
+            user.status = target_status
+            user.save(update_fields=["status"])
+            create_admin_operation_log(
+                actor=request.user,
+                module="users",
+                action="bulk_update_user_status",
+                target_type="user",
+                target_id=user.id,
+                target_label=user.nickname or user.username,
+                summary=f"批量将用户 {user.nickname or user.username} 设为{USER_STATUS_LABELS[target_status]}",
+                changes=build_change_entries(before, snapshot_model_fields(user, ["status"]), {"status": "账号状态"}, section="账号信息"),
+                metadata={"username": user.username, "bulk_action": "update_status", "bulk_status": target_status},
+            )
+
+        create_admin_operation_log(
+            actor=request.user,
+            module="users",
+            action="bulk_update_user_status",
+            target_type="user_batch",
+            target_label=f"{len(found_ids)} 个账号",
+            summary=f"批量将 {len(found_ids)} 个账号设为{USER_STATUS_LABELS[target_status]}",
+            metadata={"ids": found_ids, "requested_ids": ids, "status": target_status},
+        )
+        return Response(
+            {"code": 0, "message": "success", "data": {"updated_count": len(found_ids), "ids": found_ids, "status": target_status}},
+            status=status.HTTP_200_OK,
+        )
 
 
 class AdminUserDetailView(APIView):

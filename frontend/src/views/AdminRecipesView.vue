@@ -61,7 +61,7 @@
             class="focus-card"
             :class="{ active: focusPreset === item.key }"
             v-spotlight
-            @click="focusPreset = item.key"
+            @click="applyFocusPreset(item.key)"
           >
             <span>{{ item.label }}</span>
             <strong>{{ item.value }}</strong>
@@ -75,7 +75,7 @@
               <h3>筛选与搜索</h3>
               <p>{{ filterHint }}</p>
             </div>
-            <el-button v-if="focusPreset !== 'all'" text type="primary" @click="focusPreset = 'all'">回到全部视角</el-button>
+            <el-button v-if="focusPreset !== 'all'" text type="primary" @click="applyFocusPreset('all')">回到全部视角</el-button>
           </div>
           <div class="toolbar-grid">
             <el-input v-model.trim="filters.keyword" placeholder="搜索菜名、描述、标签或来源" clearable @keyup.enter="applyFilters" />
@@ -105,7 +105,18 @@
             <span class="table-meta">当前显示 {{ displayRecipes.length }} / {{ recipes.length }} 份菜谱</span>
           </div>
 
-          <el-table :data="displayRecipes" stripe class="recipe-table" empty-text="当前筛选下没有菜谱">
+          <div v-if="selectedRecipeIds.length" class="bulk-bar">
+            <span>已选 {{ selectedRecipeIds.length }} 份菜谱，可直接批量通过、驳回或归档。</span>
+            <div class="bulk-actions">
+              <el-button :disabled="bulkUpdatingRecipes" @click="clearRecipeSelection">清空选择</el-button>
+              <el-button type="success" :loading="bulkUpdatingRecipes" @click="applyBulkRecipeAction('approve')">批量通过</el-button>
+              <el-button type="warning" :loading="bulkUpdatingRecipes" @click="applyBulkRecipeAction('reject')">批量驳回</el-button>
+              <el-button type="danger" :loading="bulkUpdatingRecipes" @click="applyBulkRecipeAction('archive')">批量归档</el-button>
+            </div>
+          </div>
+
+          <el-table ref="recipeTableRef" :data="displayRecipes" :row-key="(row: any) => row.id" stripe class="recipe-table" empty-text="当前筛选下没有菜谱" @selection-change="handleRecipeSelectionChange">
+            <el-table-column type="selection" width="48" />
             <el-table-column label="菜谱" min-width="220">
               <template #default="{ row }">
                 <div class="recipe-cell">
@@ -311,31 +322,43 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, nextTick, reactive, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import AdminObjectTimeline from "../components/AdminObjectTimeline.vue";
 import CollectionSkeleton from "../components/CollectionSkeleton.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import { listAdminOperationLogs } from "../api/adminLogs";
-import { deleteRecipe, getRecipeDetail, listRecipes, updateRecipe } from "../api/recipes";
+import { bulkUpdateRecipes, deleteRecipe, getRecipeDetail, listRecipes, updateRecipe } from "../api/recipes";
 import { hasOpsAccess } from "../lib/opsAccess";
 import { extractApiErrorMessage, notifyActionSuccess, notifyErrorMessage, notifyLoadError } from "../lib/feedback";
 import { useAuthStore } from "../stores/auth";
 
 const router = useRouter();
+const route = useRoute();
 const auth = useAuthStore();
+
+type RecipeFocusPreset = "all" | "pending" | "draft" | "incomplete" | "user_upload";
+
+const recipeFocusPresets: RecipeFocusPreset[] = ["all", "pending", "draft", "incomplete", "user_upload"];
+const recipeStatuses = ["draft", "published"] as const;
+const recipeAuditStatuses = ["pending", "approved", "rejected"] as const;
+const recipeSourceTypes = ["user_upload", "builtin"] as const;
 
 const loadingRecipes = ref(false);
 const detailLoading = ref(false);
 const savingRecipe = ref(false);
 const archivingRecipe = ref(false);
+const bulkUpdatingRecipes = ref(false);
 const recipeLogsLoading = ref(false);
 const drawerOpen = ref(false);
+const recipeTableRef = ref<any>();
 const recipes = ref<any[]>([]);
 const selectedRecipe = ref<any | null>(null);
+const selectedRecipeIds = ref<number[]>([]);
 const recipeLogs = ref<any[]>([]);
-const focusPreset = ref<"all" | "pending" | "draft" | "incomplete" | "user_upload">("all");
+const focusPreset = ref<RecipeFocusPreset>("all");
+const syncingRoute = ref(false);
 
 const filters = reactive({
   keyword: "",
@@ -455,11 +478,74 @@ const recipeChecklist = computed(() => {
   return list;
 });
 
-onMounted(() => {
-  if (hasOpsUser.value) {
-    void loadRecipes();
-  }
-});
+watch(
+  () => route.query,
+  (query) => {
+    if (syncingRoute.value) return;
+    applyRouteQuery(query as Record<string, unknown>);
+    if (hasOpsUser.value) {
+      void loadRecipes();
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  hasOpsUser,
+  (value) => {
+    if (value && !recipes.value.length) {
+      void loadRecipes();
+    }
+  },
+  { immediate: false },
+);
+
+function readQueryText(value: unknown) {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+  return "";
+}
+
+function normalizeFocusPreset(value: string): RecipeFocusPreset {
+  return recipeFocusPresets.includes(value as RecipeFocusPreset) ? (value as RecipeFocusPreset) : "all";
+}
+
+function normalizeRecipeStatus(value: string) {
+  return recipeStatuses.includes(value as (typeof recipeStatuses)[number]) ? value : "";
+}
+
+function normalizeRecipeAuditStatus(value: string) {
+  return recipeAuditStatuses.includes(value as (typeof recipeAuditStatuses)[number]) ? value : "";
+}
+
+function normalizeRecipeSourceType(value: string) {
+  return recipeSourceTypes.includes(value as (typeof recipeSourceTypes)[number]) ? value : "";
+}
+
+function applyRouteQuery(query: Record<string, unknown>) {
+  focusPreset.value = normalizeFocusPreset(readQueryText(query.preset));
+  filters.keyword = readQueryText(query.keyword);
+  filters.status = normalizeRecipeStatus(readQueryText(query.status));
+  filters.auditStatus = normalizeRecipeAuditStatus(readQueryText(query.audit_status));
+  filters.sourceType = normalizeRecipeSourceType(readQueryText(query.source_type));
+}
+
+function buildRouteQuery() {
+  const query: Record<string, string> = {};
+  if (focusPreset.value !== "all") query.preset = focusPreset.value;
+  if (filters.keyword) query.keyword = filters.keyword;
+  if (filters.status) query.status = filters.status;
+  if (filters.auditStatus) query.audit_status = filters.auditStatus;
+  if (filters.sourceType) query.source_type = filters.sourceType;
+  return query;
+}
+
+function syncRouteFromState() {
+  syncingRoute.value = true;
+  return Promise.resolve(router.replace({ query: buildRouteQuery() })).finally(() => {
+    syncingRoute.value = false;
+  });
+}
 
 function unwrapListPayload(payload: any) {
   if (Array.isArray(payload?.data?.items)) return payload.data.items;
@@ -476,10 +562,46 @@ async function loadRecipes() {
   try {
     const response = await listRecipes();
     recipes.value = unwrapListPayload(response);
+    await nextTick();
+    clearRecipeSelection();
   } catch {
     notifyLoadError("菜谱列表");
   } finally {
     loadingRecipes.value = false;
+  }
+}
+
+function handleRecipeSelectionChange(rows: any[]) {
+  selectedRecipeIds.value = rows.map((item) => Number(item.id)).filter((id) => Number.isInteger(id) && id > 0);
+}
+
+function clearRecipeSelection() {
+  selectedRecipeIds.value = [];
+  recipeTableRef.value?.clearSelection?.();
+}
+
+async function applyBulkRecipeAction(action: "approve" | "reject" | "archive") {
+  if (!selectedRecipeIds.value.length) return;
+
+  const ids = [...selectedRecipeIds.value];
+  bulkUpdatingRecipes.value = true;
+  try {
+    await bulkUpdateRecipes({ ids, action });
+    notifyActionSuccess(
+      action === "approve"
+        ? `已批量通过 ${ids.length} 份菜谱`
+        : action === "reject"
+          ? `已批量驳回 ${ids.length} 份菜谱`
+          : `已批量归档 ${ids.length} 份菜谱`,
+    );
+    await loadRecipes();
+    if (selectedRecipe.value && ids.includes(selectedRecipe.value.id)) {
+      await openRecipeDrawer(selectedRecipe.value.id);
+    }
+  } catch (error) {
+    notifyErrorMessage(extractApiErrorMessage(error, "批量处理菜谱失败"));
+  } finally {
+    bulkUpdatingRecipes.value = false;
   }
 }
 
@@ -489,10 +611,11 @@ function resetFilters() {
   filters.auditStatus = "";
   filters.sourceType = "";
   focusPreset.value = "all";
+  void syncRouteFromState();
 }
 
 function applyFilters() {
-  focusPreset.value = focusPreset.value;
+  void syncRouteFromState();
 }
 
 function fillDraft(recipe: Record<string, any>) {
@@ -580,6 +703,11 @@ async function loadRecipeLogs(recipeId: number) {
   } finally {
     recipeLogsLoading.value = false;
   }
+}
+
+function applyFocusPreset(preset: RecipeFocusPreset) {
+  focusPreset.value = preset;
+  void syncRouteFromState();
 }
 
 function recipeCompleteness(recipe: Record<string, any>) {
@@ -748,6 +876,25 @@ function formatDateTime(value?: string) {
 .focus-card.active strong,
 .focus-card.active p {
   color: #f2f7fb;
+}
+
+.bulk-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(240, 248, 252, 0.92);
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  color: #476072;
+}
+
+.bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .filter-card,

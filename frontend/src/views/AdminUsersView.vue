@@ -37,9 +37,9 @@
             <p>当前筛选条件下的账号总量。</p>
           </article>
           <article v-spotlight>
-            <span>管理员</span>
-            <strong>{{ adminCount }}</strong>
-            <p>当前页中具备管理权限的账号数量。</p>
+            <span>待处理账号</span>
+            <strong>{{ pendingCount }}</strong>
+            <p>先处理 pending 账号，避免资料和权限问题继续积压。</p>
           </article>
           <article v-spotlight>
             <span>已停用</span>
@@ -47,9 +47,9 @@
             <p>适合优先检查这些账号是否需要恢复或保留禁用。</p>
           </article>
           <article v-spotlight>
-            <span>资料较完整</span>
-            <strong>{{ profileReadyCount }}</strong>
-            <p>当前页档案完整度达到 70% 以上的用户数。</p>
+            <span>资料待补齐</span>
+            <strong>{{ incompleteCount }}</strong>
+            <p>这批账号会直接拖慢推荐质量和后续排查。</p>
           </article>
         </div>
 
@@ -101,7 +101,17 @@
             <span class="table-meta">当前页显示 {{ displayUsers.length }} / {{ users.length }} 人</span>
           </div>
 
-          <el-table :data="displayUsers" stripe class="user-table" empty-text="当前筛选下没有用户">
+          <div v-if="selectedUserIds.length" class="bulk-bar">
+            <span>已选 {{ selectedUserIds.length }} 个账号，可直接批量启用或停用。</span>
+            <div class="bulk-actions">
+              <el-button :disabled="bulkUpdatingUsers" @click="clearUserSelection">清空选择</el-button>
+              <el-button type="success" :loading="bulkUpdatingUsers" @click="applyBulkUserStatus('active')">批量启用</el-button>
+              <el-button type="danger" :loading="bulkUpdatingUsers" @click="applyBulkUserStatus('disabled')">批量停用</el-button>
+            </div>
+          </div>
+
+          <el-table ref="userTableRef" :data="displayUsers" :row-key="(row: any) => row.id" stripe class="user-table" empty-text="当前筛选下没有用户" @selection-change="handleUserSelectionChange">
+            <el-table-column type="selection" width="48" />
             <el-table-column label="用户" min-width="200">
               <template #default="{ row }">
                 <div class="user-cell">
@@ -158,7 +168,7 @@
             </el-table-column>
             <el-table-column label="操作" fixed="right" width="140">
               <template #default="{ row }">
-                <el-button text type="primary" @click="openUserDrawer(row.id)">查看并编辑</el-button>
+                <el-button text type="primary" @click="openUserDrawer(row.id)">查看并处理</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -397,29 +407,40 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { computed, nextTick, reactive, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import AdminObjectTimeline from "../components/AdminObjectTimeline.vue";
 import CollectionSkeleton from "../components/CollectionSkeleton.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
-import { getAdminUserDetail, listAdminUsers, updateAdminUser } from "../api/admin";
+import { bulkUpdateAdminUsers, getAdminUserDetail, listAdminUsers, updateAdminUser } from "../api/admin";
 import { listAdminOperationLogs } from "../api/adminLogs";
 import { extractApiErrorMessage, notifyActionSuccess, notifyErrorMessage, notifyLoadError } from "../lib/feedback";
 import { useAuthStore } from "../stores/auth";
 
 const router = useRouter();
+const route = useRoute();
 const auth = useAuthStore();
+
+type UserFocusPreset = "all" | "pending" | "disabled" | "incomplete" | "flagged";
+
+const userFocusPresets: UserFocusPreset[] = ["all", "pending", "disabled", "incomplete", "flagged"];
+const userRoles = ["user", "admin", "auditor"] as const;
+const userStatuses = ["active", "disabled", "pending"] as const;
 
 const loadingUsers = ref(false);
 const detailLoading = ref(false);
 const savingUser = ref(false);
+const bulkUpdatingUsers = ref(false);
 const userLogsLoading = ref(false);
 const drawerOpen = ref(false);
+const userTableRef = ref<any>();
 const users = ref<any[]>([]);
 const selectedUser = ref<any | null>(null);
+const selectedUserIds = ref<number[]>([]);
 const userLogs = ref<any[]>([]);
-const focusPreset = ref<"all" | "pending" | "disabled" | "incomplete" | "flagged" | "admins">("all");
+const focusPreset = ref<UserFocusPreset>("all");
+const syncingRoute = ref(false);
 
 const filters = reactive({
   keyword: "",
@@ -468,9 +489,7 @@ const allergyOptions = ["花生", "牛奶", "鸡蛋", "海鲜", "坚果"];
 const avoidFoodOptions = ["辛辣", "油炸", "高糖", "高盐", "酒精"];
 
 const isAdminUser = computed(() => Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser || auth.user.is_staff)));
-const adminCount = computed(() => users.value.filter((item) => item.role === "admin").length);
 const disabledCount = computed(() => users.value.filter((item) => item.status === "disabled").length);
-const profileReadyCount = computed(() => users.value.filter((item) => Number(item.profile_completion || 0) >= 70).length);
 const pendingCount = computed(() => users.value.filter((item) => item.status === "pending").length);
 const flaggedCount = computed(() => users.value.filter((item) => Array.isArray(item.health_flags) && item.health_flags.length > 0).length);
 const incompleteCount = computed(() => users.value.filter((item) => Number(item.profile_completion || 0) < 70).length);
@@ -507,7 +526,6 @@ const focusPresetLabel = computed(() => ({
   disabled: "停用账号",
   incomplete: "资料待补齐账号",
   flagged: "有健康标记账号",
-  admins: "管理员账号",
 }[focusPreset.value]));
 const filterHint = computed(() => {
   if (focusPreset.value === "all") return "先快速定位用户名、邮箱或手机号，再看角色和状态。";
@@ -523,8 +541,6 @@ const displayUsers = computed(() => {
       return users.value.filter((item) => Number(item.profile_completion || 0) < 70);
     case "flagged":
       return users.value.filter((item) => Array.isArray(item.health_flags) && item.health_flags.length > 0);
-    case "admins":
-      return users.value.filter((item) => item.role === "admin");
     default:
       return users.value;
   }
@@ -576,11 +592,17 @@ const selectedUserChecklist = computed(() => {
   return list;
 });
 
-onMounted(() => {
-  if (isAdminUser.value) {
-    void loadUsers();
-  }
-});
+watch(
+  () => route.query,
+  (query) => {
+    if (syncingRoute.value) return;
+    applyRouteQuery(query as Record<string, unknown>);
+    if (isAdminUser.value) {
+      void loadUsers();
+    }
+  },
+  { immediate: true },
+);
 
 watch(
   isAdminUser,
@@ -591,6 +613,54 @@ watch(
   },
   { immediate: false },
 );
+
+function readQueryText(value: unknown) {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+  return "";
+}
+
+function readQueryPositiveInt(value: unknown) {
+  const numeric = Number(readQueryText(value));
+  return Number.isInteger(numeric) && numeric > 0 ? numeric : 1;
+}
+
+function normalizeFocusPreset(value: string): UserFocusPreset {
+  return userFocusPresets.includes(value as UserFocusPreset) ? (value as UserFocusPreset) : "all";
+}
+
+function normalizeUserRole(value: string) {
+  return userRoles.includes(value as (typeof userRoles)[number]) ? value : "";
+}
+
+function normalizeUserStatus(value: string) {
+  return userStatuses.includes(value as (typeof userStatuses)[number]) ? value : "";
+}
+
+function applyRouteQuery(query: Record<string, unknown>) {
+  focusPreset.value = normalizeFocusPreset(readQueryText(query.preset));
+  filters.keyword = readQueryText(query.keyword);
+  filters.role = normalizeUserRole(readQueryText(query.role));
+  filters.status = normalizeUserStatus(readQueryText(query.status));
+  pagination.page = readQueryPositiveInt(query.page);
+}
+
+function buildRouteQuery() {
+  const query: Record<string, string> = {};
+  if (focusPreset.value !== "all") query.preset = focusPreset.value;
+  if (filters.keyword) query.keyword = filters.keyword;
+  if (filters.role) query.role = filters.role;
+  if (filters.status) query.status = filters.status;
+  if (pagination.page > 1) query.page = String(pagination.page);
+  return query;
+}
+
+function syncRouteFromState() {
+  syncingRoute.value = true;
+  return Promise.resolve(router.replace({ query: buildRouteQuery() })).finally(() => {
+    syncingRoute.value = false;
+  });
+}
 
 function unwrapListPayload(payload: any) {
   if (Array.isArray(payload?.data?.items)) return payload.data.items;
@@ -675,6 +745,8 @@ async function loadUsers() {
     });
     users.value = unwrapListPayload(response);
     pagination.total = Number(response?.data?.count || 0);
+    await nextTick();
+    clearUserSelection();
   } catch {
     notifyLoadError("用户列表");
   } finally {
@@ -684,7 +756,7 @@ async function loadUsers() {
 
 function applyFilters() {
   pagination.page = 1;
-  void loadUsers();
+  void syncRouteFromState();
 }
 
 function resetFilters() {
@@ -693,12 +765,41 @@ function resetFilters() {
   filters.status = "";
   pagination.page = 1;
   focusPreset.value = "all";
-  void loadUsers();
+  void syncRouteFromState();
 }
 
 function handlePageChange(page: number) {
   pagination.page = page;
-  void loadUsers();
+  void syncRouteFromState();
+}
+
+function handleUserSelectionChange(rows: any[]) {
+  selectedUserIds.value = rows.map((item) => Number(item.id)).filter((id) => Number.isInteger(id) && id > 0);
+}
+
+function clearUserSelection() {
+  selectedUserIds.value = [];
+  userTableRef.value?.clearSelection?.();
+}
+
+async function applyBulkUserStatus(statusValue: "active" | "disabled") {
+  if (!selectedUserIds.value.length) return;
+
+  const ids = [...selectedUserIds.value];
+  bulkUpdatingUsers.value = true;
+  try {
+    await bulkUpdateAdminUsers({ ids, status: statusValue });
+    notifyActionSuccess(statusValue === "active" ? `已批量启用 ${ids.length} 个账号` : `已批量停用 ${ids.length} 个账号`);
+    await auth.fetchMe();
+    await loadUsers();
+    if (selectedUser.value && ids.includes(selectedUser.value.id)) {
+      await openUserDrawer(selectedUser.value.id);
+    }
+  } catch (error) {
+    notifyErrorMessage(extractApiErrorMessage(error, "批量更新账号状态失败"));
+  } finally {
+    bulkUpdatingUsers.value = false;
+  }
 }
 
 async function openUserDrawer(userId: number) {
@@ -748,8 +849,10 @@ async function saveUser() {
   }
 }
 
-function applyFocusPreset(preset: "all" | "pending" | "disabled" | "incomplete" | "flagged" | "admins") {
+function applyFocusPreset(preset: UserFocusPreset) {
   focusPreset.value = preset;
+  pagination.page = 1;
+  void syncRouteFromState();
 }
 
 async function loadUserLogs(userId: number) {
@@ -933,6 +1036,25 @@ function userJudgement(user: Record<string, any>) {
   color: #6a8898;
   font-size: 13px;
   white-space: nowrap;
+}
+
+.bulk-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(240, 248, 252, 0.92);
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  color: #476072;
+}
+
+.bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .toolbar-grid {

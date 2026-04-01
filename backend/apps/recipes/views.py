@@ -1,8 +1,11 @@
+from django.db import transaction
 from django.db.models import Q
-from rest_framework import permissions, status, viewsets
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.common.operation_logs import build_change_entries, create_admin_operation_log, is_admin_operator, snapshot_model_fields
 from apps.common.views import EnvelopeModelViewSet
@@ -11,6 +14,30 @@ from .models import Ingredient, Recipe, UserFavoriteRecipe
 from .serializers import IngredientSerializer, RecipeSerializer
 from .utils import get_recipe_nutrition_summary
 from apps.tracking.models import UserBehavior
+
+
+RECIPE_BULK_FIELD_LABELS = {
+    "status": "发布状态",
+    "audit_status": "审核结论",
+}
+
+
+class RecipeBulkRequestSerializer(serializers.Serializer):
+    ids = serializers.ListField(child=serializers.IntegerField(min_value=1), allow_empty=False)
+    action = serializers.ChoiceField(choices=[("approve", "approve"), ("reject", "reject"), ("archive", "archive")])
+
+
+class RecipeBulkResponseSerializer(serializers.Serializer):
+    code = serializers.IntegerField()
+    message = serializers.CharField()
+    data = inline_serializer(
+        name="RecipeBulkData",
+        fields={
+            "updated_count": serializers.IntegerField(),
+            "ids": serializers.ListField(child=serializers.IntegerField()),
+            "action": serializers.CharField(),
+        },
+    )
 
 
 class CanManageContent(permissions.BasePermission):
@@ -44,6 +71,59 @@ class IngredientViewSet(EnvelopeModelViewSet):
         if not is_admin_operator(self.request.user):
             raise PermissionDenied("只有管理员或审核员可以维护食材库")
         return [permission() for permission in self.permission_classes]
+
+
+
+
+class RecipeBulkActionView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        if not is_admin_operator(request.user):
+            raise PermissionDenied("只有管理员或审核员可以批量处理菜谱")
+        serializer = RecipeBulkRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ids = list(dict.fromkeys(serializer.validated_data["ids"]))
+        action_name = serializer.validated_data["action"]
+        recipes = list(Recipe.objects.filter(id__in=ids).order_by("id"))
+        found_ids = [recipe.id for recipe in recipes]
+
+        for recipe in recipes:
+            before = snapshot_model_fields(recipe, ["status", "audit_status"])
+            if action_name == "approve":
+                recipe.audit_status = "approved"
+                recipe.status = "published"
+            elif action_name == "reject":
+                recipe.audit_status = "rejected"
+            else:
+                recipe.status = "archived"
+            recipe.save(update_fields=["status", "audit_status", "updated_at"])
+            create_admin_operation_log(
+                actor=request.user,
+                module="recipes",
+                action="bulk_moderate_recipe",
+                target_type="recipe",
+                target_id=recipe.id,
+                target_label=recipe.title,
+                summary=f"批量处理了菜谱《{recipe.title}》",
+                changes=build_change_entries(before, snapshot_model_fields(recipe, ["status", "audit_status"]), RECIPE_BULK_FIELD_LABELS, section="菜谱处理"),
+                metadata={"created_by_id": recipe.created_by_id, "bulk_action": action_name},
+            )
+
+        create_admin_operation_log(
+            actor=request.user,
+            module="recipes",
+            action="bulk_moderate_recipe",
+            target_type="recipe_batch",
+            target_label=f"{len(found_ids)} 份菜谱",
+            summary=f"批量执行菜谱{action_name}，共处理 {len(found_ids)} 份",
+            metadata={"ids": found_ids, "requested_ids": ids, "action": action_name},
+        )
+        return Response(
+            {"code": 0, "message": "success", "data": {"updated_count": len(found_ids), "ids": found_ids, "action": action_name}},
+            status=status.HTTP_200_OK,
+        )
 
 
 class RecipeViewSet(EnvelopeModelViewSet):

@@ -49,12 +49,28 @@ class ContentReport(TimeStampedModel):
         ("processed", "Processed"),
         ("rejected", "Rejected"),
     ]
+    PRIORITY_CHOICES = [
+        ("low", "Low"),
+        ("normal", "Normal"),
+        ("high", "High"),
+        ("urgent", "Urgent"),
+    ]
 
     reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="content_reports")
     target_type = models.CharField(max_length=32)
     target_id = models.BigIntegerField()
     reason = models.TextField()
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
+    priority = models.CharField(max_length=32, choices=PRIORITY_CHOICES, default="normal")
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_content_reports",
+    )
+    internal_note = models.TextField(blank=True, default="")
+    follow_up_at = models.DateTimeField(null=True, blank=True)
     processed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

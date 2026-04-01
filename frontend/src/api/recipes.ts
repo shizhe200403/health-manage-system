@@ -50,6 +50,11 @@ export async function updateRecipe(recipeId: number, payload: Record<string, unk
   return data;
 }
 
+export async function bulkUpdateRecipes(payload: { ids: number[]; action: "approve" | "reject" | "archive" }) {
+  const { data } = await http.post("/recipes/admin/bulk/", payload);
+  return data;
+}
+
 export async function deleteRecipe(recipeId: number) {
   const { data } = await http.delete(`/recipes/${recipeId}/`);
   return data;

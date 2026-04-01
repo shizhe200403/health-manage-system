@@ -61,7 +61,7 @@
             class="focus-card"
             :class="{ active: focusPreset === item.key }"
             v-spotlight
-            @click="focusPreset = item.key"
+            @click="applyFocusPreset(item.key)"
           >
             <span>{{ item.label }}</span>
             <strong>{{ item.value }}</strong>
@@ -76,10 +76,10 @@
                 <h3>帖子审核</h3>
                 <p>{{ postFilterHint }}</p>
               </div>
-              <el-button v-if="focusPreset !== 'all'" text type="primary" @click="focusPreset = 'all'">回到全部视角</el-button>
+              <el-button v-if="focusPreset !== 'all'" text type="primary" @click="applyFocusPreset('all')">回到全部视角</el-button>
             </div>
             <div class="toolbar-grid">
-              <el-input v-model.trim="postFilters.keyword" placeholder="搜索标题、正文或作者" clearable @keyup.enter="loadPosts" />
+              <el-input v-model.trim="postFilters.keyword" placeholder="搜索标题、正文或作者" clearable @keyup.enter="applyPostFilters" />
               <el-select v-model="postFilters.status" clearable placeholder="状态">
                 <el-option label="公开中" value="published" />
                 <el-option label="已归档" value="archived" />
@@ -89,10 +89,21 @@
                 <el-option label="已通过" value="approved" />
                 <el-option label="已驳回" value="rejected" />
               </el-select>
-              <el-button type="primary" :loading="loadingPosts" @click="loadPosts">应用筛选</el-button>
+              <el-button type="primary" :loading="loadingPosts" @click="applyPostFilters">应用筛选</el-button>
             </div>
 
-            <el-table :data="displayPosts" stripe class="moderation-table" empty-text="当前筛选下没有帖子">
+            <div v-if="selectedPostIds.length" class="bulk-bar">
+              <span>已选 {{ selectedPostIds.length }} 条帖子，可直接批量通过、驳回或归档。</span>
+              <div class="bulk-actions">
+                <el-button :disabled="bulkUpdatingPosts" @click="clearPostSelection">清空选择</el-button>
+                <el-button type="success" :loading="bulkUpdatingPosts" @click="applyBulkPostAction('approve')">批量通过</el-button>
+                <el-button type="warning" :loading="bulkUpdatingPosts" @click="applyBulkPostAction('reject')">批量驳回</el-button>
+                <el-button type="danger" :loading="bulkUpdatingPosts" @click="applyBulkPostAction('archive')">批量归档</el-button>
+              </div>
+            </div>
+
+            <el-table ref="postTableRef" :data="displayPosts" :row-key="(row: any) => row.id" stripe class="moderation-table" empty-text="当前筛选下没有帖子" @selection-change="handlePostSelectionChange">
+              <el-table-column type="selection" width="48" />
               <el-table-column label="帖子" min-width="220">
                 <template #default="{ row }">
                   <div class="content-cell">
@@ -145,15 +156,40 @@
                 <h3>举报处理</h3>
                 <p>{{ reportFilterHint }}</p>
               </div>
+              <el-button v-if="focusPreset !== 'all'" text type="primary" @click="applyFocusPreset('all')">回到全部视角</el-button>
             </div>
             <div class="toolbar-grid reports-toolbar">
-              <el-input v-model.trim="reportFilters.keyword" placeholder="搜索举报原因或举报人" clearable @keyup.enter="loadReports" />
+              <el-input v-model.trim="reportFilters.keyword" placeholder="搜索举报原因、举报人或内部备注" clearable @keyup.enter="applyReportFilters" />
               <el-select v-model="reportFilters.status" clearable placeholder="处理状态">
                 <el-option label="待处理" value="pending" />
                 <el-option label="已处理" value="processed" />
                 <el-option label="已驳回" value="rejected" />
               </el-select>
-              <el-button type="primary" :loading="loadingReports" @click="loadReports">刷新举报</el-button>
+              <el-select v-model="reportFilters.priority" clearable placeholder="优先级">
+                <el-option label="低" value="low" />
+                <el-option label="普通" value="normal" />
+                <el-option label="高" value="high" />
+                <el-option label="紧急" value="urgent" />
+              </el-select>
+              <el-select v-model="reportFilters.assignedTo" clearable placeholder="处理人">
+                <el-option label="未指派" value="unassigned" />
+                <el-option
+                  v-for="user in reportAssignableUsers"
+                  :key="user.id"
+                  :label="user.display_name || user.username"
+                  :value="String(user.id)"
+                />
+              </el-select>
+              <el-button type="primary" :loading="loadingReports" @click="applyReportFilters">刷新举报</el-button>
+            </div>
+
+            <div v-if="selectedReportIds.length" class="bulk-bar bulk-bar-compact">
+              <span>已选 {{ selectedReportIds.length }} 条举报，可直接批量标记已处理或驳回。</span>
+              <div class="bulk-actions">
+                <el-button :disabled="bulkUpdatingReports" @click="clearReportSelection">清空选择</el-button>
+                <el-button type="primary" :loading="bulkUpdatingReports" @click="applyBulkReportAction('processed')">批量已处理</el-button>
+                <el-button type="danger" :loading="bulkUpdatingReports" @click="applyBulkReportAction('rejected')">批量驳回</el-button>
+              </div>
             </div>
 
             <div v-if="displayReports.length" class="report-list">
@@ -163,9 +199,23 @@
                     <strong>{{ report.target_post_title || "帖子举报" }}</strong>
                     <span>{{ report.reporter_info?.display_name || report.reporter_info?.username || "用户" }} · {{ formatDateTime(report.created_at) }}</span>
                   </div>
-                  <el-tag :type="reportStatusTagType(report.status)" effect="light">{{ reportStatusLabel(report.status) }}</el-tag>
+                  <div class="report-head-side">
+                    <div class="report-tags">
+                      <el-tag :type="priorityTagType(report.priority)" effect="light">{{ priorityLabel(report.priority) }}</el-tag>
+                      <el-tag :type="reportStatusTagType(report.status)" effect="light">{{ reportStatusLabel(report.status) }}</el-tag>
+                    </div>
+                    <el-checkbox :model-value="selectedReportIds.includes(report.id)" @change="toggleReportSelection(report.id, $event)">选择</el-checkbox>
+                  </div>
                 </div>
                 <p>{{ report.reason }}</p>
+                <div class="report-meta-row">
+                  <span>指派：{{ report.assigned_to_info?.display_name || report.assigned_to_info?.username || "未指派" }}</span>
+                  <span v-if="report.follow_up_at">跟进：{{ formatDateTime(report.follow_up_at) }}</span>
+                </div>
+                <div v-if="report.internal_note" class="report-note-preview">
+                  <strong>内部备注</strong>
+                  <span>{{ report.internal_note }}</span>
+                </div>
                 <div class="report-actions">
                   <el-button text @click="openReportDrawer(report.id)">查看详情</el-button>
                   <el-button text type="primary" :loading="reportActionId === report.id && reportAction === 'processed'" @click="updateReportStatus(report.id, 'processed')">标记已处理</el-button>
@@ -346,7 +396,7 @@
             </article>
             <article v-spotlight>
               <span>当前状态</span>
-              <strong>{{ reportStatusLabel(selectedReport.status) }}</strong>
+              <strong>{{ reportStatusLabel(reportDraft.status) }}</strong>
             </article>
             <article v-spotlight>
               <span>提交时间</span>
@@ -359,27 +409,84 @@
               <strong>举报判断</strong>
               <span>{{ reportFocusTitle }}</span>
             </div>
+            <div class="drawer-focus-tags">
+              <span class="drawer-focus-tag">优先级：{{ priorityLabel(reportDraft.priority) }}</span>
+              <span class="drawer-focus-tag">指派：{{ selectedReport.assigned_to_info?.display_name || selectedReport.assigned_to_info?.username || "未指派" }}</span>
+              <span v-if="reportDraft.follow_up_at" class="drawer-focus-tag">跟进：{{ formatDateTime(reportDraft.follow_up_at) }}</span>
+            </div>
             <ul class="drawer-checklist">
-              <li>举报原因：{{ selectedReport.reason }}</li>
-              <li v-if="selectedReport.target_post_title">目标帖子：{{ selectedReport.target_post_title }}</li>
-              <li v-if="selectedReport.processed_by_info">处理人：{{ selectedReport.processed_by_info.display_name || selectedReport.processed_by_info.username }}</li>
+              <li v-for="item in reportChecklist" :key="item">{{ item }}</li>
             </ul>
           </div>
 
-          <div v-if="selectedReport.target_post" class="drawer-section" v-spotlight>
-            <div class="drawer-section-head">
-              <strong>目标帖子快照</strong>
-              <span>先核对帖子当前状态，再决定举报是通过还是驳回。</span>
+          <el-form label-position="top" class="drawer-form">
+            <div class="drawer-section" v-spotlight>
+              <div class="drawer-section-head">
+                <strong>处理协作</strong>
+                <span>先明确状态、优先级和责任人，再决定什么时候继续跟进。</span>
+              </div>
+              <el-row :gutter="12">
+                <el-col :span="12">
+                  <el-form-item label="处理状态">
+                    <el-select v-model="reportDraft.status" style="width: 100%">
+                      <el-option v-for="option in reportStatusOptions" :key="option.value" :label="option.label" :value="option.value" />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="优先级">
+                    <el-select v-model="reportDraft.priority" style="width: 100%">
+                      <el-option v-for="option in reportPriorityOptions" :key="option.value" :label="option.label" :value="option.value" />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+              </el-row>
+              <el-row :gutter="12">
+                <el-col :span="12">
+                  <el-form-item label="指派处理人">
+                    <el-select v-model="reportDraft.assigned_to" clearable style="width: 100%" placeholder="暂不指派">
+                      <el-option
+                        v-for="user in reportAssignableUsers"
+                        :key="user.id"
+                        :label="user.display_name || user.username"
+                        :value="user.id"
+                      />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="跟进时间">
+                    <el-input v-model="reportDraft.follow_up_at" type="datetime-local" />
+                  </el-form-item>
+                </el-col>
+              </el-row>
             </div>
-            <div class="target-post">
-              <strong>{{ selectedReport.target_post.title }}</strong>
-              <p>{{ selectedReport.target_post.content }}</p>
-              <div class="target-post-meta">
-                <el-tag :type="postStatusTagType(selectedReport.target_post.status)" effect="light">{{ postStatusLabel(selectedReport.target_post.status) }}</el-tag>
-                <el-tag :type="auditTagType(selectedReport.target_post.audit_status)" effect="light">{{ auditLabel(selectedReport.target_post.audit_status) }}</el-tag>
+
+            <div class="drawer-section" v-spotlight>
+              <div class="drawer-section-head">
+                <strong>内部备注</strong>
+                <span>写清楚当前判断、下一步动作或需要谁继续跟进。</span>
+              </div>
+              <el-form-item label="备注内容">
+                <el-input v-model.trim="reportDraft.internal_note" type="textarea" :rows="5" placeholder="仅后台可见" />
+              </el-form-item>
+            </div>
+
+            <div v-if="selectedReport.target_post" class="drawer-section" v-spotlight>
+              <div class="drawer-section-head">
+                <strong>目标帖子快照</strong>
+                <span>先核对帖子当前状态，再决定举报是通过还是驳回。</span>
+              </div>
+              <div class="target-post">
+                <strong>{{ selectedReport.target_post.title }}</strong>
+                <p>{{ selectedReport.target_post.content }}</p>
+                <div class="target-post-meta">
+                  <el-tag :type="postStatusTagType(selectedReport.target_post.status)" effect="light">{{ postStatusLabel(selectedReport.target_post.status) }}</el-tag>
+                  <el-tag :type="auditTagType(selectedReport.target_post.audit_status)" effect="light">{{ auditLabel(selectedReport.target_post.audit_status) }}</el-tag>
+                </div>
               </div>
             </div>
-          </div>
+          </el-form>
 
           <div class="drawer-section" v-spotlight>
             <AdminObjectTimeline
@@ -394,7 +501,8 @@
           <div class="drawer-actions">
             <el-button plain @click="reportDrawerOpen = false">取消</el-button>
             <el-button type="danger" plain :loading="reportActionId === selectedReport.id && reportAction === 'rejected'" @click="updateReportStatus(selectedReport.id, 'rejected')">驳回举报</el-button>
-            <el-button type="primary" :loading="reportActionId === selectedReport.id && reportAction === 'processed'" @click="updateReportStatus(selectedReport.id, 'processed')">标记已处理</el-button>
+            <el-button type="primary" plain :loading="reportActionId === selectedReport.id && reportAction === 'processed'" @click="updateReportStatus(selectedReport.id, 'processed')">标记已处理</el-button>
+            <el-button type="primary" :loading="reportActionId === selectedReport.id && !reportAction" @click="saveReport">保存协作信息</el-button>
           </div>
         </template>
       </el-drawer>
@@ -403,13 +511,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, nextTick, reactive, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import AdminObjectTimeline from "../components/AdminObjectTimeline.vue";
 import CollectionSkeleton from "../components/CollectionSkeleton.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
-import { getAdminCommunityPostDetail, getAdminCommunityReportDetail, listAdminCommunityPosts, listAdminCommunityReports, updateAdminCommunityPost, updateAdminCommunityReport } from "../api/adminContent";
+import { bulkUpdateAdminCommunityPosts, bulkUpdateAdminCommunityReports, getAdminCommunityPostDetail, getAdminCommunityReportDetail, listAdminCommunityPosts, listAdminCommunityReports, updateAdminCommunityPost, updateAdminCommunityReport } from "../api/adminContent";
 import { listAdminOperationLogs } from "../api/adminLogs";
 import { deleteComment } from "../api/community";
 import { hasOpsAccess } from "../lib/opsAccess";
@@ -417,13 +525,24 @@ import { extractApiErrorMessage, notifyActionSuccess, notifyErrorMessage, notify
 import { useAuthStore } from "../stores/auth";
 
 const router = useRouter();
+const route = useRoute();
 const auth = useAuthStore();
+
+type CommunityFocusPreset = "all" | "pending_posts" | "pending_reports" | "rejected_posts" | "hidden_comments";
+
+const communityFocusPresets: CommunityFocusPreset[] = ["all", "pending_posts", "pending_reports", "rejected_posts", "hidden_comments"];
+const postStatuses = ["published", "archived"] as const;
+const postAuditStatuses = ["pending", "approved", "rejected"] as const;
+const reportStatuses = ["pending", "processed", "rejected"] as const;
+const reportPriorities = ["low", "normal", "high", "urgent"] as const;
 
 const posts = ref<any[]>([]);
 const reports = ref<any[]>([]);
 const loadingPosts = ref(false);
 const loadingReports = ref(false);
 const savingPost = ref(false);
+const bulkUpdatingPosts = ref(false);
+const bulkUpdatingReports = ref(false);
 const postDetailLoading = ref(false);
 const reportDetailLoading = ref(false);
 const postLogsLoading = ref(false);
@@ -433,11 +552,15 @@ const reportActionId = ref<number | null>(null);
 const reportAction = ref<"" | "processed" | "rejected">("");
 const postDrawerOpen = ref(false);
 const reportDrawerOpen = ref(false);
+const postTableRef = ref<any>();
 const selectedPost = ref<any | null>(null);
 const selectedReport = ref<any | null>(null);
+const selectedPostIds = ref<number[]>([]);
+const selectedReportIds = ref<number[]>([]);
 const postLogs = ref<any[]>([]);
 const reportLogs = ref<any[]>([]);
-const focusPreset = ref<"all" | "pending_posts" | "pending_reports" | "rejected_posts" | "hidden_comments">("all");
+const focusPreset = ref<CommunityFocusPreset>("all");
+const syncingRoute = ref(false);
 
 const postFilters = reactive({
   keyword: "",
@@ -448,6 +571,16 @@ const postFilters = reactive({
 const reportFilters = reactive({
   keyword: "",
   status: "",
+  priority: "",
+  assignedTo: "",
+});
+
+const reportDraft = reactive({
+  status: "pending",
+  priority: "normal",
+  assigned_to: null as number | null,
+  internal_note: "",
+  follow_up_at: "",
 });
 
 const postDraft = reactive({
@@ -463,6 +596,29 @@ const pendingPostCount = computed(() => posts.value.filter((item) => item.audit_
 const rejectedPostCount = computed(() => posts.value.filter((item) => item.audit_status === "rejected").length);
 const hiddenCommentCount = computed(() => posts.value.reduce((sum, item) => sum + Number(item.hidden_comment_count || 0), 0));
 const pendingReportCount = computed(() => reports.value.filter((item) => item.status === "pending").length);
+const reportAssignableUsers = computed(() => {
+  const detailUsers = Array.isArray(selectedReport.value?.assignable_users) ? selectedReport.value.assignable_users : [];
+  const seenUsers = reports.value
+    .map((item) => item.assigned_to_info)
+    .filter((item): item is Record<string, any> => Boolean(item?.id));
+  const merged = [...detailUsers, ...seenUsers];
+  const byId = new Map<number, Record<string, any>>();
+  merged.forEach((item) => {
+    if (!byId.has(item.id)) byId.set(item.id, item);
+  });
+  return Array.from(byId.values());
+});
+const reportStatusOptions = [
+  { label: "待处理", value: "pending" },
+  { label: "已处理", value: "processed" },
+  { label: "已驳回", value: "rejected" },
+];
+const reportPriorityOptions = [
+  { label: "低", value: "low" },
+  { label: "普通", value: "normal" },
+  { label: "高", value: "high" },
+  { label: "紧急", value: "urgent" },
+];
 const focusCards = computed(() => [
   {
     key: "pending_posts" as const,
@@ -499,7 +655,6 @@ const displayPosts = computed(() => {
 const displayReports = computed(() => {
   let items = [...reports.value];
   if (focusPreset.value === "pending_reports") items = items.filter((item) => item.status === "pending");
-  if (focusPreset.value === "pending_posts") items = items.filter((item) => item.status === "pending");
   return items;
 });
 const postFilterHint = computed(() => {
@@ -533,16 +688,107 @@ const postChecklist = computed(() => {
 });
 const reportFocusTitle = computed(() => {
   if (!selectedReport.value) return "先打开一条举报";
-  if (selectedReport.value.status === "pending") return "这条举报还需要后台给出处理结果";
-  if (selectedReport.value.status === "processed") return "这条举报已经完成处理";
+  if (reportDraft.status === "pending") return "这条举报还需要后台给出处理结果";
+  if (reportDraft.status === "processed") return "这条举报已经完成处理";
   return "这条举报已被驳回";
 });
-
-onMounted(() => {
-  if (hasOpsUser.value) {
-    void refreshAll();
+const reportChecklist = computed(() => {
+  if (!selectedReport.value) return [];
+  const list = [];
+  list.push(`举报原因：${selectedReport.value.reason || "暂无"}`);
+  if (selectedReport.value.target_post_title) list.push(`目标帖子：${selectedReport.value.target_post_title}`);
+  if (reportDraft.assigned_to) {
+    const assignee = reportAssignableUsers.value.find((item: any) => item.id === reportDraft.assigned_to);
+    if (assignee) list.push(`当前指派：${assignee.display_name || assignee.username}`);
+  } else {
+    list.push("当前未指派处理人，适合先明确责任人。");
   }
+  if (reportDraft.internal_note) list.push("已填写内部备注，可直接继续协作处理。");
+  if (reportDraft.follow_up_at) list.push(`跟进时间：${formatDateTime(reportDraft.follow_up_at)}`);
+  if (selectedReport.value.processed_by_info) {
+    list.push(`最近处理人：${selectedReport.value.processed_by_info.display_name || selectedReport.value.processed_by_info.username}`);
+  }
+  return list;
 });
+
+watch(
+  () => route.query,
+  (query) => {
+    if (syncingRoute.value) return;
+    applyRouteQuery(query as Record<string, unknown>);
+    if (hasOpsUser.value) {
+      void refreshAll();
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  hasOpsUser,
+  (value) => {
+    if (value && !posts.value.length && !reports.value.length) {
+      void refreshAll();
+    }
+  },
+  { immediate: false },
+);
+
+function readQueryText(value: unknown) {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+  return "";
+}
+
+function normalizeFocusPreset(value: string): CommunityFocusPreset {
+  return communityFocusPresets.includes(value as CommunityFocusPreset) ? (value as CommunityFocusPreset) : "all";
+}
+
+function normalizePostStatus(value: string) {
+  return postStatuses.includes(value as (typeof postStatuses)[number]) ? value : "";
+}
+
+function normalizePostAuditStatus(value: string) {
+  return postAuditStatuses.includes(value as (typeof postAuditStatuses)[number]) ? value : "";
+}
+
+function normalizeReportStatus(value: string) {
+  return reportStatuses.includes(value as (typeof reportStatuses)[number]) ? value : "";
+}
+
+function normalizeReportPriority(value: string) {
+  return reportPriorities.includes(value as (typeof reportPriorities)[number]) ? value : "";
+}
+
+function applyRouteQuery(query: Record<string, unknown>) {
+  focusPreset.value = normalizeFocusPreset(readQueryText(query.preset));
+  postFilters.keyword = readQueryText(query.post_keyword);
+  postFilters.status = normalizePostStatus(readQueryText(query.post_status));
+  postFilters.auditStatus = normalizePostAuditStatus(readQueryText(query.post_audit_status) || readQueryText(query.audit_status));
+  reportFilters.keyword = readQueryText(query.report_keyword);
+  reportFilters.status = normalizeReportStatus(readQueryText(query.report_status));
+  reportFilters.priority = normalizeReportPriority(readQueryText(query.report_priority) || readQueryText(query.priority));
+  reportFilters.assignedTo = readQueryText(query.report_assigned_to) || readQueryText(query.assigned_to);
+}
+
+function buildRouteQuery() {
+  const query: Record<string, string> = {};
+  if (focusPreset.value !== "all") query.preset = focusPreset.value;
+  if (postFilters.keyword) query.post_keyword = postFilters.keyword;
+  if (postFilters.status) query.post_status = postFilters.status;
+  if (postFilters.auditStatus) query.post_audit_status = postFilters.auditStatus;
+  if (reportFilters.keyword) query.report_keyword = reportFilters.keyword;
+  if (reportFilters.status) query.report_status = reportFilters.status;
+  if (reportFilters.priority) query.report_priority = reportFilters.priority;
+  if (reportFilters.assignedTo) query.report_assigned_to = reportFilters.assignedTo;
+  return query;
+}
+
+function syncRouteFromState() {
+  syncingRoute.value = true;
+  return Promise.resolve(router.replace({ query: buildRouteQuery() })).finally(() => {
+    syncingRoute.value = false;
+  });
+}
 
 async function refreshAll() {
   await Promise.all([loadPosts(), loadReports()]);
@@ -559,6 +805,8 @@ async function loadPosts() {
       page_size: 50,
     });
     posts.value = unwrapListPayload(response);
+    await nextTick();
+    clearPostSelection();
   } catch {
     notifyLoadError("社区帖子");
   } finally {
@@ -573,14 +821,92 @@ async function loadReports() {
     const response = await listAdminCommunityReports({
       keyword: reportFilters.keyword || undefined,
       status: reportFilters.status || undefined,
+      priority: reportFilters.priority || undefined,
+      assigned_to: reportFilters.assignedTo || undefined,
       page_size: 50,
     });
     reports.value = unwrapListPayload(response);
+    clearReportSelection();
   } catch {
     notifyLoadError("举报列表");
   } finally {
     loadingReports.value = false;
   }
+}
+
+function handlePostSelectionChange(rows: any[]) {
+  selectedPostIds.value = rows.map((item) => Number(item.id)).filter((id) => Number.isInteger(id) && id > 0);
+}
+
+function clearPostSelection() {
+  selectedPostIds.value = [];
+  postTableRef.value?.clearSelection?.();
+}
+
+async function applyBulkPostAction(action: "approve" | "reject" | "archive") {
+  if (!selectedPostIds.value.length) return;
+
+  const ids = [...selectedPostIds.value];
+  bulkUpdatingPosts.value = true;
+  try {
+    await bulkUpdateAdminCommunityPosts({ ids, action });
+    notifyActionSuccess(
+      action === "approve"
+        ? `已批量通过 ${ids.length} 条帖子`
+        : action === "reject"
+          ? `已批量驳回 ${ids.length} 条帖子`
+          : `已批量归档 ${ids.length} 条帖子`,
+    );
+    await refreshAll();
+    if (selectedPost.value && ids.includes(selectedPost.value.id)) {
+      await openPostDrawer(selectedPost.value.id);
+    }
+  } catch (error) {
+    notifyErrorMessage(extractApiErrorMessage(error, "批量处理帖子失败"));
+  } finally {
+    bulkUpdatingPosts.value = false;
+  }
+}
+
+function toggleReportSelection(reportId: number, checked: boolean | string | number) {
+  if (checked) {
+    if (!selectedReportIds.value.includes(reportId)) {
+      selectedReportIds.value = [...selectedReportIds.value, reportId];
+    }
+    return;
+  }
+  selectedReportIds.value = selectedReportIds.value.filter((id) => id !== reportId);
+}
+
+function clearReportSelection() {
+  selectedReportIds.value = [];
+}
+
+async function applyBulkReportAction(action: "processed" | "rejected") {
+  if (!selectedReportIds.value.length) return;
+
+  const ids = [...selectedReportIds.value];
+  bulkUpdatingReports.value = true;
+  try {
+    await bulkUpdateAdminCommunityReports({ ids, action });
+    notifyActionSuccess(action === "processed" ? `已批量处理 ${ids.length} 条举报` : `已批量驳回 ${ids.length} 条举报`);
+    await refreshAll();
+    if (selectedReport.value && ids.includes(selectedReport.value.id)) {
+      await openReportDrawer(selectedReport.value.id);
+    }
+  } catch (error) {
+    notifyErrorMessage(extractApiErrorMessage(error, "批量处理举报失败"));
+  } finally {
+    bulkUpdatingReports.value = false;
+  }
+}
+
+function applyPostFilters() {
+  void syncRouteFromState();
+}
+
+function applyReportFilters() {
+  void syncRouteFromState();
 }
 
 function resetFilters() {
@@ -590,6 +916,14 @@ function resetFilters() {
   postFilters.auditStatus = "";
   reportFilters.keyword = "";
   reportFilters.status = "";
+  reportFilters.priority = "";
+  reportFilters.assignedTo = "";
+  void syncRouteFromState();
+}
+
+function applyFocusPreset(preset: CommunityFocusPreset) {
+  focusPreset.value = preset;
+  void syncRouteFromState();
 }
 
 function unwrapListPayload(payload: any) {
@@ -647,6 +981,53 @@ async function savePost() {
   }
 }
 
+function fillReportDraft(report: Record<string, any> | null) {
+  Object.assign(reportDraft, {
+    status: report?.status || "pending",
+    priority: report?.priority || "normal",
+    assigned_to: typeof report?.assigned_to === "number" ? report.assigned_to : null,
+    internal_note: report?.internal_note || "",
+    follow_up_at: toDatetimeLocalValue(report?.follow_up_at),
+  });
+}
+
+function toDatetimeLocalValue(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function toApiDatetimeValue(value: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
+function priorityLabel(value: string) {
+  return (
+    {
+      low: "低",
+      normal: "普通",
+      high: "高",
+      urgent: "紧急",
+    }[value] || value
+  );
+}
+
+function priorityTagType(value: string) {
+  return (
+    {
+      low: "info",
+      normal: "success",
+      high: "warning",
+      urgent: "danger",
+    }[value] || "info"
+  );
+}
+
 async function hideComment(commentId: number) {
   commentActionId.value = commentId;
   try {
@@ -673,6 +1054,7 @@ async function openReportDrawer(reportId: number) {
   try {
     const response = await getAdminCommunityReportDetail(reportId);
     selectedReport.value = response?.data ?? null;
+    fillReportDraft(selectedReport.value);
     if (selectedReport.value) {
       void loadReportLogs(selectedReport.value.id);
     }
@@ -684,6 +1066,31 @@ async function openReportDrawer(reportId: number) {
   }
 }
 
+async function saveReport() {
+  if (!selectedReport.value) return;
+  reportActionId.value = selectedReport.value.id;
+  reportAction.value = reportDraft.status === "rejected" ? "rejected" : reportDraft.status === "processed" ? "processed" : "";
+  try {
+    const response = await updateAdminCommunityReport(selectedReport.value.id, {
+      status: reportDraft.status,
+      priority: reportDraft.priority,
+      assigned_to: reportDraft.assigned_to,
+      internal_note: reportDraft.internal_note,
+      follow_up_at: toApiDatetimeValue(reportDraft.follow_up_at),
+    });
+    selectedReport.value = response?.data ?? null;
+    fillReportDraft(selectedReport.value);
+    await loadReportLogs(selectedReport.value.id);
+    notifyActionSuccess("举报协作信息已经更新");
+    await refreshAll();
+  } catch (error) {
+    notifyErrorMessage(extractApiErrorMessage(error, "更新举报协作信息失败"));
+  } finally {
+    reportActionId.value = null;
+    reportAction.value = "";
+  }
+}
+
 async function updateReportStatus(reportId: number, statusValue: "processed" | "rejected") {
   reportActionId.value = reportId;
   reportAction.value = statusValue;
@@ -691,6 +1098,7 @@ async function updateReportStatus(reportId: number, statusValue: "processed" | "
     const response = await updateAdminCommunityReport(reportId, { status: statusValue });
     if (selectedReport.value?.id === reportId) {
       selectedReport.value = response?.data ?? null;
+      fillReportDraft(selectedReport.value);
       await loadReportLogs(reportId);
     }
     notifyActionSuccess(statusValue === "processed" ? "举报已经标记为已处理" : "举报已经标记为驳回");
@@ -933,6 +1341,70 @@ function formatDateTime(value?: string) {
   color: #5b7888;
   font-size: 13px;
   line-height: 1.5;
+}
+
+.bulk-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(240, 248, 252, 0.92);
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  color: #476072;
+}
+
+.bulk-bar-compact {
+  margin-bottom: 12px;
+}
+
+.bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.report-head-side {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.report-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.report-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: #5b7888;
+  font-size: 13px;
+}
+
+.report-note-preview {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px dashed rgba(16, 34, 42, 0.12);
+}
+
+.report-note-preview strong {
+  color: #173042;
+  font-size: 13px;
+}
+
+.report-note-preview span {
+  color: #587686;
+  line-height: 1.6;
 }
 
 .report-list {

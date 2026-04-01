@@ -14,3 +14,8 @@ export async function updateAdminUser(userId: number, payload: Record<string, un
   const { data } = await http.patch(`/accounts/admin/users/${userId}/`, payload);
   return data;
 }
+
+export async function bulkUpdateAdminUsers(payload: { ids: number[]; status: "active" | "disabled" }) {
+  const { data } = await http.post("/accounts/admin/users/bulk/", payload);
+  return data;
+}
