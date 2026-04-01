@@ -8,7 +8,7 @@
       </div>
       <div class="head-actions">
         <el-button plain @click="resetFilters">重置筛选</el-button>
-        <el-button type="primary" :loading="loading" @click="loadLogs">刷新日志</el-button>
+        <el-button type="primary" :loading="loading" @click="applyFilters">应用筛选</el-button>
         <el-button plain @click="router.push(resolveOpsHome(auth.user))">回后台首页</el-button>
       </div>
     </div>
@@ -48,26 +48,34 @@
             <p>不同管理员的操作轨迹越清楚，后面越容易复盘责任边界。</p>
           </article>
           <article v-spotlight>
-            <span>社区处理</span>
-            <strong>{{ summary.community_actions }}</strong>
-            <p>帖子、举报和评论动作会集中沉淀在这里。</p>
+            <span>重点模块动作</span>
+            <strong>{{ topModuleCount }}</strong>
+            <p>{{ topModuleCopy }}</p>
           </article>
         </div>
 
-        <div class="ops-alert-strip">
-          <article v-for="item in moduleCards" :key="item.label" class="ops-alert-card" v-spotlight>
+        <div class="focus-strip">
+          <article
+            v-for="item in focusCards"
+            :key="item.key"
+            class="focus-card"
+            :class="{ active: focusPreset === item.key }"
+            v-spotlight
+            @click="applyFocusPreset(item.key)"
+          >
             <span>{{ item.label }}</span>
             <strong>{{ item.value }}</strong>
             <p>{{ item.copy }}</p>
           </article>
         </div>
 
-        <article class="card console-card" v-spotlight>
+        <article class="card console-card filter-card" v-spotlight>
           <div class="card-head">
             <div>
               <h3>筛选与检索</h3>
-              <p>先按模块或操作人收窄，再看具体字段前后变化，复盘会比从全量列表硬翻快很多。</p>
+              <p>{{ filterHint }}</p>
             </div>
+            <el-button v-if="focusPreset !== 'all'" text type="primary" @click="applyFocusPreset('all')">回到全部视角</el-button>
           </div>
           <div class="toolbar-grid">
             <el-select v-model="filters.module" clearable placeholder="筛选模块">
@@ -76,13 +84,13 @@
               <el-option label="社区审核" value="community" />
               <el-option label="运营复核" value="reports" />
             </el-select>
-            <el-input v-model.trim="filters.actor" placeholder="搜索操作人" clearable @keyup.enter="loadLogs" />
-            <el-input v-model.trim="filters.keyword" placeholder="搜索对象或动作摘要" clearable @keyup.enter="loadLogs" />
-            <el-button type="primary" :loading="loading" @click="loadLogs">应用筛选</el-button>
+            <el-input v-model.trim="filters.actor" placeholder="搜索操作人" clearable @keyup.enter="applyFilters" />
+            <el-input v-model.trim="filters.keyword" placeholder="搜索对象或动作摘要" clearable @keyup.enter="applyFilters" />
+            <el-button type="primary" :loading="loading" @click="applyFilters">应用筛选</el-button>
           </div>
         </article>
 
-        <article class="card console-card" v-spotlight>
+        <article class="card console-card table-card" v-spotlight>
           <div class="card-head">
             <div>
               <h3>最近处理动作</h3>
@@ -106,6 +114,10 @@
                   <span>操作人</span>
                   <strong>{{ log.actor?.display_name || log.actor?.username || "系统" }}</strong>
                 </div>
+              </div>
+
+              <div class="log-signals">
+                <el-tag v-for="signal in logSignals(log)" :key="`${log.id}-${signal}`" size="small" effect="light">{{ signal }}</el-tag>
               </div>
 
               <div v-if="log.changes?.length" class="change-list">
@@ -143,8 +155,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onMounted, reactive, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import CollectionSkeleton from "../components/CollectionSkeleton.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
@@ -154,11 +166,18 @@ import { notifyLoadError } from "../lib/feedback";
 import { useAuthStore } from "../stores/auth";
 
 const router = useRouter();
+const route = useRoute();
 const auth = useAuthStore();
+
+type LogFocusPreset = "all" | "users" | "recipes" | "community" | "reports";
+
+const focusPresets: LogFocusPreset[] = ["all", "users", "recipes", "community", "reports"];
 
 const loading = ref(false);
 const logs = ref<any[]>([]);
 const total = ref(0);
+const focusPreset = ref<LogFocusPreset>("all");
+const syncingRoute = ref(false);
 const summary = ref({
   total: 0,
   today_total: 0,
@@ -175,29 +194,108 @@ const filters = reactive({
 });
 
 const hasOpsUser = computed(() => hasOpsAccess(auth.user));
-const moduleCards = computed(() => [
+const topModule = computed(() => {
+  const entries = [
+    { key: "users", count: summary.value.user_actions, label: "用户管理" },
+    { key: "recipes", count: summary.value.recipe_actions, label: "菜谱管理" },
+    { key: "community", count: summary.value.community_actions, label: "社区审核" },
+    { key: "reports", count: summary.value.report_actions, label: "运营复核" },
+  ];
+  return entries.sort((a, b) => b.count - a.count)[0] || { key: "users", count: 0, label: "用户管理" };
+});
+const topModuleCount = computed(() => topModule.value.count);
+const topModuleCopy = computed(() => topModule.value.count > 0 ? `${topModule.value.label}是当前筛选下最活跃的处理入口，适合先回看这里的处理节奏。` : "当前筛选下各模块还没有明显动作沉淀。");
+const focusCards = computed(() => [
   {
+    key: "users" as const,
     label: "用户侧动作",
     value: summary.value.user_actions,
     copy: summary.value.user_actions > 0 ? "账号状态、角色边界和资料改动已经开始沉淀可追踪记录。" : "当前筛选下还没有用户管理动作。",
   },
   {
+    key: "recipes" as const,
     label: "菜谱侧动作",
     value: summary.value.recipe_actions,
     copy: summary.value.recipe_actions > 0 ? "菜谱审核、状态调整和归档动作都能回看了。" : "当前筛选下还没有菜谱处理动作。",
   },
   {
+    key: "community" as const,
     label: "社区侧动作",
     value: summary.value.community_actions,
     copy: summary.value.community_actions > 0 ? "帖子审核、举报处理和评论隐藏已经能串成完整轨迹。" : "当前筛选下还没有社区处理动作。",
   },
+  {
+    key: "reports" as const,
+    label: "复盘侧动作",
+    value: summary.value.report_actions,
+    copy: summary.value.report_actions > 0 ? "报表生成、复核和异常处理也已经能串回日志。" : "当前筛选下还没有运营复核动作。",
+  },
 ]);
+const focusPresetLabel = computed(() => ({
+  all: "全部日志",
+  users: "用户管理日志",
+  recipes: "菜谱管理日志",
+  community: "社区审核日志",
+  reports: "运营复核日志",
+}[focusPreset.value]));
+const filterHint = computed(() => {
+  if (focusPreset.value === "all") return "先按模块或操作人收窄，再看具体字段前后变化，复盘会比从全量列表硬翻快很多。";
+  return `当前聚焦：${focusPresetLabel.value}。先看这一批处理轨迹，再回到全量视角。`;
+});
 
 onMounted(() => {
   if (hasOpsUser.value) {
+    applyRouteQuery(route.query);
     void loadLogs();
   }
 });
+
+watch(
+  () => route.query,
+  (query) => {
+    if (!hasOpsUser.value || syncingRoute.value) return;
+    applyRouteQuery(query);
+    void loadLogs();
+  },
+);
+
+function readQueryText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeFocusPreset(value: string): LogFocusPreset {
+  return focusPresets.includes(value as LogFocusPreset) ? (value as LogFocusPreset) : "all";
+}
+
+function normalizeModule(value: string) {
+  return ["users", "recipes", "community", "reports"].includes(value) ? value : "";
+}
+
+function applyRouteQuery(query: Record<string, unknown>) {
+  focusPreset.value = normalizeFocusPreset(readQueryText(query.preset));
+  filters.module = normalizeModule(readQueryText(query.module));
+  filters.actor = readQueryText(query.actor);
+  filters.keyword = readQueryText(query.keyword);
+  if (!filters.module && focusPreset.value !== "all") {
+    filters.module = focusPreset.value;
+  }
+}
+
+function buildRouteQuery() {
+  const query: Record<string, string> = {};
+  if (focusPreset.value !== "all") query.preset = focusPreset.value;
+  if (filters.module) query.module = filters.module;
+  if (filters.actor) query.actor = filters.actor;
+  if (filters.keyword) query.keyword = filters.keyword;
+  return query;
+}
+
+function syncRouteFromState() {
+  syncingRoute.value = true;
+  return Promise.resolve(router.replace({ query: buildRouteQuery() })).finally(() => {
+    syncingRoute.value = false;
+  });
+}
 
 function unwrapItems(payload: any) {
   if (Array.isArray(payload?.data?.items)) return payload.data.items;
@@ -226,11 +324,27 @@ async function loadLogs() {
   }
 }
 
+function applyFilters() {
+  if (filters.module) {
+    focusPreset.value = normalizeFocusPreset(filters.module);
+  } else if (focusPreset.value !== "all") {
+    filters.module = focusPreset.value;
+  }
+  void syncRouteFromState();
+}
+
 function resetFilters() {
   filters.module = "";
   filters.actor = "";
   filters.keyword = "";
-  void loadLogs();
+  focusPreset.value = "all";
+  void syncRouteFromState();
+}
+
+function applyFocusPreset(preset: LogFocusPreset) {
+  focusPreset.value = preset;
+  filters.module = preset === "all" ? "" : preset;
+  void syncRouteFromState();
 }
 
 function moduleLabel(value: string) {
@@ -280,6 +394,15 @@ function buildMetaLine(log: Record<string, any>) {
   const action = log.action ? `动作：${log.action}` : "";
   return [target, action].filter(Boolean).join(" · ");
 }
+
+function logSignals(log: Record<string, any>) {
+  const items = [moduleLabel(log.module)];
+  if (log.target_type) items.push(`对象类型：${log.target_type}`);
+  if (Array.isArray(log.changes) && log.changes.length) items.push(`字段变更 ${log.changes.length} 项`);
+  else items.push("仅保留处理轨迹");
+  if (log.actor?.display_name || log.actor?.username) items.push(`操作人：${log.actor.display_name || log.actor.username}`);
+  return items;
+}
 </script>
 
 <style scoped>
@@ -293,40 +416,55 @@ function buildMetaLine(log: Record<string, any>) {
   gap: 10px;
 }
 
-.ops-alert-strip {
+.focus-strip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
-.ops-alert-card {
+.focus-card {
   display: grid;
   gap: 6px;
-  padding: 16px 18px;
+  padding: 16px;
   border-radius: 18px;
   border: 1px solid rgba(16, 34, 42, 0.08);
   background:
-    linear-gradient(135deg, rgba(252, 254, 255, 0.96), rgba(242, 248, 252, 0.94)),
-    radial-gradient(circle at top right, rgba(87, 181, 231, 0.12), transparent 34%);
+    linear-gradient(135deg, rgba(252, 254, 255, 0.96), rgba(244, 249, 252, 0.94)),
+    radial-gradient(circle at top right, rgba(87, 181, 231, 0.1), transparent 36%);
+  cursor: pointer;
 }
 
-.ops-alert-card span {
+.focus-card span {
   color: #638295;
   font-size: 12px;
 }
 
-.ops-alert-card strong {
+.focus-card strong {
   color: #173042;
-  font-size: 28px;
+  font-size: 24px;
 }
 
-.ops-alert-card p {
+.focus-card p {
   margin: 0;
-  color: #557383;
+  color: #587686;
   line-height: 1.6;
 }
 
-.console-card {
+.focus-card.active {
+  border-color: rgba(23, 48, 66, 0.2);
+  background: linear-gradient(135deg, rgba(23, 48, 66, 0.96), rgba(39, 76, 99, 0.92));
+  box-shadow: 0 16px 30px rgba(15, 30, 39, 0.14);
+}
+
+.focus-card.active span,
+.focus-card.active strong,
+.focus-card.active p {
+  color: #f2f7fb;
+}
+
+.console-card,
+.filter-card,
+.table-card {
   display: grid;
   gap: 16px;
 }
@@ -414,6 +552,12 @@ function buildMetaLine(log: Record<string, any>) {
   margin-top: 6px;
 }
 
+.log-signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .change-list {
   display: grid;
   gap: 10px;
@@ -477,9 +621,12 @@ function buildMetaLine(log: Record<string, any>) {
 
 @media (max-width: 1080px) {
   .toolbar-grid,
-  .ops-alert-strip,
   .change-values {
     grid-template-columns: 1fr;
+  }
+
+  .focus-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .log-head {
@@ -488,6 +635,12 @@ function buildMetaLine(log: Record<string, any>) {
 
   .log-actor {
     text-align: left;
+  }
+}
+
+@media (max-width: 720px) {
+  .focus-strip {
+    grid-template-columns: 1fr;
   }
 }
 </style>
