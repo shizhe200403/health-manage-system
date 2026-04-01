@@ -112,6 +112,10 @@
     <div class="list">
       <article v-for="post in visiblePosts" :key="post.id" class="post-card">
         <div class="row">
+          <div class="user-avatar-sm">
+            <img v-if="post.user_info?.avatar_url" :src="post.user_info.avatar_url" alt="" />
+            <span v-else>{{ (post.user_info?.display_name || post.user_info?.username || '?').charAt(0).toUpperCase() }}</span>
+          </div>
           <div class="post-main">
             <div class="post-top">
               <strong>{{ post.title }}</strong>
@@ -143,7 +147,13 @@
         <div class="comments" v-if="post.comments?.length">
           <div v-for="comment in post.comments" :key="comment.id" class="comment-item">
             <div class="comment-head">
-              <strong>{{ comment.user_info?.display_name || "用户" }}</strong>
+              <div class="comment-author">
+                <div class="user-avatar-xs">
+                  <img v-if="comment.user_info?.avatar_url" :src="comment.user_info.avatar_url" alt="" />
+                  <span v-else>{{ (comment.user_info?.display_name || '?').charAt(0).toUpperCase() }}</span>
+                </div>
+                <strong>{{ comment.user_info?.display_name || "用户" }}</strong>
+              </div>
               <span>{{ formatDateTime(comment.created_at) }}</span>
               <el-button v-if="isMyComment(comment)" text type="danger" size="small" :loading="deletingCommentId === comment.id" @click="removeComment(comment.id)">删除</el-button>
             </div>
@@ -595,6 +605,44 @@ h2 {
 
 .comment-item strong {
   font-size: 15px;
+}
+
+.user-avatar-sm,
+.user-avatar-xs {
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  background: #d0e8f5;
+  color: #2d6a8a;
+}
+
+.user-avatar-sm {
+  width: 40px;
+  height: 40px;
+  font-size: 16px;
+}
+
+.user-avatar-xs {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
+
+.user-avatar-sm img,
+.user-avatar-xs img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.comment-author {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 @media (max-width: 960px) {
