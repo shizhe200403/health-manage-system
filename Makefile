@@ -1,4 +1,4 @@
-PROJECT ?= demo
+PROJECT ?= health-manage-system
 ENV_FILE ?= .env.production
 PROD_COMPOSE = docker compose -p $(PROJECT) --env-file $(ENV_FILE) -f docker-compose.prod.yml
 
@@ -64,10 +64,10 @@ build-frontend-local:
 deploy-frontend-dist: build-frontend-local
 	@echo "📤 上传到服务器..."
 	@scp -r frontend/dist root@121.41.102.152:/tmp/frontend-dist
-	@ssh root@121.41.102.152 "cd /root/demo-git && \
+	@ssh root@121.41.102.152 "cd /root/health-manage-system && \
 		rm -rf frontend/dist/* && \
 		mkdir -p frontend/dist && \
 		cp -r /tmp/frontend-dist/dist/. frontend/dist/ && \
 		rm -rf /tmp/frontend-dist && \
-		docker compose -p demo --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate frontend"
+		docker compose -p health-manage-system --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate frontend"
 	@echo "🎉 部署完成!"

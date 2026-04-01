@@ -15,15 +15,15 @@
     <PageStateBlock
       v-if="auth.isAuthenticated && !auth.user"
       tone="loading"
-      title="正在确认管理员身份"
+      title="正在确认后台身份"
       description="先把当前账号权限拉齐，再展开后台运营复核。"
       compact
     />
     <PageStateBlock
-      v-else-if="!isAdminUser"
+      v-else-if="!hasOpsUser"
       tone="error"
       title="当前账号没有后台权限"
-      description="运营复核只对管理员开放，普通账号不会显示这里。"
+      description="运营复核只对后台值守账号开放，普通账号不会显示这里。"
       action-label="回到首页"
       @action="router.push('/')"
     />
@@ -183,6 +183,7 @@ import CollectionSkeleton from "../components/CollectionSkeleton.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import { getAdminOperationsOverview } from "../api/adminReports";
+import { hasOpsAccess, isOpsManager } from "../lib/opsAccess";
 import { notifyLoadError } from "../lib/feedback";
 import { useAuthStore } from "../stores/auth";
 
@@ -192,7 +193,8 @@ const auth = useAuthStore();
 const loading = ref(false);
 const overview = ref<any | null>(null);
 
-const isAdminUser = computed(() => Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser || auth.user.is_staff)));
+const hasOpsUser = computed(() => hasOpsAccess(auth.user));
+const isManagerUser = computed(() => isOpsManager(auth.user));
 const summary = computed(() => overview.value?.summary ?? {
   users_total: 0,
   users_active: 0,
@@ -263,8 +265,8 @@ const operationsStage = computed(() => {
     badge: "Stable",
     title: "当前后台节奏相对稳定",
     copy: "活跃、内容处理和报表任务都没有明显失衡，适合继续补细节而不是紧急救火。",
-    cta: "回后台总览",
-    to: "/ops",
+    cta: isManagerUser.value ? "回后台总览" : "留在运营复核",
+    to: isManagerUser.value ? "/ops" : "/ops/reports",
   };
 });
 const operationConclusions = computed(() => [
@@ -318,13 +320,13 @@ const moduleHealthCards = computed(() => [
 ]);
 
 onMounted(() => {
-  if (isAdminUser.value) {
+  if (hasOpsUser.value) {
     void loadOverview();
   }
 });
 
 async function loadOverview() {
-  if (!isAdminUser.value) return;
+  if (!hasOpsUser.value) return;
   loading.value = true;
   try {
     const response = await getAdminOperationsOverview();

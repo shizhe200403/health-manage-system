@@ -43,9 +43,9 @@ make docker-down
 
 推荐使用 Docker Compose 部署到 Ubuntu 22.04+ 云服务器。
 
-- 开发环境使用 [docker-compose.yml](/Users/shizhe/Downloads/demo/docker-compose.yml)
-- 生产环境使用 [docker-compose.prod.yml](/Users/shizhe/Downloads/demo/docker-compose.prod.yml)
-- 生产环境变量模板使用 [.env.production.example](/Users/shizhe/Downloads/demo/.env.production.example)
+- 开发环境使用 [docker-compose.yml](./docker-compose.yml)
+- 生产环境使用 [docker-compose.prod.yml](./docker-compose.prod.yml)
+- 生产环境变量模板使用 [.env.production.example](./.env.production.example)
 
 生产编排默认只对外暴露前端 `80` 端口，Nginx 会统一代理 `/api/`、`/admin/`、`/static/` 和 `/media/`。数据库结构以 Django migrations 为准，`schema.sql` 仅用于参考和手工排查。
 
@@ -61,21 +61,21 @@ make prod-migrate
 make prod-superuser
 ```
 
-如果生产环境目录名不是 `demo`，可以覆盖 Compose 项目名：
+如果生产环境目录名不是默认值，可覆盖 Compose 项目名：
 
 ```bash
-make PROJECT=demo-git prod-ps
+make PROJECT=health-manage-system prod-ps
 ```
 
 ## 参考文档
 
-- [数据库设计](/Users/shizhe/Downloads/demo/database_design.md)
-- [接口清单](/Users/shizhe/Downloads/demo/api_spec.md)
-- [部署方案](/Users/shizhe/Downloads/demo/deployment_guide.md)
-- [论文与答辩材料](/Users/shizhe/Downloads/demo/docs/THESIS_DEFENSE_MATERIALS.md)
-- [用户验收与体验优化清单](/Users/shizhe/Downloads/demo/docs/UAT_CHECKLIST_AND_UX_OPTIMIZATION.md)
-- [上线验证报告](/Users/shizhe/Downloads/demo/docs/RELEASE_VALIDATION.md)
-- [云服务器部署命令清单](/Users/shizhe/Downloads/demo/docs/CLOUD_DEPLOY_COMMANDS.md)
-- [阿里云单机部署说明](/Users/shizhe/Downloads/demo/docs/ALIYUN_SINGLE_SERVER_DEPLOYMENT.md)
-- [上线手册](/Users/shizhe/Downloads/demo/docs/PRODUCTION_RUNBOOK.md)
-- [用户指南](/Users/shizhe/Downloads/demo/docs/USER_GUIDE.md)
+- [数据库设计](./database_design.md)
+- [接口清单](./api_spec.md)
+- [部署方案](./deployment_guide.md)
+- [论文与答辩材料](./docs/THESIS_DEFENSE_MATERIALS.md)
+- [用户验收与体验优化清单](./docs/UAT_CHECKLIST_AND_UX_OPTIMIZATION.md)
+- [上线验证报告](./docs/RELEASE_VALIDATION.md)
+- [云服务器部署命令清单](./docs/CLOUD_DEPLOY_COMMANDS.md)
+- [阿里云单机部署说明](./docs/ALIYUN_SINGLE_SERVER_DEPLOYMENT.md)
+- [上线手册](./docs/PRODUCTION_RUNBOOK.md)
+- [用户指南](./docs/USER_GUIDE.md)

@@ -42,12 +42,12 @@ scp -r dist root@121.41.102.152:/tmp/frontend-dist
 
 # 3. 在服务器上部署
 ssh root@121.41.102.152
-cd /root/demo-git
-docker compose -p demo --env-file .env.production -f docker-compose.prod.yml stop frontend
+cd /root/health-manage-system
+docker compose -p health-manage-system --env-file .env.production -f docker-compose.prod.yml stop frontend
 mkdir -p frontend/dist
 rm -rf frontend/dist/*
 cp -r /tmp/frontend-dist/dist/* frontend/dist/
-docker compose -p demo --env-file .env.production -f docker-compose.prod.yml start frontend
+docker compose -p health-manage-system --env-file .env.production -f docker-compose.prod.yml start frontend
 ```
 
 ### 方案 2: 优化服务器 Docker 配置
@@ -84,11 +84,11 @@ docker info | grep -A 10 "Registry Mirrors"
 
 ```bash
 # 上传脚本到服务器
-scp scripts/deploy-server.sh root@121.41.102.152:/root/demo-git/
+scp scripts/deploy-server.sh root@121.41.102.152:/root/health-manage-system/
 
 # 在服务器上执行
 ssh root@121.41.102.152
-cd /root/demo-git
+cd /root/health-manage-system
 chmod +x scripts/deploy-server.sh
 ./scripts/deploy-server.sh
 ```
@@ -106,8 +106,8 @@ make deploy-frontend-dist
 ```bash
 # 只需重启后端容器，无需重新构建
 ssh root@121.41.102.152
-cd /root/demo-git
-docker compose -p demo --env-file .env.production -f docker-compose.prod.yml restart backend worker
+cd /root/health-manage-system
+docker compose -p health-manage-system --env-file .env.production -f docker-compose.prod.yml restart backend worker
 ```
 
 ### 完整部署（大版本更新）
@@ -120,9 +120,9 @@ scp -r frontend/dist root@121.41.102.152:/tmp/
 
 # 3. 在服务器上拉取代码并部署
 ssh root@121.41.102.152
-cd /root/demo-git
+cd /root/health-manage-system
 git pull origin main
-docker compose -p demo --env-file .env.production -f docker-compose.prod.yml up -d --build backend worker
+docker compose -p health-manage-system --env-file .env.production -f docker-compose.prod.yml up -d --build backend worker
 # 然后手动复制前端文件到 nginx 容器
 ```
 

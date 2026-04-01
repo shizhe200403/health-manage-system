@@ -49,7 +49,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
 
     echo "🔄 在服务器上部署..."
     ssh root@$server_ip << 'ENDSSH'
-cd /root/demo-git
+cd /root/health-manage-system
 
 # 同步最新 dist 到宿主机目录，供 frontend 容器直接挂载使用
 rm -rf frontend/dist
@@ -60,7 +60,7 @@ cp -r /tmp/frontend-dist/dist/. frontend/dist/
 rm -rf /tmp/frontend-dist
 
 # 重建并重启 frontend，使挂载生效
-docker compose -p demo --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate frontend
+docker compose -p health-manage-system --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate frontend
 
 echo "✅ 部署完成!"
 ENDSSH
@@ -68,5 +68,5 @@ ENDSSH
     echo "🎉 前端已成功部署到服务器!"
 else
     echo "💡 提示: 构建文件在 frontend/dist/ 目录"
-    echo "   你可以手动上传到服务器的 /root/demo-git/frontend/dist/ 目录"
+    echo "   你可以手动上传到服务器的 /root/health-manage-system/frontend/dist/ 目录"
 fi

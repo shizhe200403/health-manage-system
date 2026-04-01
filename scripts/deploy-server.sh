@@ -5,7 +5,7 @@
 
 set -e
 
-PROJECT_NAME="demo"
+PROJECT_NAME="health-manage-system"
 ENV_FILE=".env.production"
 COMPOSE_FILE="docker-compose.prod.yml"
 
@@ -46,4 +46,4 @@ docker compose \
     ps
 
 echo "✅ 部署完成!"
-echo "💡 查看日志: docker compose -p demo --env-file $ENV_FILE -f $COMPOSE_FILE logs -f frontend"
+echo "💡 查看日志: docker compose -p health-manage-system --env-file $ENV_FILE -f $COMPOSE_FILE logs -f frontend"

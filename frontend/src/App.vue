@@ -22,7 +22,7 @@
           </RouterLink>
         </nav>
         <div class="user-box">
-          <RouterLink v-if="isAdminUser" class="ghost admin-entry" to="/ops">后台</RouterLink>
+          <RouterLink v-if="hasOpsUser" class="ghost admin-entry" :to="opsHomeRoute">后台</RouterLink>
           <div ref="moreMenuWrapRef" class="more-menu-wrap">
             <button ref="moreTriggerRef" class="ghost more-trigger" type="button" :aria-expanded="moreMenuOpen" @click="toggleMoreMenu">
               更多
@@ -117,8 +117,8 @@
             <div class="mobile-rail-group">
               <span class="mobile-rail-label">更多</span>
               <RouterLink
-                v-if="isAdminUser"
-                to="/ops"
+                v-if="hasOpsUser"
+                :to="opsHomeRoute"
                 class="mobile-rail-link"
                 @click="mobileNavOpen = false"
               >
@@ -173,7 +173,7 @@
           <div class="admin-sidebar-group">
             <span class="admin-section-label">后台主线</span>
             <nav class="admin-nav" aria-label="后台导航">
-              <RouterLink v-for="item in adminNavItems" :key="item.to" :to="item.to" class="admin-nav-link">
+              <RouterLink v-for="item in filteredAdminNavItems" :key="item.to" :to="item.to" class="admin-nav-link">
                 <span class="admin-nav-icon">{{ item.icon }}</span>
                 <span class="admin-nav-copy">
                   <strong>{{ item.label }}</strong>
@@ -196,7 +196,7 @@
           <div class="admin-sidebar-footer">
             <div class="admin-operator">
               <span class="admin-operator-label">当前值守</span>
-              <strong>{{ auth.user?.nickname || auth.user?.username || "管理员" }}</strong>
+              <strong>{{ auth.user?.nickname || auth.user?.username || adminRoleLabel }}</strong>
             </div>
             <button v-if="auth.isAuthenticated" class="ghost admin-logout" @click="logout">退出</button>
           </div>
@@ -212,7 +212,7 @@
             <div class="admin-topbar-actions">
               <RouterLink class="ghost admin-return" to="/">回到前台</RouterLink>
               <div class="admin-user-chip">
-                <span>管理员</span>
+                <span>{{ adminRoleLabel }}</span>
                 <strong>{{ auth.user?.nickname || auth.user?.username }}</strong>
               </div>
             </div>
@@ -232,7 +232,7 @@
                     </span>
                   </div>
                 </div>
-                <RouterLink class="ticker-action" :to="currentAdminMoment.to">{{ currentAdminMoment.cta }}</RouterLink>
+                <RouterLink class="ticker-action" :to="currentAdminAction.to">{{ currentAdminAction.label }}</RouterLink>
               </article>
             </Transition>
 
@@ -261,7 +261,7 @@
             <div class="mobile-rail-group">
               <span class="mobile-rail-label">后台主线</span>
               <RouterLink
-                v-for="item in adminNavItems"
+                v-for="item in filteredAdminNavItems"
                 :key="item.to"
                 :to="item.to"
                 class="mobile-rail-link admin-mobile-link"
@@ -307,6 +307,7 @@ import { useRoute, useRouter } from "vue-router";
 import { listHealthGoals } from "./api/goals";
 import { listMealRecords } from "./api/tracking";
 import { useAuthStore } from "./stores/auth";
+import { canAccessOpsScope, hasOpsAccess, isOpsManager, resolveOpsHome } from "./lib/opsAccess";
 
 const route = useRoute();
 const router = useRouter();
@@ -335,12 +336,12 @@ const navItems = [
 ];
 
 const adminNavItems = [
-  { to: "/ops", label: "后台总览", icon: "览", copy: "先看今天的值守主线和后台建议" },
-  { to: "/ops/logs", label: "操作日志", icon: "迹", copy: "回看是谁改了什么、改完是否把后台主线拉稳" },
-  { to: "/ops/reports", label: "运营复核", icon: "报", copy: "集中看后台运营指标、报表任务和记录覆盖情况" },
-  { to: "/ops/community", label: "社区审核", icon: "社", copy: "集中处理帖子审核、举报和评论隐藏" },
-  { to: "/ops/recipes", label: "菜谱管理", icon: "谱", copy: "集中处理菜谱状态、审核结论和内容质量" },
-  { to: "/ops/users", label: "用户管理", icon: "户", copy: "集中管理账号状态、角色边界和资料质量" },
+  { to: "/ops", label: "后台总览", icon: "览", copy: "先看今天的值守主线和后台建议", scope: "manager" as const },
+  { to: "/ops/logs", label: "操作日志", icon: "迹", copy: "回看是谁改了什么、改完是否把后台主线拉稳", scope: "operator" as const },
+  { to: "/ops/reports", label: "运营复核", icon: "报", copy: "集中看后台运营指标、报表任务和记录覆盖情况", scope: "operator" as const },
+  { to: "/ops/community", label: "社区审核", icon: "社", copy: "集中处理帖子审核、举报和评论隐藏", scope: "operator" as const },
+  { to: "/ops/recipes", label: "菜谱管理", icon: "谱", copy: "集中处理菜谱状态、审核结论和内容质量", scope: "operator" as const },
+  { to: "/ops/users", label: "用户管理", icon: "户", copy: "集中管理账号状态、角色边界和资料质量", scope: "manager" as const },
 ];
 
 const primaryNavPaths = ["/", "/records", "/recipes", "/favorites"];
@@ -356,21 +357,31 @@ const frontRouteMoments = [
   { path: "/profile", label: "我的", badge: "Profile Ready", title: "资料越完整，系统建议越像真的懂你", copy: "健康档案是系统判断下一步的底层信息，不需要花哨，但需要清楚。", hint: "底层信息补齐，建议才会更准", cta: "回首页继续", to: "/" },
 ];
 const adminRouteMoments = [
-  { path: "/ops", label: "后台总览", badge: "Ops Overview", title: "先把后台今天最该处理的动作排清楚", copy: "后台先定优先级，再进入具体模块，避免一开始就散到每个角落。", hint: "先定优先级，再展开处理", cta: "去用户管理", to: "/ops/users" },
-  { path: "/ops/logs", label: "操作日志", badge: "Action Trail", title: "先把最近到底改了什么看清楚", copy: "操作日志不是为了堆记录，而是为了让后台动作可回看、可追责、可复盘。", hint: "先看动作轨迹，再判断问题出在哪一步", cta: "回后台总览", to: "/ops" },
-  { path: "/ops/reports", label: "运营复核", badge: "Operations Review", title: "先把运营指标和报表任务看清楚", copy: "这页更适合管理员看整体活跃度、内容处理节奏和报表任务是否健康，而不是站在单个用户视角复盘。", hint: "先看指标，再判断要补数据、补内容还是补处理节奏", cta: "回后台总览", to: "/ops" },
-  { path: "/ops/community", label: "社区审核", badge: "Community Moderation", title: "先把帖子审核和举报处理收紧", copy: "社区后台先看待审核内容、待处理举报和评论隐藏动作，别让风险内容继续外露。", hint: "优先看待审核帖子和待处理举报", cta: "回后台总览", to: "/ops" },
-  { path: "/ops/recipes", label: "菜谱管理", badge: "Recipe Operations", title: "先把菜谱状态和审核结论收紧", copy: "菜谱管理先盯状态、审核和信息质量，别让无效内容混进用户决策链路。", hint: "优先看待审核和信息不完整的菜谱", cta: "回后台总览", to: "/ops" },
-  { path: "/ops/users", label: "用户管理", badge: "User Operations", title: "先把账号、角色和资料边界看清楚", copy: "用户管理是后台最核心的第一块，先把角色边界、状态和资料质量稳住。", hint: "优先检查权限、停用状态和资料完整度", cta: "回后台总览", to: "/ops" },
+  { path: "/ops", label: "后台总览", badge: "Ops Overview", title: "先把后台今天最该处理的动作排清楚", copy: "后台先定优先级，再进入具体模块，避免一开始就散到每个角落。", hint: "先定优先级，再展开处理", cta: "去用户管理", to: "/ops/users", scope: "manager" as const },
+  { path: "/ops/logs", label: "操作日志", badge: "Action Trail", title: "先把最近到底改了什么看清楚", copy: "操作日志不是为了堆记录，而是为了让后台动作可回看、可追责、可复盘。", hint: "先看动作轨迹，再判断问题出在哪一步", cta: "回后台总览", to: "/ops", scope: "operator" as const },
+  { path: "/ops/reports", label: "运营复核", badge: "Operations Review", title: "先把运营指标和报表任务看清楚", copy: "这页更适合从整体活跃度、内容处理节奏和报表任务状态判断后台下一步。", hint: "先看指标，再判断要补数据、补内容还是补处理节奏", cta: "回后台总览", to: "/ops", scope: "operator" as const },
+  { path: "/ops/community", label: "社区审核", badge: "Community Moderation", title: "先把帖子审核和举报处理收紧", copy: "社区后台先看待审核内容、待处理举报和评论隐藏动作，别让风险内容继续外露。", hint: "优先看待审核帖子和待处理举报", cta: "回后台总览", to: "/ops", scope: "operator" as const },
+  { path: "/ops/recipes", label: "菜谱管理", badge: "Recipe Operations", title: "先把菜谱状态和审核结论收紧", copy: "菜谱管理先盯状态、审核和信息质量，别让无效内容混进用户决策链路。", hint: "优先看待审核和信息不完整的菜谱", cta: "回后台总览", to: "/ops", scope: "operator" as const },
+  { path: "/ops/users", label: "用户管理", badge: "User Operations", title: "先把账号、角色和资料边界看清楚", copy: "用户管理是后台最核心的第一块，先把角色边界、状态和资料质量稳住。", hint: "优先检查权限、停用状态和资料完整度", cta: "回后台总览", to: "/ops", scope: "manager" as const },
 ];
 
 const showChrome = computed(() => route.path !== "/login");
 const isAdminRoute = computed(() => route.path.startsWith("/ops"));
 const primaryNavItems = computed(() => navItems.filter((item) => primaryNavPaths.includes(item.to)));
 const secondaryNavItems = computed(() => navItems.filter((item) => !primaryNavPaths.includes(item.to)));
-const isAdminUser = computed(() => Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser || auth.user.is_staff)));
+const hasOpsUser = computed(() => hasOpsAccess(auth.user));
+const isManagerUser = computed(() => isOpsManager(auth.user));
+const opsHomeRoute = computed(() => resolveOpsHome(auth.user));
+const filteredAdminNavItems = computed(() => adminNavItems.filter((item) => !item.scope || canAccessOpsScope(auth.user, item.scope)));
+const adminRoleLabel = computed(() => (isManagerUser.value ? "管理员" : hasOpsUser.value ? "审核员" : "后台用户"));
 const currentFrontMoment = computed(() => matchRouteMoment(route.path, frontRouteMoments) ?? frontRouteMoments[0]);
 const currentAdminMoment = computed(() => matchRouteMoment(route.path, adminRouteMoments) ?? adminRouteMoments[0]);
+const currentAdminAction = computed(() => {
+  if (currentAdminMoment.value.scope === "manager" || isManagerUser.value) {
+    return { to: currentAdminMoment.value.to, label: currentAdminMoment.value.cta };
+  }
+  return { to: opsHomeRoute.value, label: route.path === "/ops/reports" ? "回运营复核首页" : "回到运营复核" };
+});
 const currentFrontTitle = computed(() => currentFrontMoment.value.label || "营养饮食助手");
 const fallbackTickerTips = computed(() => [
   currentFrontMoment.value.hint,
@@ -385,9 +396,9 @@ const tickerLoopMessages = computed(() => [...tickerMessages.value, ...tickerMes
 const adminTickerMessages = computed(() => [
   currentAdminMoment.value.hint,
   "后台先解决最影响真实用户体验的问题，再扩展模块深度。",
-  isAdminUser.value
+  hasOpsUser.value
     ? `当前值守：${auth.user?.nickname || auth.user?.username}，先完成一个明确动作，比同时盯多块更有效。`
-    : "先确认管理员权限，再开始处理后台事项。",
+    : "先确认后台权限，再开始处理后台事项。",
   route.path === "/ops/users"
     ? "用户管理里先看账号状态、角色边界和资料完整度，再处理个别字段。"
     : route.path === "/ops/logs"
@@ -656,19 +667,17 @@ async function refreshTickerTips() {
   min-height: 100vh;
   overflow-x: clip;
   background:
-    radial-gradient(circle at var(--pointer-x) var(--pointer-y), rgba(87, 181, 231, 0.2), transparent 0, transparent 26%),
-    radial-gradient(circle at top left, rgba(87, 181, 231, 0.18), transparent 35%),
-    radial-gradient(circle at top right, rgba(34, 197, 94, 0.14), transparent 28%),
-    linear-gradient(180deg, #f7fbff 0%, #eef4f8 100%);
+    radial-gradient(circle at var(--pointer-x) var(--pointer-y), rgba(87, 181, 231, 0.14), transparent 0, transparent 24%),
+    radial-gradient(circle at top left, rgba(87, 181, 231, 0.14), transparent 32%),
+    linear-gradient(180deg, #f8fbfe 0%, #eef4f8 100%);
   color: #123;
   transition: background 0.26s ease;
 }
 
 .shell.admin-shell-root {
   background:
-    radial-gradient(circle at var(--pointer-x) var(--pointer-y), rgba(87, 181, 231, 0.16), transparent 0, transparent 30%),
-    radial-gradient(circle at top left, rgba(33, 82, 118, 0.24), transparent 32%),
-    linear-gradient(180deg, #09121c 0%, #101d2a 42%, #122233 100%);
+    radial-gradient(circle at var(--pointer-x) var(--pointer-y), rgba(87, 181, 231, 0.08), transparent 0, transparent 24%),
+    linear-gradient(180deg, #0f1822 0%, #14212e 100%);
   color: #ecf5ff;
 }
 
@@ -704,10 +713,8 @@ async function refreshTickerTips() {
   content: "";
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.44), transparent 28%),
-    linear-gradient(120deg, transparent 10%, rgba(255, 255, 255, 0.28), transparent 42%);
-  opacity: 0.72;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 32%);
+  opacity: 0.56;
   pointer-events: none;
 }
 

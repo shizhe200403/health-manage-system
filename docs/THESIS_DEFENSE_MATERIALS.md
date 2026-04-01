@@ -180,7 +180,7 @@
 - 健康管理相关：`meal_record`、`meal_record_item`、`health_goal`、`health_goal_progress`
 - 社区相关：`post`、`post_comment`、`content_report`
 
-数据库结构参考文档见 [database_design.md](/Users/shizhe/Downloads/demo/database_design.md)。实际表结构以 Django migrations 为准。
+数据库结构参考文档见 [database_design.md](../database_design.md)。实际表结构以 Django migrations 为准。
 
 ## 8. 核心算法与方法说明
 
@@ -342,8 +342,8 @@
 
 本项目现有文档中可直接引用或改写的内容包括：
 
-- [README.md](/Users/shizhe/Downloads/demo/README.md)
-- [docs/ARCHITECTURE.md](/Users/shizhe/Downloads/demo/docs/ARCHITECTURE.md)
-- [database_design.md](/Users/shizhe/Downloads/demo/database_design.md)
-- [api_spec.md](/Users/shizhe/Downloads/demo/api_spec.md)
-- [docs/TESTING.md](/Users/shizhe/Downloads/demo/docs/TESTING.md)
+- [README.md](../README.md)
+- [docs/ARCHITECTURE.md](./ARCHITECTURE.md)
+- [database_design.md](../database_design.md)
+- [api_spec.md](../api_spec.md)
+- [docs/TESTING.md](./TESTING.md)

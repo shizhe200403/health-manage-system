@@ -16,15 +16,15 @@
     <PageStateBlock
       v-if="auth.isAuthenticated && !auth.user"
       tone="loading"
-      title="正在确认管理员身份"
+      title="正在确认后台身份"
       description="先把账号权限拉齐，再展开菜谱管理台。"
       compact
     />
     <PageStateBlock
-      v-else-if="!isAdminUser"
+      v-else-if="!hasOpsUser"
       tone="error"
       title="当前账号没有后台权限"
-      description="菜谱管理只对管理员开放，普通账号不会显示这里。"
+      description="菜谱管理只对后台值守账号开放，普通账号不会显示这里。"
       action-label="回到首页"
       @action="router.push('/')"
     />
@@ -319,6 +319,7 @@ import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import { listAdminOperationLogs } from "../api/adminLogs";
 import { deleteRecipe, getRecipeDetail, listRecipes, updateRecipe } from "../api/recipes";
+import { hasOpsAccess } from "../lib/opsAccess";
 import { extractApiErrorMessage, notifyActionSuccess, notifyErrorMessage, notifyLoadError } from "../lib/feedback";
 import { useAuthStore } from "../stores/auth";
 
@@ -353,7 +354,7 @@ const recipeDraft = reactive({
   source_name: "",
 });
 
-const isAdminUser = computed(() => Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser || auth.user.is_staff)));
+const hasOpsUser = computed(() => hasOpsAccess(auth.user));
 const pendingAuditCount = computed(() => recipes.value.filter((item) => item.audit_status === "pending").length);
 const draftLikeCount = computed(() => recipes.value.filter((item) => item.status !== "published").length);
 const incompleteCount = computed(() => recipes.value.filter((item) => recipeCompleteness(item) < 70).length);
@@ -455,7 +456,7 @@ const recipeChecklist = computed(() => {
 });
 
 onMounted(() => {
-  if (isAdminUser.value) {
+  if (hasOpsUser.value) {
     void loadRecipes();
   }
 });
@@ -469,7 +470,7 @@ function unwrapListPayload(payload: any) {
 }
 
 async function loadRecipes() {
-  if (!isAdminUser.value) return;
+  if (!hasOpsUser.value) return;
 
   loadingRecipes.value = true;
   try {

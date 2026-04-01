@@ -68,6 +68,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from "vue";
 import FormActionBar from "../components/FormActionBar.vue";
+import { resolveOpsHome } from "../lib/opsAccess";
 import { extractApiErrorMessage, notifyActionSuccess, notifyWarning } from "../lib/feedback";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
@@ -137,8 +138,7 @@ async function handleLogin() {
 
   await auth.login(form.account, form.password);
   notifyActionSuccess("登录成功");
-  const isAdminUser = Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser || auth.user.is_staff));
-  router.push(isAdminUser ? "/ops" : "/");
+  router.push(resolveOpsHome(auth.user));
 }
 
 async function handleRegister() {

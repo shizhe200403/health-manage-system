@@ -9,22 +9,22 @@
       <div class="head-actions">
         <el-button plain @click="resetFilters">重置筛选</el-button>
         <el-button type="primary" :loading="loading" @click="loadLogs">刷新日志</el-button>
-        <el-button plain @click="router.push('/ops')">回后台总览</el-button>
+        <el-button plain @click="router.push(resolveOpsHome(auth.user))">回后台首页</el-button>
       </div>
     </div>
 
     <PageStateBlock
       v-if="auth.isAuthenticated && !auth.user"
       tone="loading"
-      title="正在确认管理员身份"
+      title="正在确认后台身份"
       description="先把账号权限拉齐，再展开后台操作日志。"
       compact
     />
     <PageStateBlock
-      v-else-if="!isAdminUser"
+      v-else-if="!hasOpsUser"
       tone="error"
       title="当前账号没有后台权限"
-      description="操作日志只对管理员开放，普通账号不会显示这里。"
+      description="操作日志只对后台值守账号开放，普通账号不会显示这里。"
       action-label="回到首页"
       @action="router.push('/')"
     />
@@ -149,6 +149,7 @@ import CollectionSkeleton from "../components/CollectionSkeleton.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import { listAdminOperationLogs } from "../api/adminLogs";
+import { hasOpsAccess, resolveOpsHome } from "../lib/opsAccess";
 import { notifyLoadError } from "../lib/feedback";
 import { useAuthStore } from "../stores/auth";
 
@@ -173,7 +174,7 @@ const filters = reactive({
   keyword: "",
 });
 
-const isAdminUser = computed(() => Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser || auth.user.is_staff)));
+const hasOpsUser = computed(() => hasOpsAccess(auth.user));
 const moduleCards = computed(() => [
   {
     label: "用户侧动作",
@@ -193,7 +194,7 @@ const moduleCards = computed(() => [
 ]);
 
 onMounted(() => {
-  if (isAdminUser.value) {
+  if (hasOpsUser.value) {
     void loadLogs();
   }
 });
@@ -205,6 +206,7 @@ function unwrapItems(payload: any) {
 }
 
 async function loadLogs() {
+  if (!hasOpsUser.value) return;
   loading.value = true;
   try {
     const response = await listAdminOperationLogs({

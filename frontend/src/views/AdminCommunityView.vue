@@ -16,15 +16,15 @@
     <PageStateBlock
       v-if="auth.isAuthenticated && !auth.user"
       tone="loading"
-      title="正在确认管理员身份"
+      title="正在确认后台身份"
       description="先把当前账号权限拉齐，再展开社区审核。"
       compact
     />
     <PageStateBlock
-      v-else-if="!isAdminUser"
+      v-else-if="!hasOpsUser"
       tone="error"
       title="当前账号没有后台权限"
-      description="社区审核只对管理员开放，普通账号不会显示这里。"
+      description="社区审核只对后台值守账号开放，普通账号不会显示这里。"
       action-label="回到首页"
       @action="router.push('/')"
     />
@@ -412,6 +412,7 @@ import RefreshFrame from "../components/RefreshFrame.vue";
 import { getAdminCommunityPostDetail, getAdminCommunityReportDetail, listAdminCommunityPosts, listAdminCommunityReports, updateAdminCommunityPost, updateAdminCommunityReport } from "../api/adminContent";
 import { listAdminOperationLogs } from "../api/adminLogs";
 import { deleteComment } from "../api/community";
+import { hasOpsAccess } from "../lib/opsAccess";
 import { extractApiErrorMessage, notifyActionSuccess, notifyErrorMessage, notifyLoadError } from "../lib/feedback";
 import { useAuthStore } from "../stores/auth";
 
@@ -456,7 +457,7 @@ const postDraft = reactive({
   audit_status: "pending",
 });
 
-const isAdminUser = computed(() => Boolean(auth.user && (auth.user.role === "admin" || auth.user.is_superuser || auth.user.is_staff)));
+const hasOpsUser = computed(() => hasOpsAccess(auth.user));
 const showSkeleton = computed(() => (loadingPosts || loadingReports) && !posts.value.length && !reports.value.length);
 const pendingPostCount = computed(() => posts.value.filter((item) => item.audit_status === "pending").length);
 const rejectedPostCount = computed(() => posts.value.filter((item) => item.audit_status === "rejected").length);
@@ -538,7 +539,7 @@ const reportFocusTitle = computed(() => {
 });
 
 onMounted(() => {
-  if (isAdminUser.value) {
+  if (hasOpsUser.value) {
     void refreshAll();
   }
 });
@@ -548,7 +549,7 @@ async function refreshAll() {
 }
 
 async function loadPosts() {
-  if (!isAdminUser.value) return;
+  if (!hasOpsUser.value) return;
   loadingPosts.value = true;
   try {
     const response = await listAdminCommunityPosts({
@@ -566,7 +567,7 @@ async function loadPosts() {
 }
 
 async function loadReports() {
-  if (!isAdminUser.value) return;
+  if (!hasOpsUser.value) return;
   loadingReports.value = true;
   try {
     const response = await listAdminCommunityReports({

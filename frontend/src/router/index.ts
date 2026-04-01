@@ -1,10 +1,8 @@
 import { createRouter, createWebHistory } from "vue-router";
+import { canAccessOpsScope, hasOpsAccess, readStoredOpsIdentity, resolveOpsHome, type OpsScope } from "../lib/opsAccess";
 
 function resolveDefaultRoute() {
-  const role = localStorage.getItem("user_role");
-  const isSuperuser = localStorage.getItem("user_is_superuser") === "true";
-  const isStaff = localStorage.getItem("user_is_staff") === "true";
-  return role === "admin" || isSuperuser || isStaff ? "/ops" : "/";
+  return resolveOpsHome(readStoredOpsIdentity());
 }
 
 const router = createRouter({
@@ -20,12 +18,12 @@ const router = createRouter({
     { path: "/reports", component: () => import("../views/ReportsView.vue") },
     { path: "/profile", component: () => import("../views/ProfileView.vue") },
     { path: "/assistant", component: () => import("../views/AssistantView.vue") },
-    { path: "/ops", component: () => import("../views/AdminDashboardView.vue"), meta: { requiresAdmin: true } },
-    { path: "/ops/community", component: () => import("../views/AdminCommunityView.vue"), meta: { requiresAdmin: true } },
-    { path: "/ops/logs", component: () => import("../views/AdminOperationLogsView.vue"), meta: { requiresAdmin: true } },
-    { path: "/ops/reports", component: () => import("../views/AdminOpsReportsView.vue"), meta: { requiresAdmin: true } },
-    { path: "/ops/recipes", component: () => import("../views/AdminRecipesView.vue"), meta: { requiresAdmin: true } },
-    { path: "/ops/users", component: () => import("../views/AdminUsersView.vue"), meta: { requiresAdmin: true } },
+    { path: "/ops", component: () => import("../views/AdminDashboardView.vue"), meta: { opsScope: "manager" } },
+    { path: "/ops/community", component: () => import("../views/AdminCommunityView.vue"), meta: { opsScope: "operator" } },
+    { path: "/ops/logs", component: () => import("../views/AdminOperationLogsView.vue"), meta: { opsScope: "operator" } },
+    { path: "/ops/reports", component: () => import("../views/AdminOpsReportsView.vue"), meta: { opsScope: "operator" } },
+    { path: "/ops/recipes", component: () => import("../views/AdminRecipesView.vue"), meta: { opsScope: "operator" } },
+    { path: "/ops/users", component: () => import("../views/AdminUsersView.vue"), meta: { opsScope: "manager" } },
   ],
 });
 
@@ -37,14 +35,18 @@ router.beforeEach((to) => {
   if (token && to.path === "/login") {
     return resolveDefaultRoute();
   }
-  if (to.meta.requiresAdmin) {
-    const role = localStorage.getItem("user_role");
-    const isSuperuser = localStorage.getItem("user_is_superuser") === "true";
-    const isStaff = localStorage.getItem("user_is_staff") === "true";
-    if ((role || isSuperuser || isStaff) && role !== "admin" && !isSuperuser && !isStaff) {
+
+  const requiredScope = to.meta.opsScope as OpsScope | undefined;
+  if (requiredScope) {
+    const identity = readStoredOpsIdentity();
+    if (!hasOpsAccess(identity)) {
       return "/";
     }
+    if (!canAccessOpsScope(identity, requiredScope)) {
+      return resolveOpsHome(identity);
+    }
   }
+
   return true;
 });
 

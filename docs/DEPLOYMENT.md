@@ -25,9 +25,9 @@
 
 ## 生产建议
 
-- 生产环境优先使用 [docker-compose.prod.yml](/Users/shizhe/Downloads/demo/docker-compose.prod.yml)。
+- 生产环境优先使用 [docker-compose.prod.yml](../docker-compose.prod.yml)。
 - 外部仅开放 `80/443`，数据库、Redis、后端 API 只在容器网络内访问。
-- 使用 [.env.production.example](/Users/shizhe/Downloads/demo/.env.production.example) 生成 `.env.production`，不要直接复用开发环境的 `.env`。
+- 使用 [.env.production.example](../.env.production.example) 生成 `.env.production`，不要直接复用开发环境的 `.env`。
 - 前端容器统一代理 `/api/`、`/admin/`、`/static/` 和 `/media/`。
 - 数据库结构请以 Django migrations 为准，`schema.sql` 仅作参考。
 

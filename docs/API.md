@@ -1,6 +1,6 @@
 # API 说明
 
-详细接口列表见 [api_spec.md](/Users/shizhe/Downloads/demo/api_spec.md)。
+详细接口列表见 [api_spec.md](../api_spec.md)。
 
 ## 统一响应
 

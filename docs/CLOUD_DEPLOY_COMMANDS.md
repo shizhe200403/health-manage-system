@@ -61,15 +61,15 @@ free -h
 
 ```bash
 git clone <your-repo-url>
-cd demo
+cd health-manage-system
 ```
 
 如果是本地上传：
 
 ```bash
-scp -r ./demo <user>@<server-ip>:/home/<user>/
+scp -r ./health-manage-system <user>@<server-ip>:/home/<user>/
 ssh <user>@<server-ip>
-cd /home/<user>/demo
+cd /home/<user>/health-manage-system
 ```
 
 ## 3. 配置生产环境变量
@@ -234,8 +234,8 @@ cat backup.sql | docker compose --env-file .env.production -f docker-compose.pro
 
 ## 11. 当前项目对应的关键文件
 
-- 生产编排：[docker-compose.prod.yml](/Users/shizhe/Downloads/demo/docker-compose.prod.yml)
-- 生产环境模板：[.env.production.example](/Users/shizhe/Downloads/demo/.env.production.example)
-- 阿里云单机部署说明：[docs/ALIYUN_SINGLE_SERVER_DEPLOYMENT.md](/Users/shizhe/Downloads/demo/docs/ALIYUN_SINGLE_SERVER_DEPLOYMENT.md)
-- 上线手册：[docs/PRODUCTION_RUNBOOK.md](/Users/shizhe/Downloads/demo/docs/PRODUCTION_RUNBOOK.md)
-- 上线验证报告：[docs/RELEASE_VALIDATION.md](/Users/shizhe/Downloads/demo/docs/RELEASE_VALIDATION.md)
+- 生产编排：[docker-compose.prod.yml](../docker-compose.prod.yml)
+- 生产环境模板：[.env.production.example](../.env.production.example)
+- 阿里云单机部署说明：[docs/ALIYUN_SINGLE_SERVER_DEPLOYMENT.md](./ALIYUN_SINGLE_SERVER_DEPLOYMENT.md)
+- 上线手册：[docs/PRODUCTION_RUNBOOK.md](./PRODUCTION_RUNBOOK.md)
+- 上线验证报告：[docs/RELEASE_VALIDATION.md](./RELEASE_VALIDATION.md)

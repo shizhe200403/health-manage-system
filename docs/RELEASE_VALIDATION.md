@@ -9,13 +9,13 @@
 
 ## 已完成的生产化改造
 
-- 新增生产编排文件 [docker-compose.prod.yml](/Users/shizhe/Downloads/demo/docker-compose.prod.yml)
-- 新增生产环境模板 [.env.production.example](/Users/shizhe/Downloads/demo/.env.production.example)
-- 新增后端生产启动脚本 [backend/entrypoint.prod.sh](/Users/shizhe/Downloads/demo/backend/entrypoint.prod.sh)
-- 收紧 Django 默认安全配置 [backend/config/settings.py](/Users/shizhe/Downloads/demo/backend/config/settings.py)
-- 补齐前端 Nginx 对 `/api/`、`/admin/`、`/static/`、`/media/` 的代理与映射 [frontend/nginx.conf](/Users/shizhe/Downloads/demo/frontend/nginx.conf)
-- 区分开发环境和生产环境部署说明 [docs/PRODUCTION_RUNBOOK.md](/Users/shizhe/Downloads/demo/docs/PRODUCTION_RUNBOOK.md)
-- 升级后端数据库驱动依赖以兼容 Python 3.14 [backend/requirements.txt](/Users/shizhe/Downloads/demo/backend/requirements.txt)
+- 新增生产编排文件 [docker-compose.prod.yml](../docker-compose.prod.yml)
+- 新增生产环境模板 [.env.production.example](../.env.production.example)
+- 新增后端生产启动脚本 [backend/entrypoint.prod.sh](../backend/entrypoint.prod.sh)
+- 收紧 Django 默认安全配置 [backend/config/settings.py](../backend/config/settings.py)
+- 补齐前端 Nginx 对 `/api/`、`/admin/`、`/static/`、`/media/` 的代理与映射 [frontend/nginx.conf](../frontend/nginx.conf)
+- 区分开发环境和生产环境部署说明 [docs/PRODUCTION_RUNBOOK.md](./PRODUCTION_RUNBOOK.md)
+- 升级后端数据库驱动依赖以兼容 Python 3.14 [backend/requirements.txt](../backend/requirements.txt)
 
 ## 实际执行的检查
 
@@ -99,7 +99,7 @@ DJANGO_SECURE_SSL_REDIRECT=true \
 结果：
 
 - 通过
-- 已生成 [backend/openapi.yaml](/Users/shizhe/Downloads/demo/backend/openapi.yaml)
+- 已生成 [backend/openapi.yaml](../backend/openapi.yaml)
 
 ### 5. 后端核心烟雾测试
 

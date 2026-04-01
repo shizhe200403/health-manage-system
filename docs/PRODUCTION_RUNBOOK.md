@@ -10,7 +10,7 @@
 
 ```bash
 git clone <your-repo-url>
-cd demo
+cd health-manage-system
 ```
 
 如果是手工上传到服务器，确保目录结构包含：
@@ -134,11 +134,11 @@ make prod-recreate
 make prod-migrate
 ```
 
-如果项目目录对应的 Compose 项目名不是默认的 `demo`，可显式覆盖：
+如果项目目录对应的 Compose 项目名不是默认值，可显式覆盖：
 
 ```bash
-make PROJECT=demo-git prod-ps
-make PROJECT=demo-git prod-recreate
+make PROJECT=health-manage-system prod-ps
+make PROJECT=health-manage-system prod-recreate
 ```
 
 ## 10. 常见问题
