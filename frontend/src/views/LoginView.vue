@@ -1,5 +1,5 @@
 <template>
-  <section class="login-layout">
+  <section class="login-layout" @keyup.enter="submit">
     <div class="login-card">
       <p class="tag">每日饮食</p>
       <h2>{{ isRegisterMode ? "创建你的饮食管理账号" : "欢迎回来" }}</h2>
@@ -12,7 +12,7 @@
         <button :class="{ active: isRegisterMode }" @click="switchMode('register')">注册</button>
       </div>
 
-      <el-form :model="form" label-position="top" class="form" @keyup.enter="submit">
+      <el-form :model="form" label-position="top" class="form">
         <el-form-item :label="isRegisterMode ? '用户名' : '账号'">
           <el-input
             v-model.trim="form.account"
