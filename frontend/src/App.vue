@@ -150,7 +150,7 @@
         <div class="admin-mobile-copy">
           <p class="mobile-eyebrow">Admin Console</p>
           <strong>{{ currentAdminMoment.label }}</strong>
-          <p class="mobile-subtitle">{{ currentAdminMoment.copy }}</p>
+          <p class="mobile-subtitle">{{ currentAdminMoment.title }}</p>
         </div>
         <button class="ghost mobile-nav-trigger" type="button" :aria-expanded="adminMobileNavOpen" @click="adminMobileNavOpen = !adminMobileNavOpen">
           <span class="hamburger-mark" aria-hidden="true">
@@ -163,33 +163,37 @@
       </header>
 
       <div class="admin-shell-layout">
-        <aside class="admin-sidebar desktop-only">
-          <div class="admin-brand shell-surface">
-            <p class="eyebrow">Admin Console</p>
-            <h2>饮食管理台</h2>
-            <p>把权限、账号状态和资料质量先稳住，后台才算真正成型。</p>
+        <aside class="admin-sidebar desktop-only" aria-label="后台侧边栏">
+          <div class="admin-sidebar-top">
+            <div class="admin-brand shell-surface">
+              <p class="eyebrow">Admin Console</p>
+              <h2>饮食管理台</h2>
+              <p>聚焦值守主线、内容审核和操作追踪。</p>
+            </div>
           </div>
 
-          <div class="admin-sidebar-group">
-            <span class="admin-section-label">后台主线</span>
-            <nav class="admin-nav" aria-label="后台导航">
-              <RouterLink v-for="item in filteredAdminNavItems" :key="item.to" :to="item.to" class="admin-nav-link">
-                <span class="admin-nav-icon">{{ item.icon }}</span>
-                <span class="admin-nav-copy">
-                  <strong>{{ item.label }}</strong>
+          <div class="admin-sidebar-scroll">
+            <div class="admin-sidebar-group">
+              <span class="admin-section-label">后台主线</span>
+              <nav class="admin-nav" aria-label="后台导航">
+                <RouterLink v-for="item in filteredAdminNavItems" :key="item.to" :to="item.to" class="admin-nav-link">
+                  <span class="admin-nav-icon">{{ item.icon }}</span>
+                  <span class="admin-nav-copy">
+                    <strong>{{ item.label }}</strong>
+                    <small>{{ item.copy }}</small>
+                  </span>
+                </RouterLink>
+              </nav>
+            </div>
+
+            <div class="admin-sidebar-group">
+              <span class="admin-section-label">前台入口</span>
+              <div class="admin-subnav">
+                <RouterLink v-for="item in primaryNavItems" :key="item.to" :to="item.to" class="admin-subnav-link">
+                  <span>{{ item.label }}</span>
                   <small>{{ item.copy }}</small>
-                </span>
-              </RouterLink>
-            </nav>
-          </div>
-
-          <div class="admin-sidebar-group">
-            <span class="admin-section-label">前台入口</span>
-            <div class="admin-subnav">
-              <RouterLink v-for="item in primaryNavItems" :key="item.to" :to="item.to" class="admin-subnav-link">
-                <span>{{ item.label }}</span>
-                <small>{{ item.copy }}</small>
-              </RouterLink>
+                </RouterLink>
+              </div>
             </div>
           </div>
 
@@ -206,13 +210,17 @@
           <header class="admin-topbar desktop-only">
             <div class="admin-topbar-copy">
               <p class="eyebrow">{{ currentAdminMoment.badge }}</p>
-              <h1 class="admin-title">{{ currentAdminMoment.label }}</h1>
-              <p class="admin-subtitle">{{ currentAdminMoment.copy }}</p>
+              <div class="admin-topbar-title-row">
+                <h1 class="admin-title">{{ currentAdminMoment.label }}</h1>
+                <span class="admin-topbar-badge">{{ adminRoleLabel }}</span>
+              </div>
+              <p class="admin-subtitle">{{ currentAdminMoment.title }}</p>
             </div>
             <div class="admin-topbar-actions">
-              <RouterLink class="ghost admin-return" to="/">回到前台</RouterLink>
+              <RouterLink class="ghost admin-return" :to="currentAdminAction.to">{{ currentAdminAction.label }}</RouterLink>
+              <RouterLink class="ghost admin-return admin-return-soft" to="/">回到前台</RouterLink>
               <div class="admin-user-chip">
-                <span>{{ adminRoleLabel }}</span>
+                <span>当前账号</span>
                 <strong>{{ auth.user?.nickname || auth.user?.username }}</strong>
               </div>
             </div>
@@ -223,7 +231,7 @@
               <article :key="route.path" class="floating-ribbon admin-pulse">
                 <div class="ticker-label">
                   <span class="ribbon-status-dot" aria-hidden="true" />
-                  <strong>管理提醒</strong>
+                  <strong>当前提醒</strong>
                 </div>
                 <div class="ticker-viewport" aria-label="后台管理提醒">
                   <div class="ticker-track">
@@ -232,7 +240,10 @@
                     </span>
                   </div>
                 </div>
-                <RouterLink class="ticker-action" :to="currentAdminAction.to">{{ currentAdminAction.label }}</RouterLink>
+                <div class="admin-ribbon-side">
+                  <span>当前页</span>
+                  <strong>{{ currentAdminMoment.label }}</strong>
+                </div>
               </article>
             </Transition>
 
@@ -996,7 +1007,7 @@ h1,
 .admin-shell-layout {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 290px minmax(0, 1fr);
+  grid-template-columns: 324px minmax(0, 1fr);
 }
 
 .admin-sidebar {
@@ -1005,53 +1016,63 @@ h1,
   align-self: start;
   height: 100vh;
   display: grid;
-  grid-template-rows: auto auto auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 18px;
-  padding: 22px 18px;
-  border-right: 1px solid rgba(161, 197, 223, 0.12);
-  background:
-    linear-gradient(180deg, rgba(8, 17, 26, 0.96), rgba(11, 22, 35, 0.94)),
-    radial-gradient(circle at top left, rgba(67, 128, 168, 0.16), transparent 34%);
-  backdrop-filter: blur(18px);
+  padding: 22px 18px 18px;
+  border-right: 1px solid rgba(161, 197, 223, 0.1);
+  background: linear-gradient(180deg, rgba(8, 17, 26, 0.98), rgba(12, 24, 36, 0.96));
+  overflow: hidden;
+}
+
+.admin-sidebar-top,
+.admin-sidebar-scroll {
+  min-height: 0;
+}
+
+.admin-sidebar-scroll {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .admin-brand {
   display: grid;
   gap: 8px;
-  padding: 18px;
+  padding: 20px;
   border-radius: 24px;
-  background:
-    linear-gradient(145deg, rgba(24, 48, 68, 0.92), rgba(12, 25, 39, 0.94)),
-    radial-gradient(circle at top right, rgba(106, 170, 212, 0.2), transparent 38%);
-  border: 1px solid rgba(161, 197, 223, 0.1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: linear-gradient(180deg, rgba(20, 41, 57, 0.98), rgba(13, 28, 42, 0.96));
+  border: 1px solid rgba(161, 197, 223, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .admin-brand h2 {
   margin: 0;
-  font-size: 22px;
+  font-size: 24px;
   color: #f0f8ff;
 }
 
 .admin-brand p:last-child {
   margin: 0;
   color: rgba(212, 230, 244, 0.72);
-  line-height: 1.7;
+  line-height: 1.55;
   font-size: 13px;
 }
 
 .admin-sidebar-group {
   display: grid;
   gap: 10px;
+  min-width: 0;
 }
 
 .admin-section-label {
-  padding: 0 2px;
+  padding: 0 4px;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(172, 208, 234, 0.62);
+  color: rgba(172, 208, 234, 0.58);
 }
 
 .admin-nav,
@@ -1064,17 +1085,19 @@ h1,
 .admin-subnav-link {
   display: grid;
   gap: 6px;
+  min-width: 0;
   text-decoration: none;
-  border-radius: 20px;
+  border-radius: 18px;
   border: 1px solid rgba(161, 197, 223, 0.12);
-  background: rgba(15, 31, 46, 0.72);
+  background: rgba(14, 28, 42, 0.78);
   color: #e9f4ff;
-  transition: transform 0.24s ease, border-color 0.24s ease, background 0.24s ease, box-shadow 0.24s ease;
+  transition: border-color 0.22s ease, background 0.22s ease, box-shadow 0.22s ease;
 }
 
 .admin-nav-link {
   grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
+  gap: 12px;
   padding: 14px;
 }
 
@@ -1082,9 +1105,9 @@ h1,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 14px;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
   background: rgba(113, 175, 214, 0.14);
   color: #e9f4ff;
   font-size: 12px;
@@ -1093,7 +1116,7 @@ h1,
 
 .admin-nav-copy {
   display: grid;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
 }
 
@@ -1101,12 +1124,18 @@ h1,
 .admin-subnav-link span {
   color: #f0f8ff;
   font-size: 14px;
+  line-height: 1.35;
 }
 
 .admin-nav-copy small,
 .admin-subnav-link small {
   color: rgba(212, 230, 244, 0.64);
-  line-height: 1.55;
+  line-height: 1.45;
+  font-size: 12px;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .admin-subnav-link {
@@ -1115,27 +1144,25 @@ h1,
 
 .admin-nav-link:hover,
 .admin-subnav-link:hover {
-  transform: translateY(-2px);
   border-color: rgba(161, 197, 223, 0.2);
-  background: rgba(21, 41, 59, 0.92);
-  box-shadow: 0 18px 28px rgba(4, 10, 17, 0.22);
+  background: rgba(20, 38, 54, 0.94);
+  box-shadow: 0 12px 22px rgba(4, 10, 17, 0.18);
 }
 
 .admin-nav-link.router-link-active,
 .admin-subnav-link.router-link-active {
-  border-color: rgba(122, 191, 234, 0.32);
-  background: linear-gradient(135deg, rgba(27, 60, 85, 0.96), rgba(18, 38, 55, 0.96));
+  border-color: rgba(122, 191, 234, 0.28);
+  background: linear-gradient(135deg, rgba(27, 60, 85, 0.92), rgba(18, 38, 55, 0.96));
   box-shadow: inset 0 0 0 1px rgba(122, 191, 234, 0.08);
 }
 
 .admin-sidebar-footer {
-  align-self: end;
   display: grid;
   gap: 12px;
   padding: 16px;
-  border-radius: 22px;
-  background: rgba(11, 22, 35, 0.72);
-  border: 1px solid rgba(161, 197, 223, 0.12);
+  border-radius: 20px;
+  background: rgba(11, 22, 35, 0.74);
+  border: 1px solid rgba(161, 197, 223, 0.1);
 }
 
 .admin-operator {
@@ -1152,6 +1179,8 @@ h1,
 
 .admin-operator strong {
   color: #f0f8ff;
+  min-width: 0;
+  word-break: break-word;
 }
 
 .admin-workspace {
@@ -1168,30 +1197,60 @@ h1,
   justify-content: space-between;
   align-items: flex-start;
   gap: 18px;
-  padding: 18px 26px 14px;
-  border-bottom: 1px solid rgba(161, 197, 223, 0.12);
-  background: rgba(9, 18, 28, 0.72);
+  padding: 18px 24px 16px;
+  border-bottom: 1px solid rgba(161, 197, 223, 0.1);
+  background: rgba(9, 18, 28, 0.84);
   backdrop-filter: blur(18px);
 }
 
 .admin-topbar-copy {
   display: grid;
-  gap: 6px;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-topbar-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.admin-topbar-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(123, 192, 235, 0.12);
+  border: 1px solid rgba(123, 192, 235, 0.18);
+  color: #bfe6ff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .admin-topbar-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+}
+
+.admin-return-soft {
+  opacity: 0.88;
 }
 
 .admin-user-chip {
   display: grid;
   gap: 2px;
+  min-width: 160px;
   padding: 12px 14px;
-  border-radius: 18px;
+  border-radius: 16px;
   background: rgba(14, 28, 42, 0.74);
-  border: 1px solid rgba(161, 197, 223, 0.12);
+  border: 1px solid rgba(161, 197, 223, 0.1);
 }
 
 .admin-user-chip span {
@@ -1204,15 +1263,17 @@ h1,
 .admin-user-chip strong {
   color: #f0f8ff;
   font-size: 14px;
+  min-width: 0;
+  word-break: break-word;
 }
 
 .admin-content {
   min-width: 0;
-  padding: 18px 20px 32px;
+  padding: 16px 20px 32px;
 }
 
 .admin-content-inner {
-  width: min(100%, 1280px);
+  width: min(100%, 1320px);
   margin: 0 auto;
   min-width: 0;
 }
@@ -1222,12 +1283,10 @@ h1,
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  margin: 0 0 10px;
-  padding: 8px 14px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
   border-radius: 16px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(244, 249, 252, 0.9)),
-    radial-gradient(circle at top right, rgba(87, 181, 231, 0.14), transparent 34%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(244, 249, 252, 0.9));
   border: 1px solid rgba(16, 34, 42, 0.08);
   box-shadow: 0 14px 28px rgba(15, 30, 39, 0.07);
   backdrop-filter: blur(18px);
@@ -1235,13 +1294,11 @@ h1,
 }
 
 .admin-pulse {
-  width: min(100%, 1280px);
-  margin: 0 auto 14px;
-  background:
-    linear-gradient(135deg, rgba(18, 37, 53, 0.92), rgba(13, 28, 42, 0.94)),
-    radial-gradient(circle at top right, rgba(102, 173, 217, 0.14), transparent 38%);
-  border-color: rgba(161, 197, 223, 0.12);
-  box-shadow: 0 18px 34px rgba(4, 10, 17, 0.22);
+  width: min(100%, 1320px);
+  margin: 0 auto 16px;
+  background: rgba(15, 31, 46, 0.88);
+  border-color: rgba(161, 197, 223, 0.1);
+  box-shadow: 0 14px 28px rgba(4, 10, 17, 0.18);
 }
 
 .admin-pulse .ticker-label strong,
@@ -1251,11 +1308,30 @@ h1,
 }
 
 .admin-pulse .ticker-item {
-  color: rgba(224, 239, 250, 0.8);
+  color: rgba(224, 239, 250, 0.78);
 }
 
 .admin-pulse .ticker-item::before {
-  background: rgba(122, 191, 234, 0.48);
+  background: rgba(122, 191, 234, 0.4);
+}
+
+.admin-ribbon-side {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  text-align: right;
+}
+
+.admin-ribbon-side span {
+  color: rgba(172, 208, 234, 0.62);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.admin-ribbon-side strong {
+  color: #f0f8ff;
+  font-size: 13px;
 }
 
 .ticker-label {
@@ -1572,18 +1648,43 @@ h1,
   display: none;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1280px) {
   .admin-shell-layout {
-    grid-template-columns: 250px minmax(0, 1fr);
+    grid-template-columns: 286px minmax(0, 1fr);
+  }
+
+  .admin-topbar,
+  .admin-content {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+}
+
+@media (max-width: 1120px) {
+  .admin-shell-layout {
+    grid-template-columns: 258px minmax(0, 1fr);
+  }
+
+  .admin-topbar {
+    align-items: stretch;
   }
 
   .admin-topbar-actions {
     flex-direction: column;
     align-items: stretch;
   }
+
+  .admin-user-chip {
+    min-width: 0;
+  }
+
+  .admin-ribbon-side {
+    justify-items: start;
+    text-align: left;
+  }
 }
 
-@media (max-width: 960px) {
+@media (max-width: 980px) {
   .desktop-only {
     display: none;
   }
@@ -1669,6 +1770,11 @@ h1,
   .ticker-action {
     width: 100%;
     min-height: 36px;
+  }
+
+  .admin-ribbon-side {
+    justify-items: start;
+    text-align: left;
   }
 
   .ghost,

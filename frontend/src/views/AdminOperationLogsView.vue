@@ -620,13 +620,8 @@ function logSignals(log: Record<string, any>) {
 }
 
 @media (max-width: 1080px) {
-  .toolbar-grid,
   .change-values {
     grid-template-columns: 1fr;
-  }
-
-  .focus-strip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .log-head {

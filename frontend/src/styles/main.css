@@ -395,17 +395,206 @@ a[href]:active {
   max-width: 100%;
 }
 
-@media (max-width: 768px) {
-  .mobile-scroll-row {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 10px;
-    overflow-x: auto;
-    padding-bottom: 4px;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
+.admin-shell-root .page,
+.admin-shell-root .dashboard {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 18px;
+}
+
+.admin-shell-root .page > *,
+.admin-shell-root .dashboard > * {
+  min-width: 0;
+}
+
+.admin-shell-root .page .head,
+.admin-shell-root .dashboard .head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.admin-shell-root .page .head > :first-child,
+.admin-shell-root .dashboard .head > :first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.admin-shell-root .page .head h2,
+.admin-shell-root .dashboard .head h2,
+.admin-shell-root .page .head h3,
+.admin-shell-root .dashboard .head h3 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-shell-root .page .desc,
+.admin-shell-root .dashboard .desc {
+  max-width: 760px;
+  line-height: 1.65;
+}
+
+.admin-shell-root .page .head-actions,
+.admin-shell-root .dashboard .head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.admin-shell-root .page .summary-grid,
+.admin-shell-root .dashboard .summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-shell-root .page .focus-strip,
+.admin-shell-root .dashboard .focus-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-shell-root .page .toolbar-grid,
+.admin-shell-root .dashboard .toolbar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-shell-root .page .admin-grid,
+.admin-shell-root .dashboard .admin-grid,
+.admin-shell-root .dashboard .admin-lower-grid,
+.admin-shell-root .dashboard .lower-grid {
+  min-width: 0;
+  gap: 14px;
+}
+
+.admin-shell-root .page .console-card,
+.admin-shell-root .page .filter-card,
+.admin-shell-root .page .table-card,
+.admin-shell-root .dashboard .panel,
+.admin-shell-root .dashboard .console-card {
+  gap: 14px;
+}
+
+.admin-shell-root .page .card-head,
+.admin-shell-root .dashboard .card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.admin-shell-root .page .card-head > :first-child,
+.admin-shell-root .dashboard .card-head > :first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.admin-shell-root .page .card-head h3,
+.admin-shell-root .dashboard .card-head h3,
+.admin-shell-root .page .card-head p,
+.admin-shell-root .dashboard .card-head p,
+.admin-shell-root .page .table-meta,
+.admin-shell-root .dashboard .table-meta {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-shell-root .page .bulk-bar,
+.admin-shell-root .dashboard .bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-shell-root .page .bulk-actions,
+.admin-shell-root .dashboard .bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-shell-root .page .el-table,
+.admin-shell-root .dashboard .el-table,
+.admin-shell-root .page .el-pagination,
+.admin-shell-root .dashboard .el-pagination,
+.admin-shell-root .page .log-list,
+.admin-shell-root .page .report-list,
+.admin-shell-root .page .change-list {
+  min-width: 0;
+}
+
+.admin-shell-root .interactive-spotlight:hover,
+.admin-shell-root .page .card:hover,
+.admin-shell-root .page .summary-grid article:hover,
+.admin-shell-root .dashboard .panel:hover,
+.admin-shell-root .dashboard .summary-grid article:hover {
+  transform: none;
+  box-shadow: 0 18px 34px rgba(15, 30, 39, 0.08) !important;
+}
+
+@media (max-width: 1180px) {
+  .admin-shell-root .page .summary-grid,
+  .admin-shell-root .dashboard .summary-grid,
+  .admin-shell-root .page .focus-strip,
+  .admin-shell-root .dashboard .focus-strip,
+  .admin-shell-root .page .toolbar-grid,
+  .admin-shell-root .dashboard .toolbar-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .admin-shell-root .page .head,
+  .admin-shell-root .dashboard .head,
+  .admin-shell-root .page .card-head,
+  .admin-shell-root .dashboard .card-head {
+    flex-direction: column;
+  }
+
+  .admin-shell-root .page .head-actions,
+  .admin-shell-root .dashboard .head-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-shell-root .page,
+  .admin-shell-root .dashboard {
+    gap: 14px;
+  }
+
+  .admin-shell-root .page .summary-grid,
+  .admin-shell-root .dashboard .summary-grid,
+  .admin-shell-root .page .focus-strip,
+  .admin-shell-root .dashboard .focus-strip,
+  .admin-shell-root .page .toolbar-grid,
+  .admin-shell-root .dashboard .toolbar-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-shell-root .page .head-actions,
+  .admin-shell-root .dashboard .head-actions,
+  .admin-shell-root .page .bulk-actions,
+  .admin-shell-root .dashboard .bulk-actions {
+    width: 100%;
+  }
+
+  .admin-shell-root .page .head-actions > *,
+  .admin-shell-root .dashboard .head-actions > *,
+  .admin-shell-root .page .bulk-actions > *,
+  .admin-shell-root .dashboard .bulk-actions > * {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
   .mobile-scroll-row::-webkit-scrollbar {
     display: none;
   }
