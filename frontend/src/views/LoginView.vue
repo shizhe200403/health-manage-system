@@ -30,11 +30,11 @@
         </template>
 
         <el-form-item label="密码">
-          <el-input v-model="form.password" type="password" show-password placeholder="请输入密码" />
+          <el-input v-model="form.password" type="password" show-password placeholder="请输入密码" @keyup.enter="submit" />
         </el-form-item>
 
         <el-form-item v-if="isRegisterMode" label="确认密码">
-          <el-input v-model="form.confirmPassword" type="password" show-password placeholder="请再次输入密码" />
+          <el-input v-model="form.confirmPassword" type="password" show-password placeholder="请再次输入密码" @keyup.enter="submit" />
           <div class="password-rules">
             <span :class="ruleClass(passwordRules.length)">✓ 至少 8 位</span>
             <span :class="ruleClass(passwordRules.hasLetter)">✓ 包含字母</span>
