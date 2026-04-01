@@ -210,10 +210,8 @@
           <el-button text @click="openDetail(recipe)">查看详情</el-button>
           <el-button type="primary" plain @click="addToRecord(recipe)">加入记录</el-button>
           <el-button text @click="openEditor(recipe)">编辑</el-button>
-          <el-button text @click="triggerCoverUpload(recipe)">上传封面</el-button>
           <el-button text type="danger" :loading="deletingId === recipe.id" @click="handleDelete(recipe)">删除</el-button>
         </div>
-        <input ref="coverInput" type="file" accept="image/*" style="display:none" @change="onCoverChange" />
       </article>
     </div>
     <PageStateBlock
@@ -239,8 +237,8 @@
         <div class="creator-section vision-section">
           <div class="section-head">
             <div>
-              <strong>AI 图片识别</strong>
-              <span>上传一张食物照片，系统会尝试识别菜品、主要食材和每份营养信息，并回填到下方表单。</span>
+              <strong>菜谱照片</strong>
+              <span>上传照片后会作为菜谱封面保存，也可以点击「AI 识别并填充」自动识别菜品信息。</span>
             </div>
             <div class="vision-actions">
               <input
@@ -454,8 +452,6 @@ const creatorVisible = ref(false);
 const creatingRecipe = ref(false);
 const editingRecipeId = ref<number | null>(null);
 const deletingId = ref<number | null>(null);
-const coverInput = ref<HTMLInputElement | null>(null);
-const coverUploadingRecipeId = ref<number | null>(null);
 const followUpFavoriting = ref(false);
 const latestSavedRecipe = ref<null | { id: number; title: string; meal_type?: string; source_type?: string; mode: "create" | "update" }>(null);
 const recipeFollowUpRef = ref<HTMLElement | null>(null);
@@ -1161,29 +1157,6 @@ async function runFoodImageAnalysis() {
   }
 }
 
-function triggerCoverUpload(recipe: Record<string, any>) {
-  coverUploadingRecipeId.value = Number(recipe.id);
-  coverInput.value?.click();
-}
-
-async function onCoverChange(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0];
-  const recipeId = coverUploadingRecipeId.value;
-  if (!file || !recipeId) return;
-  try {
-    const res = await uploadRecipeCover(recipeId, file);
-    recipes.value = recipes.value.map((r) =>
-      Number(r.id) === recipeId ? { ...r, cover_image_url: res.cover_image_url } : r
-    );
-    notifyActionSuccess("封面已更新");
-  } catch {
-    notifyActionError("上传封面");
-  } finally {
-    coverUploadingRecipeId.value = null;
-    if (coverInput.value) coverInput.value.value = "";
-  }
-}
-
 async function submitCreatorRecipe() {
   if (!creatorForm.title.trim()) {
     notifyWarning("请先填写菜谱名称");
@@ -1241,6 +1214,12 @@ async function submitCreatorRecipe() {
       const response = await updateRecipe(editingRecipeId.value, payload);
       const updated = response?.data ?? response;
       if (updated?.id) {
+        if (selectedFoodImage.value) {
+          try {
+            const coverRes = await uploadRecipeCover(Number(updated.id), selectedFoodImage.value);
+            updated.cover_image_url = coverRes.cover_image_url;
+          } catch { /* 封面上传失败不阻断主流程 */ }
+        }
         recipes.value = recipes.value.map((item) => Number(item.id) === Number(updated.id) ? updated : item);
         latestSavedRecipe.value = {
           id: Number(updated.id),
@@ -1258,6 +1237,12 @@ async function submitCreatorRecipe() {
       const response = await createRecipe(payload);
       const createdRecipe = response?.data ?? response;
       if (createdRecipe?.id) {
+        if (selectedFoodImage.value) {
+          try {
+            const coverRes = await uploadRecipeCover(Number(createdRecipe.id), selectedFoodImage.value);
+            createdRecipe.cover_image_url = coverRes.cover_image_url;
+          } catch { /* 封面上传失败不阻断主流程 */ }
+        }
         recipes.value = [createdRecipe, ...recipes.value.filter((item) => Number(item.id) !== Number(createdRecipe.id))];
         latestSavedRecipe.value = {
           id: Number(createdRecipe.id),
