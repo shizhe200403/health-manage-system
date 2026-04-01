@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.common.operation_logs import build_change_entries, create_admin_operation_log, snapshot_model_fields
 from .models import UserHealthCondition, UserProfile
 from .serializers import (
     AdminUserDetailSerializer,
@@ -25,6 +26,43 @@ from .serializers import (
 
 
 User = get_user_model()
+ACCOUNT_FIELD_LABELS = {
+    "username": "用户名",
+    "email": "邮箱",
+    "phone": "手机号",
+    "nickname": "昵称",
+    "signature": "签名",
+    "avatar_url": "头像",
+    "role": "角色",
+    "status": "账号状态",
+}
+PROFILE_FIELD_LABELS = {
+    "gender": "性别",
+    "birthday": "生日",
+    "height_cm": "身高",
+    "weight_kg": "体重",
+    "target_weight_kg": "目标体重",
+    "activity_level": "活动水平",
+    "occupation": "职业",
+    "budget_level": "预算水平",
+    "cooking_skill": "烹饪水平",
+    "meal_preference": "餐次偏好",
+    "diet_type": "饮食类型",
+    "is_outdoor_eating_frequent": "外食频率",
+    "household_size": "家庭人数",
+}
+HEALTH_FIELD_LABELS = {
+    "has_allergy": "是否过敏",
+    "allergy_tags": "过敏标签",
+    "avoid_food_tags": "忌口标签",
+    "religious_restriction": "宗教限制",
+    "has_hypertension": "高血压",
+    "has_diabetes": "糖尿病",
+    "has_hyperlipidemia": "高血脂",
+    "is_pregnant": "孕期",
+    "is_lactating": "哺乳期",
+    "notes": "备注",
+}
 
 
 class EnvelopeUserSerializer(serializers.Serializer):
@@ -270,20 +308,44 @@ class AdminUserDetailView(APIView):
     @extend_schema(request=AdminUserRequestSerializer, responses=AdminUserDetailEnvelopeSerializer)
     def patch(self, request, user_id):
         user = self.get_object(user_id)
+        account_fields = list((request.data.get("account") or {}).keys())
+        profile_fields = list((request.data.get("profile") or {}).keys())
+        health_fields = list((request.data.get("health_condition") or {}).keys())
+
+        before_account = snapshot_model_fields(user, account_fields)
 
         account_serializer = AdminUserUpdateSerializer(user, data=request.data.get("account", {}), partial=True)
         account_serializer.is_valid(raise_exception=True)
         user = account_serializer.save()
 
         profile, _ = UserProfile.objects.get_or_create(user=user)
+        before_profile = snapshot_model_fields(profile, profile_fields)
         profile_serializer = UserProfileSerializer(profile, data=request.data.get("profile", {}), partial=True)
         profile_serializer.is_valid(raise_exception=True)
         profile_serializer.save()
 
         health_condition, _ = UserHealthCondition.objects.get_or_create(user=user)
+        before_health = snapshot_model_fields(health_condition, health_fields)
         health_serializer = UserHealthConditionSerializer(health_condition, data=request.data.get("health_condition", {}), partial=True)
         health_serializer.is_valid(raise_exception=True)
         health_serializer.save()
+
+        changes = [
+            *build_change_entries(before_account, snapshot_model_fields(user, account_fields), ACCOUNT_FIELD_LABELS, section="账号信息"),
+            *build_change_entries(before_profile, snapshot_model_fields(profile, profile_fields), PROFILE_FIELD_LABELS, section="档案信息"),
+            *build_change_entries(before_health, snapshot_model_fields(health_condition, health_fields), HEALTH_FIELD_LABELS, section="健康约束"),
+        ]
+        create_admin_operation_log(
+            actor=request.user,
+            module="users",
+            action="update_user",
+            target_type="user",
+            target_id=user.id,
+            target_label=user.nickname or user.username,
+            summary=f"更新了用户 {user.nickname or user.username} 的账号资料与状态",
+            changes=changes,
+            metadata={"username": user.username},
+        )
 
         detail_serializer = AdminUserDetailSerializer(user)
         return Response({"code": 0, "message": "success", "data": detail_serializer.data}, status=status.HTTP_200_OK)

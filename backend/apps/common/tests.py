@@ -8,6 +8,7 @@ from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import UserHealthCondition, UserProfile
+from apps.common.models import AdminOperationLog
 from apps.community.models import ContentReport, Post, PostComment
 from apps.recipes.models import Ingredient, Recipe, RecipeNutritionSummary, RecipeStep, UserFavoriteRecipe
 from apps.reports.models import ReportTask
@@ -275,6 +276,78 @@ class ProductApiSmokeTests(APITestCase):
         self._login("alice")
 
         response = self.client.get("/api/v1/reports/admin/overview/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_actions_are_written_to_operation_logs(self):
+        admin_user = self._create_user(username="auditops", email="auditops@example.com", phone="13800000015")
+        admin_user.role = "admin"
+        admin_user.is_staff = True
+        admin_user.save(update_fields=["role", "is_staff"])
+
+        managed_user = self._create_user(username="dora", email="dora@example.com", phone="13800000016")
+        recipe = self._create_recipe_bundle(managed_user, title="Audit Recipe")
+        post = Post.objects.create(
+            user=managed_user,
+            title="Needs Review",
+            content="Waiting for moderation",
+            status="published",
+            audit_status="pending",
+        )
+        comment = PostComment.objects.create(post=post, user=managed_user, content="Unsafe note", status="visible")
+        report = ContentReport.objects.create(reporter=managed_user, target_type="post", target_id=post.id, reason="audit this")
+
+        self._login("auditops@example.com")
+
+        user_response = self.client.patch(
+            f"/api/v1/accounts/admin/users/{managed_user.id}/",
+            {"account": {"nickname": "Dora Updated", "status": "disabled"}},
+            format="json",
+        )
+        self.assertEqual(user_response.status_code, 200)
+
+        recipe_response = self.client.patch(
+            f"/api/v1/recipes/{recipe.id}/",
+            {"audit_status": "rejected", "status": "draft"},
+            format="json",
+        )
+        self.assertEqual(recipe_response.status_code, 200)
+
+        post_response = self.client.patch(
+            f"/api/v1/community/admin/posts/{post.id}/",
+            {"audit_status": "approved", "title": "Reviewed Needs Review"},
+            format="json",
+        )
+        self.assertEqual(post_response.status_code, 200)
+
+        comment_response = self.client.delete(f"/api/v1/comments/{comment.id}/")
+        self.assertEqual(comment_response.status_code, 200)
+
+        report_response = self.client.patch(
+            f"/api/v1/community/admin/reports/{report.id}/",
+            {"status": "processed"},
+            format="json",
+        )
+        self.assertEqual(report_response.status_code, 200)
+
+        logs_response = self.client.get("/api/v1/admin/operation-logs/?page_size=10")
+        self.assertEqual(logs_response.status_code, 200)
+        items = logs_response.data["data"]["items"]
+        self.assertGreaterEqual(len(items), 5)
+        summaries = [item["summary"] for item in items]
+        modules = {item["module"] for item in items}
+        self.assertIn("users", modules)
+        self.assertIn("recipes", modules)
+        self.assertIn("community", modules)
+        self.assertTrue(any("Dora Updated" in summary or "dora" in summary for summary in summaries))
+        self.assertTrue(any("Audit Recipe" in summary for summary in summaries))
+        self.assertTrue(any("举报" in summary for summary in summaries))
+        self.assertGreaterEqual(AdminOperationLog.objects.count(), 5)
+
+    def test_regular_user_cannot_access_operation_logs(self):
+        self._create_user()
+        self._login("alice")
+
+        response = self.client.get("/api/v1/admin/operation-logs/")
         self.assertEqual(response.status_code, 403)
 
     def test_recipe_recommendation_and_favorite_flow(self):

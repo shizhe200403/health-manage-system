@@ -4,6 +4,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.common.operation_logs import build_change_entries, create_admin_operation_log, is_admin_operator, snapshot_model_fields
 from apps.common.views import EnvelopeModelViewSet
 from .bootstrap import ensure_builtin_recipes
 from .models import Ingredient, Recipe, UserFavoriteRecipe
@@ -23,7 +24,7 @@ class CanManageContent(permissions.BasePermission):
             return True
         if not request.user or not request.user.is_authenticated:
             return False
-        if getattr(request.user, "role", "") in {"admin", "auditor"}:
+        if is_admin_operator(request.user):
             return True
         return getattr(obj, "created_by_id", None) == request.user.id
 
@@ -40,7 +41,7 @@ class IngredientViewSet(EnvelopeModelViewSet):
             return [permission() for permission in self.permission_classes]
         if self.request.method in permissions.SAFE_METHODS:
             return [permission() for permission in self.permission_classes]
-        if getattr(self.request.user, "role", "") not in {"admin", "auditor"}:
+        if not is_admin_operator(self.request.user):
             raise PermissionDenied("只有管理员或审核员可以维护食材库")
         return [permission() for permission in self.permission_classes]
 
@@ -61,7 +62,7 @@ class RecipeViewSet(EnvelopeModelViewSet):
         queryset = super().get_queryset().exclude(status="archived")
         user = self.request.user
 
-        if user.is_authenticated and getattr(user, "role", "") in {"admin", "auditor"}:
+        if is_admin_operator(user):
             return queryset
 
         public_filter = Q(status="published", audit_status="approved")
@@ -81,7 +82,41 @@ class RecipeViewSet(EnvelopeModelViewSet):
     def perform_update(self, serializer):
         instance = serializer.instance
         self.check_object_permissions(self.request, instance)
+        fields = list(serializer.validated_data.keys())
+        before = snapshot_model_fields(instance, fields)
         serializer.save()
+        if is_admin_operator(self.request.user):
+            create_admin_operation_log(
+                actor=self.request.user,
+                module="recipes",
+                action="update_recipe",
+                target_type="recipe",
+                target_id=instance.id,
+                target_label=instance.title,
+                summary=f"更新了菜谱《{instance.title}》的内容与审核状态",
+                changes=build_change_entries(
+                    before,
+                    snapshot_model_fields(instance, fields),
+                    {
+                        "title": "菜谱标题",
+                        "description": "菜谱描述",
+                        "portion_size": "分量说明",
+                        "servings": "份数",
+                        "difficulty": "难度",
+                        "cook_time_minutes": "烹饪时长",
+                        "prep_time_minutes": "准备时长",
+                        "meal_type": "餐次",
+                        "taste_tags": "口味标签",
+                        "cuisine_tags": "菜系标签",
+                        "status": "发布状态",
+                        "source_type": "来源类型",
+                        "source_name": "来源名称",
+                        "audit_status": "审核结论",
+                    },
+                    section="菜谱处理",
+                ),
+                metadata={"created_by_id": instance.created_by_id},
+            )
 
     @action(detail=True, methods=["get"])
     def nutrition(self, request, pk=None):
@@ -119,6 +154,19 @@ class RecipeViewSet(EnvelopeModelViewSet):
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         self.check_object_permissions(request, instance)
+        before = snapshot_model_fields(instance, ["status"])
         instance.status = "archived"
         instance.save(update_fields=["status", "updated_at"])
+        if is_admin_operator(request.user):
+            create_admin_operation_log(
+                actor=request.user,
+                module="recipes",
+                action="archive_recipe",
+                target_type="recipe",
+                target_id=instance.id,
+                target_label=instance.title,
+                summary=f"归档了菜谱《{instance.title}》",
+                changes=build_change_entries(before, snapshot_model_fields(instance, ["status"]), {"status": "发布状态"}, section="菜谱处理"),
+                metadata={"created_by_id": instance.created_by_id},
+            )
         return Response({"code": 0, "message": "success", "data": {"archived": True}}, status=status.HTTP_200_OK)

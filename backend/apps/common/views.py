@@ -1,7 +1,13 @@
-from drf_spectacular.utils import extend_schema
+from django.db.models import Q
+from django.utils import timezone
+from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import serializers, status, viewsets
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from .models import AdminOperationLog
+from .operation_logs import IsAdminOperatorPermission
 
 
 class HealthCheckDataSerializer(serializers.Serializer):
@@ -21,6 +27,133 @@ class HealthCheckView(APIView):
     @extend_schema(responses=HealthCheckResponseSerializer)
     def get(self, request):
         return Response({"code": 0, "message": "success", "data": {"status": "ok"}})
+
+
+class AdminOperationLogActorSerializer(serializers.Serializer):
+    id = serializers.IntegerField(allow_null=True)
+    username = serializers.CharField(allow_blank=True)
+    nickname = serializers.CharField(allow_blank=True)
+    display_name = serializers.CharField(allow_blank=True)
+
+
+class AdminOperationLogSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    module = serializers.CharField()
+    action = serializers.CharField()
+    target_type = serializers.CharField(allow_blank=True)
+    target_id = serializers.IntegerField(allow_null=True)
+    target_label = serializers.CharField(allow_blank=True)
+    summary = serializers.CharField()
+    changes = serializers.JSONField()
+    metadata = serializers.JSONField()
+    created_at = serializers.DateTimeField()
+    actor = AdminOperationLogActorSerializer()
+
+
+class AdminOperationLogSummarySerializer(serializers.Serializer):
+    total = serializers.IntegerField()
+    today_total = serializers.IntegerField()
+    unique_operators = serializers.IntegerField()
+    user_actions = serializers.IntegerField()
+    recipe_actions = serializers.IntegerField()
+    community_actions = serializers.IntegerField()
+    report_actions = serializers.IntegerField()
+
+
+class AdminOperationLogEnvelopeSerializer(serializers.Serializer):
+    code = serializers.IntegerField()
+    message = serializers.CharField()
+    data = inline_serializer(
+        name="AdminOperationLogListData",
+        fields={
+            "count": serializers.IntegerField(),
+            "next": serializers.CharField(allow_null=True),
+            "previous": serializers.CharField(allow_null=True),
+            "summary": AdminOperationLogSummarySerializer(),
+            "items": AdminOperationLogSerializer(many=True),
+        },
+    )
+
+
+class AdminOperationLogPagination(PageNumberPagination):
+    page_size = 15
+    page_size_query_param = "page_size"
+    max_page_size = 50
+
+    def get_paginated_response(self, data):
+        return Response(
+            {
+                "code": 0,
+                "message": "success",
+                "data": {
+                    "count": self.page.paginator.count,
+                    "next": self.get_next_link(),
+                    "previous": self.get_previous_link(),
+                    "summary": getattr(self, "summary", {}),
+                    "items": data,
+                },
+            }
+        )
+
+
+class AdminOperationLogListView(APIView):
+    permission_classes = [IsAdminOperatorPermission]
+    pagination_class = AdminOperationLogPagination
+
+    @extend_schema(responses=AdminOperationLogEnvelopeSerializer)
+    def get(self, request):
+        queryset = AdminOperationLog.objects.select_related("actor").order_by("-created_at", "-id")
+
+        module = request.query_params.get("module", "").strip()
+        keyword = request.query_params.get("keyword", "").strip()
+        actor = request.query_params.get("actor", "").strip()
+
+        if module:
+            queryset = queryset.filter(module=module)
+        if keyword:
+            queryset = queryset.filter(Q(summary__icontains=keyword) | Q(target_label__icontains=keyword))
+        if actor:
+            queryset = queryset.filter(
+                Q(actor__username__icontains=actor)
+                | Q(actor__nickname__icontains=actor)
+            )
+
+        today = timezone.localdate()
+        summary = {
+            "total": queryset.count(),
+            "today_total": queryset.filter(created_at__date=today).count(),
+            "unique_operators": queryset.exclude(actor=None).values("actor_id").distinct().count(),
+            "user_actions": queryset.filter(module="users").count(),
+            "recipe_actions": queryset.filter(module="recipes").count(),
+            "community_actions": queryset.filter(module="community").count(),
+            "report_actions": queryset.filter(module="reports").count(),
+        }
+
+        paginator = self.pagination_class()
+        paginator.summary = summary
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        items = [
+            {
+                "id": log.id,
+                "module": log.module,
+                "action": log.action,
+                "target_type": log.target_type,
+                "target_id": log.target_id,
+                "target_label": log.target_label,
+                "summary": log.summary,
+                "changes": log.changes,
+                "metadata": log.metadata,
+                "created_at": log.created_at,
+                "actor": {
+                    "id": log.actor_id,
+                    "username": log.actor.username if log.actor else "",
+                    "nickname": log.actor.nickname if log.actor else "",
+                    "display_name": (log.actor.nickname or log.actor.username) if log.actor else "",
+                },
+            }
+            for log in page
+        ]
+        return paginator.get_paginated_response(items)
 
 
 class EnvelopeModelViewSet(viewsets.ModelViewSet):

@@ -7,6 +7,7 @@
         <p class="desc">先看今天最值得处理的管理动作，再进入具体模块，避免后台也变成信息堆叠页。</p>
       </div>
       <div class="head-actions">
+        <RouterLink class="ghost-link" to="/ops/logs">进入操作日志</RouterLink>
         <RouterLink class="ghost-link" to="/ops/reports">进入运营复核</RouterLink>
         <RouterLink class="ghost-link" to="/ops/community">进入社区审核</RouterLink>
         <RouterLink class="ghost-link" to="/ops/recipes">进入菜谱管理</RouterLink>
@@ -120,6 +121,10 @@
             <RouterLink class="action-link action-link-primary" to="/ops/users">
               <strong>用户管理</strong>
               <span>查看账号状态、角色边界、资料完整度与健康约束。</span>
+            </RouterLink>
+            <RouterLink class="action-link" to="/ops/logs">
+              <strong>操作日志</strong>
+              <span>回看后台最近是谁改了什么，避免处理结果脱离过程。</span>
             </RouterLink>
             <RouterLink class="action-link" to="/ops/reports">
               <strong>运营复核</strong>
@@ -258,6 +263,14 @@ const moduleCards = computed(() => [
   },
   {
     state: "已成型",
+    title: "操作日志",
+    copy: "管理员处理用户、菜谱和社区内容的动作已经能沉淀下来，方便回看是谁改了什么。",
+    cta: "进入模块",
+    to: "/ops/logs",
+    tone: "ready",
+  },
+  {
+    state: "已成型",
     title: "运营复核",
     copy: "管理员已经能从后台看整体活跃、内容处理节奏和报表任务状态，不用再借道前台报表。",
     cta: "进入模块",
@@ -282,10 +295,10 @@ const moduleCards = computed(() => [
   },
   {
     state: "下一步",
-    title: "操作日志",
-    copy: "再下一轮更适合把管理员的处理动作也沉淀成后台日志，方便回看是谁改了什么。",
-    cta: "先回后台总览",
-    to: "/ops",
+    title: "处理回放",
+    copy: "下一轮更适合继续把日志做成按对象聚合的处理回放，而不只是时间流列表。",
+    cta: "先看操作日志",
+    to: "/ops/logs",
     tone: "next",
   },
 ]);

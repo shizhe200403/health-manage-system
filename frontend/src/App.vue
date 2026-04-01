@@ -336,6 +336,7 @@ const navItems = [
 
 const adminNavItems = [
   { to: "/ops", label: "后台总览", icon: "览", copy: "先看今天的值守主线和后台建议" },
+  { to: "/ops/logs", label: "操作日志", icon: "迹", copy: "回看是谁改了什么、改完是否把后台主线拉稳" },
   { to: "/ops/reports", label: "运营复核", icon: "报", copy: "集中看后台运营指标、报表任务和记录覆盖情况" },
   { to: "/ops/community", label: "社区审核", icon: "社", copy: "集中处理帖子审核、举报和评论隐藏" },
   { to: "/ops/recipes", label: "菜谱管理", icon: "谱", copy: "集中处理菜谱状态、审核结论和内容质量" },
@@ -356,6 +357,7 @@ const frontRouteMoments = [
 ];
 const adminRouteMoments = [
   { path: "/ops", label: "后台总览", badge: "Ops Overview", title: "先把后台今天最该处理的动作排清楚", copy: "后台先定优先级，再进入具体模块，避免一开始就散到每个角落。", hint: "先定优先级，再展开处理", cta: "去用户管理", to: "/ops/users" },
+  { path: "/ops/logs", label: "操作日志", badge: "Action Trail", title: "先把最近到底改了什么看清楚", copy: "操作日志不是为了堆记录，而是为了让后台动作可回看、可追责、可复盘。", hint: "先看动作轨迹，再判断问题出在哪一步", cta: "回后台总览", to: "/ops" },
   { path: "/ops/reports", label: "运营复核", badge: "Operations Review", title: "先把运营指标和报表任务看清楚", copy: "这页更适合管理员看整体活跃度、内容处理节奏和报表任务是否健康，而不是站在单个用户视角复盘。", hint: "先看指标，再判断要补数据、补内容还是补处理节奏", cta: "回后台总览", to: "/ops" },
   { path: "/ops/community", label: "社区审核", badge: "Community Moderation", title: "先把帖子审核和举报处理收紧", copy: "社区后台先看待审核内容、待处理举报和评论隐藏动作，别让风险内容继续外露。", hint: "优先看待审核帖子和待处理举报", cta: "回后台总览", to: "/ops" },
   { path: "/ops/recipes", label: "菜谱管理", badge: "Recipe Operations", title: "先把菜谱状态和审核结论收紧", copy: "菜谱管理先盯状态、审核和信息质量，别让无效内容混进用户决策链路。", hint: "优先看待审核和信息不完整的菜谱", cta: "回后台总览", to: "/ops" },
@@ -388,6 +390,8 @@ const adminTickerMessages = computed(() => [
     : "先确认管理员权限，再开始处理后台事项。",
   route.path === "/ops/users"
     ? "用户管理里先看账号状态、角色边界和资料完整度，再处理个别字段。"
+    : route.path === "/ops/logs"
+      ? "操作日志里先看最近动作轨迹和字段前后变化，再判断是误改、漏改还是流程本身有问题。"
     : route.path === "/ops/reports"
       ? "运营复核里先看整体活跃、内容处理节奏和报表任务状态，再决定下一步补哪里。"
     : route.path === "/ops/community"

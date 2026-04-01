@@ -22,6 +22,7 @@ const router = createRouter({
     { path: "/assistant", component: () => import("../views/AssistantView.vue") },
     { path: "/ops", component: () => import("../views/AdminDashboardView.vue"), meta: { requiresAdmin: true } },
     { path: "/ops/community", component: () => import("../views/AdminCommunityView.vue"), meta: { requiresAdmin: true } },
+    { path: "/ops/logs", component: () => import("../views/AdminOperationLogsView.vue"), meta: { requiresAdmin: true } },
     { path: "/ops/reports", component: () => import("../views/AdminOpsReportsView.vue"), meta: { requiresAdmin: true } },
     { path: "/ops/recipes", component: () => import("../views/AdminRecipesView.vue"), meta: { requiresAdmin: true } },
     { path: "/ops/users", component: () => import("../views/AdminUsersView.vue"), meta: { requiresAdmin: true } },

@@ -9,6 +9,13 @@ from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.views import APIView
 
+from apps.common.operation_logs import (
+    IsAdminOperatorPermission,
+    build_change_entries,
+    create_admin_operation_log,
+    is_admin_operator,
+    snapshot_model_fields,
+)
 from apps.common.views import EnvelopeModelViewSet
 from .models import ContentReport, Post, PostComment
 from .serializers import (
@@ -42,13 +49,13 @@ class PostViewSet(EnvelopeModelViewSet):
 
     def perform_update(self, serializer):
         post = serializer.instance
-        if post.user_id != self.request.user.id and getattr(self.request.user, "role", "") not in {"admin", "auditor"}:
+        if post.user_id != self.request.user.id and not is_admin_operator(self.request.user):
             raise PermissionDenied("只有作者或管理员可以编辑帖子")
         serializer.save()
 
     def destroy(self, request, *args, **kwargs):
         post = self.get_object()
-        if post.user_id != request.user.id and getattr(request.user, "role", "") not in {"admin", "auditor"}:
+        if post.user_id != request.user.id and not is_admin_operator(request.user):
             return Response({"code": 403, "message": "forbidden", "data": None}, status=403)
         post.status = "archived"
         post.save(update_fields=["status", "updated_at"])
@@ -87,13 +94,25 @@ class CommentModerationViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def destroy(self, request, pk=None):
-        if getattr(request.user, "role", "") not in {"admin", "auditor"}:
+        if not is_admin_operator(request.user):
             return Response({"code": 403, "message": "forbidden", "data": None}, status=403)
         comment = PostComment.objects.filter(id=pk).first()
         if comment is None:
             return Response({"code": 404, "message": "not found", "data": None}, status=404)
+        before_status = snapshot_model_fields(comment, ["status"])
         comment.status = "hidden"
         comment.save(update_fields=["status", "updated_at"])
+        create_admin_operation_log(
+            actor=request.user,
+            module="community",
+            action="hide_comment",
+            target_type="comment",
+            target_id=comment.id,
+            target_label=f"评论 #{comment.id}",
+            summary=f"隐藏了帖子《{comment.post.title}》下的一条评论",
+            changes=build_change_entries(before_status, snapshot_model_fields(comment, ["status"]), {"status": "评论状态"}, section="评论处理"),
+            metadata={"post_id": comment.post_id, "post_title": comment.post.title},
+        )
         return Response({"code": 0, "message": "success", "data": {"hidden": True}})
 
 
@@ -113,8 +132,7 @@ class ContentReportViewSet(EnvelopeModelViewSet):
 
 class IsAdminModerator(permissions.BasePermission):
     def has_permission(self, request, view):
-        user = request.user
-        return bool(user and user.is_authenticated and (user.is_superuser or user.is_staff or getattr(user, "role", "") in {"admin", "auditor"}))
+        return IsAdminOperatorPermission().has_permission(request, view)
 
 
 class AdminPostPagination(PageNumberPagination):
@@ -227,9 +245,33 @@ class AdminCommunityPostDetailView(APIView):
     @extend_schema(request=AdminPostUpdateSerializer, responses=AdminPostDetailEnvelopeSerializer)
     def patch(self, request, post_id):
         post = self.get_object(post_id)
+        fields = list(request.data.keys())
+        before = snapshot_model_fields(post, fields)
         serializer = AdminPostUpdateSerializer(post, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        create_admin_operation_log(
+            actor=request.user,
+            module="community",
+            action="moderate_post",
+            target_type="post",
+            target_id=post.id,
+            target_label=post.title,
+            summary=f"更新了帖子《{post.title}》的审核与发布状态",
+            changes=build_change_entries(
+                before,
+                snapshot_model_fields(post, fields),
+                {
+                    "title": "帖子标题",
+                    "content": "帖子正文",
+                    "cover_image_url": "封面图",
+                    "status": "帖子状态",
+                    "audit_status": "审核结论",
+                },
+                section="帖子处理",
+            ),
+            metadata={"author_id": post.user_id},
+        )
         detail = AdminPostDetailSerializer(post)
         return Response({"code": 0, "message": "success", "data": detail.data}, status=status.HTTP_200_OK)
 
@@ -278,11 +320,32 @@ class AdminContentReportDetailView(APIView):
     @extend_schema(request=AdminContentReportUpdateSerializer, responses=AdminContentReportDetailEnvelopeSerializer)
     def patch(self, request, report_id):
         report = self.get_object(report_id)
+        before = snapshot_model_fields(report, ["status", "processed_by_id", "processed_at"])
         serializer = AdminContentReportUpdateSerializer(report, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         report = serializer.save(
             processed_by=request.user if serializer.validated_data.get("status") in {"processed", "rejected"} else None,
             processed_at=timezone.now() if serializer.validated_data.get("status") in {"processed", "rejected"} else None,
+        )
+        create_admin_operation_log(
+            actor=request.user,
+            module="community",
+            action="review_report",
+            target_type="content_report",
+            target_id=report.id,
+            target_label=f"举报 #{report.id}",
+            summary=f"更新了举报 #{report.id} 的处理结论",
+            changes=build_change_entries(
+                before,
+                snapshot_model_fields(report, ["status", "processed_by_id", "processed_at"]),
+                {
+                    "status": "举报状态",
+                    "processed_by_id": "处理人",
+                    "processed_at": "处理时间",
+                },
+                section="举报处理",
+            ),
+            metadata={"target_type": report.target_type, "target_id": report.target_id},
         )
         detail = AdminContentReportDetailSerializer(report)
         return Response({"code": 0, "message": "success", "data": detail.data}, status=status.HTTP_200_OK)
