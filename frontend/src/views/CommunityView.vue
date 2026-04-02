@@ -124,9 +124,6 @@
 
     <div class="list">
       <article v-for="post in visiblePosts" :key="post.id" class="post-card">
-        <div v-if="post.cover_image_url" class="post-cover">
-          <img :src="post.cover_image_url" :alt="post.title" loading="lazy" />
-        </div>
         <div class="row">
           <div class="user-avatar-sm">
             <img v-if="post.user_info?.avatar_url" :src="post.user_info.avatar_url" alt="" />
@@ -152,7 +149,18 @@
           </div>
         </div>
 
-        <p class="content">{{ post.content }}</p>
+        <div class="post-content-row" :class="{ 'has-cover': post.cover_image_url }">
+          <p class="content">{{ post.content }}</p>
+          <button
+            v-if="post.cover_image_url"
+            type="button"
+            class="post-inline-cover"
+            @click="lightboxUrl = post.cover_image_url"
+          >
+            <img :src="post.cover_image_url" :alt="post.title" loading="lazy" />
+            <span>查看大图</span>
+          </button>
+        </div>
 
         <div v-if="post.linked_recipe_info" class="linked-recipe-card">
           <div class="linked-recipe-header">
@@ -760,6 +768,17 @@ h2 {
   white-space: pre-wrap;
 }
 
+.post-content-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.post-content-row.has-cover {
+  grid-template-columns: minmax(0, 1fr) 136px;
+}
+
 .status-pill,
 .audit-pill {
   display: inline-flex;
@@ -848,22 +867,36 @@ h2 {
   gap: 8px;
 }
 
-.post-cover {
-  margin: -24px -24px 16px;
-  border-radius: 20px 20px 0 0;
-  overflow: hidden;
-  background: #f0f5f8;
-  max-height: 420px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.post-inline-cover {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: #476072;
 }
 
-.post-cover img {
-  width: 100%;
-  max-height: 420px;
-  object-fit: contain;
+.post-inline-cover img {
+  width: 136px;
+  height: 136px;
+  object-fit: cover;
   display: block;
+  border-radius: 18px;
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  box-shadow: 0 14px 28px rgba(15, 30, 39, 0.08);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.post-inline-cover span {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1f4f67;
+}
+
+.post-inline-cover:hover img {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 32px rgba(15, 30, 39, 0.12);
 }
 
 .cover-upload-row {
@@ -1121,6 +1154,15 @@ h2 {
   .summary-grid,
   .overview-grid {
     grid-template-columns: 1fr;
+  }
+
+  .post-content-row.has-cover {
+    grid-template-columns: 1fr;
+  }
+
+  .post-inline-cover img {
+    width: min(180px, 100%);
+    height: 120px;
   }
 
   .head,
