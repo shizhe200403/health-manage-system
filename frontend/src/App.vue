@@ -247,12 +247,15 @@
         <component :is="Component" :key="currentRoute.path" />
       </Transition>
     </RouterView>
+
+    <GlobalAssistantFloat v-if="showChrome && auth.isAuthenticated" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import GlobalAssistantFloat from "./components/GlobalAssistantFloat.vue";
 import { listHealthGoals } from "./api/goals";
 import { listMealRecords } from "./api/tracking";
 import { useAuthStore } from "./stores/auth";
