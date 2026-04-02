@@ -57,3 +57,8 @@ export async function uploadCommentImage(commentId: number, file: File) {
   });
   return data;
 }
+
+export async function likeComment(commentId: number) {
+  const { data } = await http.post(`/comments/${commentId}/like/`);
+  return data;
+}

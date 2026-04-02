@@ -103,3 +103,14 @@ class PostLike(TimeStampedModel):
             models.UniqueConstraint(fields=["user", "post"], name="uq_post_like"),
         ]
 
+
+class CommentLike(TimeStampedModel):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="comment_likes")
+    comment = models.ForeignKey(PostComment, on_delete=models.CASCADE, related_name="likes")
+
+    class Meta:
+        db_table = "comment_like"
+        constraints = [
+            models.UniqueConstraint(fields=["user", "comment"], name="uq_comment_like"),
+        ]
+

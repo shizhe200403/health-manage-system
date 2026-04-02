@@ -18,7 +18,7 @@ from apps.common.operation_logs import (
     snapshot_model_fields,
 )
 from apps.common.views import EnvelopeModelViewSet
-from .models import ContentReport, Post, PostComment, PostLike
+from .models import ContentReport, Post, PostComment, PostLike, CommentLike
 from .serializers import (
     AdminContentReportDetailSerializer,
     AdminContentReportListSerializer,
@@ -222,8 +222,12 @@ class PostViewSet(EnvelopeModelViewSet):
         if getattr(self, "swagger_fake_view", False) or not self.request.user.is_authenticated:
             return Post.objects.none()
         user = self.request.user
-        return Post.objects.select_related("user", "linked_recipe").prefetch_related(
-            "comments", "comments__user", "likes"
+        return Post.objects.select_related(
+            "user", "linked_recipe"
+        ).prefetch_related(
+            "comments", "comments__user", "comments__likes",
+            "likes",
+            "linked_recipe__steps", "linked_recipe__recipe_ingredients", "linked_recipe__recipe_ingredients__ingredient",
         ).filter(
             models.Q(status="published") | models.Q(user=user)
         )
@@ -291,6 +295,18 @@ class PostViewSet(EnvelopeModelViewSet):
             like_obj.delete()
             return Response({"code": 0, "message": "success", "data": {"liked": False, "like_count": post.likes.count()}})
         return Response({"code": 0, "message": "success", "data": {"liked": True, "like_count": post.likes.count()}}, status=status.HTTP_201_CREATED)
+
+
+class CommentLikeView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, comment_id):
+        comment = get_object_or_404(PostComment, id=comment_id)
+        like_obj, created = CommentLike.objects.get_or_create(user=request.user, comment=comment)
+        if not created:
+            like_obj.delete()
+            return Response({"code": 0, "message": "success", "data": {"liked": False, "like_count": comment.likes.count()}})
+        return Response({"code": 0, "message": "success", "data": {"liked": True, "like_count": comment.likes.count()}}, status=status.HTTP_201_CREATED)
 
 
 @extend_schema_view(

@@ -155,11 +155,39 @@
         <p class="content">{{ post.content }}</p>
 
         <div v-if="post.linked_recipe_info" class="linked-recipe-card">
-          <img v-if="post.linked_recipe_info.cover_image_url" :src="post.linked_recipe_info.cover_image_url" class="linked-recipe-thumb" />
-          <div class="linked-recipe-meta">
-            <strong>{{ post.linked_recipe_info.title }}</strong>
-            <p class="linked-recipe-sub">{{ mealTypeLabel(post.linked_recipe_info.meal_type) }}{{ post.linked_recipe_info.cook_time_minutes ? ` · ${post.linked_recipe_info.cook_time_minutes} 分钟` : '' }}</p>
-            <p v-if="post.linked_recipe_info.description" class="linked-recipe-desc">{{ post.linked_recipe_info.description }}</p>
+          <div class="linked-recipe-header">
+            <img v-if="post.linked_recipe_info.cover_image_url" :src="post.linked_recipe_info.cover_image_url" class="linked-recipe-thumb" @click="lightboxUrl = post.linked_recipe_info.cover_image_url" />
+            <div class="linked-recipe-meta">
+              <strong>{{ post.linked_recipe_info.title }}</strong>
+              <div class="linked-recipe-tags">
+                <span v-if="post.linked_recipe_info.meal_type" class="recipe-tag">{{ mealTypeLabel(post.linked_recipe_info.meal_type) }}</span>
+                <span v-if="post.linked_recipe_info.difficulty" class="recipe-tag">{{ difficultyLabel(post.linked_recipe_info.difficulty) }}</span>
+                <span v-if="post.linked_recipe_info.prep_time_minutes" class="recipe-tag">备料 {{ post.linked_recipe_info.prep_time_minutes }} 分钟</span>
+                <span v-if="post.linked_recipe_info.cook_time_minutes" class="recipe-tag">烹饪 {{ post.linked_recipe_info.cook_time_minutes }} 分钟</span>
+                <span v-if="post.linked_recipe_info.servings" class="recipe-tag">{{ post.linked_recipe_info.servings }} 人份</span>
+              </div>
+              <div v-if="post.linked_recipe_info.taste_tags?.length || post.linked_recipe_info.cuisine_tags?.length" class="linked-recipe-flavor-tags">
+                <span v-for="tag in [...(post.linked_recipe_info.taste_tags||[]), ...(post.linked_recipe_info.cuisine_tags||[])]" :key="tag" class="flavor-tag">{{ tag }}</span>
+              </div>
+              <p v-if="post.linked_recipe_info.description" class="linked-recipe-desc">{{ post.linked_recipe_info.description }}</p>
+            </div>
+          </div>
+          <div v-if="post.linked_recipe_info.ingredients?.length" class="linked-recipe-section">
+            <p class="linked-recipe-section-title">食材</p>
+            <div class="ingredient-list">
+              <span v-for="ing in post.linked_recipe_info.ingredients" :key="ing.name" class="ingredient-chip" :class="{ 'is-main': ing.is_main }">
+                {{ ing.name }} {{ ing.amount }}{{ ing.unit }}
+              </span>
+            </div>
+          </div>
+          <div v-if="post.linked_recipe_info.steps?.length" class="linked-recipe-section">
+            <p class="linked-recipe-section-title">做法步骤</p>
+            <ol class="step-list">
+              <li v-for="step in post.linked_recipe_info.steps" :key="step.step_no" class="step-item">
+                <span class="step-text">{{ step.content }}</span>
+                <img v-if="step.step_image_url" :src="step.step_image_url" class="step-img" @click="lightboxUrl = step.step_image_url" />
+              </li>
+            </ol>
           </div>
         </div>
 
@@ -171,12 +199,12 @@
             @click="toggleLike(post)"
           >
             <span class="like-heart">{{ post.is_liked_by_me ? '❤️' : '🤍' }}</span>
-            <span class="like-count">{{ post.like_count || 0 }}</span>
+            <span class="like-count">{{ post.like_count ?? 0 }}</span>
           </el-button>
           <el-input v-model.trim="commentDrafts[post.id]" placeholder="写评论" />
           <input
             :id="`comment-img-input-${post.id}`"
-            type="file" accept="image/*" style="display:none"
+            type="file" accept="image/*,image/gif" style="display:none"
             @change="onCommentImageSelected(post.id, $event)"
           />
           <el-button plain @click="triggerCommentImageInput(post.id)">{{ commentImageFiles[post.id] ? '已选图' : '附图' }}</el-button>
@@ -195,10 +223,21 @@
                 <strong>{{ comment.user_info?.display_name || "用户" }}</strong>
               </div>
               <span>{{ formatDateTime(comment.created_at) }}</span>
-              <el-button v-if="isMyComment(comment)" text type="danger" size="small" :loading="deletingCommentId === comment.id" @click="removeComment(comment.id)">删除</el-button>
+              <div class="comment-actions">
+                <el-button
+                  text
+                  size="small"
+                  :loading="likingCommentId === comment.id"
+                  :class="['comment-like-btn', { 'is-liked': comment.is_liked_by_me }]"
+                  @click="toggleCommentLike(post, comment)"
+                >
+                  {{ comment.is_liked_by_me ? '❤️' : '🤍' }} {{ comment.like_count ?? 0 }}
+                </el-button>
+                <el-button v-if="isMyComment(comment)" text type="danger" size="small" :loading="deletingCommentId === comment.id" @click="removeComment(comment.id)">删除</el-button>
+              </div>
             </div>
             <p>{{ comment.content }}</p>
-            <img v-if="comment.image_url" :src="comment.image_url" class="comment-img" />
+            <img v-if="comment.image_url" :src="comment.image_url" class="comment-img" @click="lightboxUrl = comment.image_url" />
           </div>
         </div>
       </article>
@@ -213,6 +252,14 @@
       />
     </div>
     </RefreshFrame>
+
+    <!-- Lightbox -->
+    <Teleport to="body">
+      <div v-if="lightboxUrl" class="lightbox" @click="lightboxUrl = ''">
+        <img :src="lightboxUrl" class="lightbox-img" @click.stop />
+        <button class="lightbox-close" @click="lightboxUrl = ''">✕</button>
+      </div>
+    </Teleport>
   </section>
 </template>
 
@@ -223,7 +270,7 @@ import CollectionSkeleton from "../components/CollectionSkeleton.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import { ElMessageBox, notifyActionError, notifyActionSuccess, notifyLoadError, notifyWarning } from "../lib/feedback";
-import { createComment, createPost, deleteComment, deletePost, likePost, listPosts, reportPost, updatePost, uploadCommentImage, uploadPostCover } from "../api/community";
+import { createComment, createPost, deleteComment, deletePost, likeComment, likePost, listPosts, reportPost, updatePost, uploadCommentImage, uploadPostCover } from "../api/community";
 import { listRecipes } from "../api/recipes";
 import { trackEvent } from "../api/behavior";
 import { useAuthStore } from "../stores/auth";
@@ -241,6 +288,8 @@ const deletingPostId = ref<number | null>(null);
 const deletingCommentId = ref<number | null>(null);
 const commentSubmittingId = ref<number | null>(null);
 const likingPostId = ref<number | null>(null);
+const likingCommentId = ref<number | null>(null);
+const lightboxUrl = ref("");
 const commentDrafts = reactive<Record<number, string>>({});
 const commentImageFiles = reactive<Record<number, File | null>>({});
 const coverFile = ref<File | null>(null);
@@ -532,16 +581,37 @@ async function toggleLike(post: Record<string, any>) {
     if (target) {
       target.is_liked_by_me = res.data.liked;
       target.like_count = res.data.like_count;
-    }
-  } catch {
+    }  } catch {
     notifyActionError("点赞操作");
   } finally {
     likingPostId.value = null;
   }
 }
 
-function triggerCommentImageInput(postId: number) {
-  const el = document.getElementById(`comment-img-input-${postId}`) as HTMLInputElement | null;
+async function toggleCommentLike(post: Record<string, any>, comment: Record<string, any>) {
+  if (!auth.isAuthenticated) {
+    notifyWarning("请先登录后再点赞");
+    return;
+  }
+  try {
+    likingCommentId.value = Number(comment.id);
+    const res = await likeComment(Number(comment.id));
+    const targetPost = posts.value.find((p) => p.id === post.id);
+    if (targetPost) {
+      const targetComment = targetPost.comments?.find((c: any) => c.id === comment.id);
+      if (targetComment) {
+        targetComment.is_liked_by_me = res.data.liked;
+        targetComment.like_count = res.data.like_count;
+      }
+    }
+  } catch {
+    notifyActionError("点赞操作");
+  } finally {
+    likingCommentId.value = null;
+  }
+}
+
+function triggerCommentImageInput(postId: number) {  const el = document.getElementById(`comment-img-input-${postId}`) as HTMLInputElement | null;
   el?.click();
 }
 
@@ -551,7 +621,11 @@ function onCommentImageSelected(postId: number, e: Event) {
 }
 
 function mealTypeLabel(val: string) {
-  return ({ breakfast: "早餐", lunch: "午餐", dinner: "晚餐", snack: "加餐" } as Record<string, string>)[val] || "";
+  return ({ breakfast: "早餐", lunch: "午餐", dinner: "晚餐", snack: "加餐" } as Record<string, string>)[val] || val;
+}
+
+function difficultyLabel(val: string) {
+  return ({ easy: "简单", medium: "中等", hard: "困难" } as Record<string, string>)[val] || val;
 }
 
 onMounted(loadPosts);
@@ -809,32 +883,74 @@ h2 {
 }
 
 .linked-recipe-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   margin-top: 12px;
-  padding: 12px 14px;
-  border-radius: 14px;
+  padding: 16px;
+  border-radius: 16px;
   background: rgba(247, 251, 255, 0.92);
-  border: 1px solid rgba(16, 34, 42, 0.06);
+  border: 1px solid rgba(16, 34, 42, 0.08);
+}
+
+.linked-recipe-header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
 }
 
 .linked-recipe-thumb {
-  width: 56px;
-  height: 56px;
-  border-radius: 10px;
+  width: 80px;
+  height: 80px;
+  border-radius: 12px;
   object-fit: cover;
   flex-shrink: 0;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.linked-recipe-thumb:hover {
+  opacity: 0.85;
+}
+
+.linked-recipe-meta {
+  flex: 1;
+  min-width: 0;
 }
 
 .linked-recipe-meta strong {
-  font-size: 14px;
+  font-size: 15px;
+  display: block;
+  margin-bottom: 6px;
 }
 
-.linked-recipe-sub {
-  margin: 4px 0 0;
-  font-size: 12px;
-  color: #5a7a8a;
+.linked-recipe-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+
+.recipe-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: rgba(16, 34, 42, 0.07);
+  color: #3e6272;
+}
+
+.linked-recipe-flavor-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+
+.flavor-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: rgba(29, 111, 95, 0.10);
+  color: #1d6f5f;
 }
 
 .linked-recipe-desc {
@@ -846,6 +962,65 @@ h2 {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.linked-recipe-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(16, 34, 42, 0.06);
+}
+
+.linked-recipe-section-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #3e6272;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ingredient-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ingredient-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgba(16, 34, 42, 0.05);
+  color: #476072;
+  border: 1px solid rgba(16, 34, 42, 0.07);
+}
+
+.ingredient-chip.is-main {
+  background: rgba(23, 48, 66, 0.10);
+  color: #173042;
+  font-weight: 600;
+}
+
+.step-list {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 10px;
+}
+
+.step-item {
+  font-size: 13px;
+  color: #3a5566;
+  line-height: 1.6;
+}
+
+.step-img {
+  margin-top: 6px;
+  max-width: 100%;
+  max-height: 160px;
+  border-radius: 8px;
+  object-fit: cover;
+  cursor: pointer;
+  display: block;
 }
 
 .like-btn {
@@ -871,6 +1046,16 @@ h2 {
   color: #5a7a8a;
 }
 
+.comment-actions {  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.comment-like-btn {
+  font-size: 13px;
+  padding: 2px 6px;
+}
+
 .comment-img {
   margin-top: 8px;
   max-width: 100%;
@@ -878,6 +1063,49 @@ h2 {
   border-radius: 10px;
   object-fit: cover;
   display: block;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.comment-img:hover {
+  opacity: 0.88;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.lightbox-img {
+  max-width: 92vw;
+  max-height: 92vh;
+  border-radius: 8px;
+  object-fit: contain;
+  cursor: default;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 24px;
+  cursor: pointer;
+  opacity: 0.8;
+  line-height: 1;
+}
+
+.lightbox-close:hover {
+  opacity: 1;
 }
 
 @media (max-width: 960px) {

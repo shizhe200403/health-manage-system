@@ -27,11 +27,22 @@ class UserBriefSerializer(serializers.ModelSerializer):
 
 class PostCommentSerializer(serializers.ModelSerializer):
     user_info = UserBriefSerializer(source="user", read_only=True)
+    like_count = serializers.SerializerMethodField()
+    is_liked_by_me = serializers.SerializerMethodField()
 
     class Meta:
         model = PostComment
-        fields = ["id", "user", "user_info", "content", "image_url", "status", "created_at"]
-        read_only_fields = ["id", "status", "created_at", "user"]
+        fields = ["id", "user", "user_info", "content", "image_url", "status", "like_count", "is_liked_by_me", "created_at"]
+        read_only_fields = ["id", "status", "created_at", "user", "like_count", "is_liked_by_me"]
+
+    def get_like_count(self, obj):
+        return obj.likes.count()
+
+    def get_is_liked_by_me(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return obj.likes.filter(user=request.user).exists()
 
 
 class AdminPostCommentSerializer(serializers.ModelSerializer):
@@ -43,13 +54,37 @@ class AdminPostCommentSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "user", "user_info", "created_at", "updated_at"]
 
 
+class LinkedRecipeStepSerializer(serializers.Serializer):
+    step_no = serializers.IntegerField()
+    content = serializers.CharField()
+    step_image_url = serializers.CharField()
+
+
+class LinkedRecipeIngredientSerializer(serializers.Serializer):
+    name = serializers.SerializerMethodField()
+    amount = serializers.DecimalField(max_digits=12, decimal_places=4)
+    unit = serializers.CharField()
+    is_main = serializers.BooleanField()
+    remark = serializers.CharField()
+
+    def get_name(self, obj):
+        return obj.ingredient.canonical_name
+
+
 class LinkedRecipeSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     title = serializers.CharField()
     cover_image_url = serializers.CharField()
-    meal_type = serializers.CharField()
-    cook_time_minutes = serializers.IntegerField(allow_null=True)
     description = serializers.CharField()
+    meal_type = serializers.CharField()
+    difficulty = serializers.CharField()
+    servings = serializers.IntegerField()
+    prep_time_minutes = serializers.IntegerField(allow_null=True)
+    cook_time_minutes = serializers.IntegerField(allow_null=True)
+    taste_tags = serializers.ListField(child=serializers.CharField())
+    cuisine_tags = serializers.ListField(child=serializers.CharField())
+    steps = LinkedRecipeStepSerializer(source="steps", many=True)
+    ingredients = LinkedRecipeIngredientSerializer(source="recipe_ingredients", many=True)
 
 
 class PostSerializer(serializers.ModelSerializer):
@@ -92,7 +127,7 @@ class PostSerializer(serializers.ModelSerializer):
 
     def get_comments(self, obj):
         comments = obj.comments.filter(status="visible").select_related("user")
-        return PostCommentSerializer(comments, many=True).data
+        return PostCommentSerializer(comments, many=True, context=self.context).data
 
     def create(self, validated_data):
         return Post.objects.create(user=self.context["request"].user, **validated_data)
