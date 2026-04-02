@@ -52,6 +52,8 @@ class CanManageContent(permissions.BasePermission):
             return True
         if not request.user or not request.user.is_authenticated:
             return False
+        if getattr(view, "action", "") in {"favorite", "unfavorite"}:
+            return True
         if is_admin_operator(request.user):
             return True
         return getattr(obj, "created_by_id", None) == request.user.id

@@ -1,6 +1,6 @@
 import shutil
 import tempfile
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from django.contrib.auth import get_user_model
@@ -557,19 +557,20 @@ class ProductApiSmokeTests(APITestCase):
         user = self._create_user()
         self._login("alice")
         recipe = self._create_recipe_bundle(user, title="Protein Bowl")
+        record_date = date.today() - timedelta(days=1)
         goal = HealthGoal.objects.create(
             user=user,
             goal_type="protein_up",
             target_value=90,
             current_value=47,
-            start_date=date(2026, 3, 26),
-            target_date=date(2026, 4, 30),
+            start_date=record_date,
+            target_date=date.today() + timedelta(days=30),
             status="active",
             description="Raise protein consistency",
         )
         HealthGoalProgress.objects.create(
             health_goal=goal,
-            progress_date=date(2026, 3, 27),
+            progress_date=date.today(),
             progress_value=52,
             note="Added one protein meal",
         )
@@ -577,7 +578,7 @@ class ProductApiSmokeTests(APITestCase):
         meal_response = self.client.post(
             "/api/v1/meal-records/",
             {
-                "record_date": "2026-03-26",
+                "record_date": record_date.isoformat(),
                 "meal_type": "lunch",
                 "source_type": "manual",
                 "note": "office lunch",
@@ -620,6 +621,25 @@ class ProductApiSmokeTests(APITestCase):
             self.assertGreaterEqual(len(dashboard["charts"]["daily_nutrition_trend"]), 1)
             self.assertEqual(dashboard["report_assets"]["completed"], 1)
             self.assertEqual(dashboard["goals"][0]["label"], "补蛋白")
+
+    def test_regular_user_can_favorite_and_unfavorite_public_recipe(self):
+        owner = self._create_user(username="chef", email="chef@example.com", phone="13800000020")
+        recipe = self._create_recipe_bundle(owner, title="Public Protein Bowl")
+
+        self._create_user(username="favoriter", email="favoriter@example.com", phone="13800000021")
+        self._login("favoriter@example.com")
+
+        favorite_response = self.client.post(f"/api/v1/recipes/{recipe.id}/favorite/", format="json")
+        self.assertEqual(favorite_response.status_code, 200)
+        self.assertTrue(UserFavoriteRecipe.objects.filter(user__username="favoriter", recipe=recipe).exists())
+
+        duplicate_favorite_response = self.client.post(f"/api/v1/recipes/{recipe.id}/favorite/", format="json")
+        self.assertEqual(duplicate_favorite_response.status_code, 200)
+        self.assertEqual(UserFavoriteRecipe.objects.filter(user__username="favoriter", recipe=recipe).count(), 1)
+
+        unfavorite_response = self.client.delete(f"/api/v1/recipes/{recipe.id}/favorite/", format="json")
+        self.assertEqual(unfavorite_response.status_code, 200)
+        self.assertFalse(UserFavoriteRecipe.objects.filter(user__username="favoriter", recipe=recipe).exists())
 
     def test_health_goal_progress_flow(self):
         self._create_user()
