@@ -623,10 +623,68 @@ a[href]:active {
 .admin-shell-root .page .drawer-summary article,
 .admin-shell-root .page .drawer-focus,
 .admin-shell-root .page .drawer-section {
+  position: relative;
+  overflow: hidden;
   background:
     linear-gradient(180deg, rgba(250, 253, 255, 0.98), rgba(243, 249, 253, 0.94)) !important;
   border: 1px solid rgba(16, 34, 42, 0.07) !important;
   box-shadow: 0 14px 30px rgba(15, 30, 39, 0.06) !important;
+  transition:
+    transform var(--app-ease),
+    box-shadow var(--app-ease),
+    border-color var(--app-ease),
+    background var(--app-ease) !important;
+}
+
+.admin-shell-root .page .ops-alert-card::before,
+.admin-shell-root .dashboard .ops-alert-card::before,
+.admin-shell-root .page .review-stage-card::before,
+.admin-shell-root .dashboard .review-stage-card::before,
+.admin-shell-root .page .conclusion-item::before,
+.admin-shell-root .dashboard .conclusion-item::before,
+.admin-shell-root .page .sample-item::before,
+.admin-shell-root .dashboard .sample-item::before,
+.admin-shell-root .page .action-link::before,
+.admin-shell-root .dashboard .action-link::before,
+.admin-shell-root .page .stats-grid article::before,
+.admin-shell-root .dashboard .stats-grid article::before,
+.admin-shell-root .page .report-item::before,
+.admin-shell-root .page .status-item::before,
+.admin-shell-root .page .drawer-summary article::before,
+.admin-shell-root .page .drawer-focus::before,
+.admin-shell-root .page .drawer-section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top right, rgba(87, 181, 231, 0.12), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 34%);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .admin-shell-root .page .ops-alert-card:hover,
+  .admin-shell-root .dashboard .ops-alert-card:hover,
+  .admin-shell-root .page .review-stage-card:hover,
+  .admin-shell-root .dashboard .review-stage-card:hover,
+  .admin-shell-root .page .conclusion-item:hover,
+  .admin-shell-root .dashboard .conclusion-item:hover,
+  .admin-shell-root .page .sample-item:hover,
+  .admin-shell-root .dashboard .sample-item:hover,
+  .admin-shell-root .page .action-link:hover,
+  .admin-shell-root .dashboard .action-link:hover,
+  .admin-shell-root .page .stats-grid article:hover,
+  .admin-shell-root .dashboard .stats-grid article:hover,
+  .admin-shell-root .page .report-item:hover,
+  .admin-shell-root .page .status-item:hover,
+  .admin-shell-root .page .drawer-summary article:hover,
+  .admin-shell-root .page .drawer-focus:hover,
+  .admin-shell-root .page .drawer-section:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 20px 38px rgba(15, 30, 39, 0.08) !important;
+    border-color: rgba(16, 34, 42, 0.12) !important;
+  }
 }
 
 .admin-shell-root .page .review-stage-card,
@@ -707,6 +765,53 @@ a[href]:active {
 .admin-shell-root .page .el-table td.el-table__cell,
 .admin-shell-root .dashboard .el-table td.el-table__cell {
   color: #173042;
+}
+
+.admin-shell-root .page .table-footer,
+.admin-shell-root .dashboard .table-footer {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(247, 251, 255, 0.92);
+  border: 1px solid rgba(16, 34, 42, 0.06);
+}
+
+.admin-shell-root .page .card-head,
+.admin-shell-root .dashboard .card-head {
+  position: relative;
+  padding-bottom: 12px;
+}
+
+.admin-shell-root .page .card-head::after,
+.admin-shell-root .dashboard .card-head::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(16, 34, 42, 0.12), rgba(16, 34, 42, 0.04), transparent 86%);
+}
+
+.admin-shell-root .page .drawer-form,
+.admin-shell-root .dashboard .drawer-form {
+  gap: 16px !important;
+}
+
+.admin-shell-root .page .drawer-section + .drawer-section,
+.admin-shell-root .dashboard .drawer-section + .drawer-section {
+  margin-top: 2px;
+}
+
+.admin-shell-root .page .head-actions,
+.admin-shell-root .dashboard .head-actions {
+  gap: 12px;
+}
+
+.admin-shell-root .page .head-actions > .el-button,
+.admin-shell-root .page .head-actions > a,
+.admin-shell-root .dashboard .head-actions > .el-button,
+.admin-shell-root .dashboard .head-actions > a {
+  min-height: 42px;
 }
 
 .admin-shell-root .page .el-drawer,
