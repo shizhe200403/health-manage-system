@@ -13,36 +13,38 @@
     <RefreshFrame v-else :active="showReportsRefreshing" label="正在同步报表状态">
     <ReportsDashboardBoard v-if="dashboardData" :dashboard="dashboardData" />
 
-    <div class="summary-grid">
-      <article>
-        <span>累计报表</span>
-        <strong>{{ reportSummary.total }}</strong>
-        <p>已经沉淀下来的可回看结果数。</p>
-      </article>
-      <article>
-        <span>已完成</span>
-        <strong>{{ reportSummary.completed }}</strong>
-        <p>可直接打开或下载的报表数量。</p>
-      </article>
-      <article>
-        <span>生成中</span>
-        <strong>{{ reportSummary.processing }}</strong>
-        <p>{{ reportSummary.processing ? "页面会自动刷新，不需要重复点击。" : "当前没有正在处理的报表任务。" }}</p>
-      </article>
-      <article>
-        <span>最近生成</span>
-        <strong>{{ reportSummary.latestGenerated }}</strong>
-        <p>帮助用户判断是否需要重新生成一份新周期报告。</p>
-      </article>
-    </div>
+    <div class="reports-topline-layout">
+      <aside class="reports-summary-column">
+        <div class="summary-grid compact-summary-grid">
+          <article>
+            <span>累计报表</span>
+            <strong>{{ reportSummary.total }}</strong>
+            <p>可回看结果</p>
+          </article>
+          <article>
+            <span>已完成</span>
+            <strong>{{ reportSummary.completed }}</strong>
+            <p>可直接打开</p>
+          </article>
+          <article>
+            <span>生成中</span>
+            <strong>{{ reportSummary.processing }}</strong>
+            <p>{{ reportSummary.processing ? "自动刷新中" : "当前无任务" }}</p>
+          </article>
+          <article>
+            <span>最近生成</span>
+            <strong>{{ reportSummary.latestGenerated }}</strong>
+            <p>判断是否需重跑</p>
+          </article>
+        </div>
+      </aside>
 
-    <div class="grid">
       <div class="card review-stage-card">
         <div class="review-stage-head">
           <div>
             <p class="section-kicker">Stage Review</p>
             <h3>阶段复盘</h3>
-            <p>先看结论，再决定是补记录、回看旧报表，还是生成新的周期复盘。</p>
+            <p>先看结论，再决定补记录、回看旧报表，还是生成新周期复盘。</p>
           </div>
           <span class="status-pill" :class="reviewStageTone">{{ reviewStageLabel }}</span>
         </div>
@@ -81,12 +83,12 @@
       </div>
     </div>
 
-    <div class="grid">
+    <div class="grid reports-focus-layout">
       <div class="card">
         <div class="card-head">
           <div>
             <h3>下周动作计划</h3>
-            <p>把复盘真正落成动作，只保留最值得执行的 3 件事，不让用户看完就停在页面里。</p>
+            <p>把复盘真正落成动作，只保留最值得执行的 3 件事。</p>
           </div>
           <el-button text @click="openAssistantForNextWeekPlan">让 AI 生成行动版</el-button>
         </div>
@@ -124,7 +126,7 @@
         <div class="card-head">
           <div>
             <h3>本周复盘卡</h3>
-            <p>把本周状态压成一眼能看懂的结论，直接告诉你做得怎么样、最常漏哪里、资产有没有沉淀下来。</p>
+            <p>把本周状态压成一眼能看懂的结论。</p>
           </div>
         </div>
 
@@ -164,12 +166,12 @@
       </div>
     </div>
 
-    <div class="grid">
+    <div class="grid reports-support-layout">
       <div class="card">
         <div class="card-head">
           <div>
             <h3>记录覆盖度</h3>
-            <p>先判断数据量够不够，再决定该出周报还是月报，避免用户空跑一次生成流程。</p>
+            <p>先判断数据量够不够，再决定出周报还是月报。</p>
           </div>
         </div>
 
@@ -220,7 +222,7 @@
         <div class="card-head">
           <div>
             <h3>最新报表</h3>
-            <p>优先回看最近一次结果，不必每次都重新生成，先看现成结论更省事。</p>
+            <p>优先回看最近一次结果，不必每次都重新生成。</p>
           </div>
         </div>
 
@@ -258,12 +260,12 @@
       </div>
     </div>
 
-    <div class="grid">
+    <div class="grid reports-workflow-layout">
       <div class="card">
         <div class="card-head">
           <div>
             <h3>生成新报表</h3>
-            <p>支持按推荐周期一键生成，也可以按自定义时间范围导出，适合日常回顾和阶段总结。</p>
+            <p>支持按推荐周期一键生成，也可以按自定义时间范围导出。</p>
           </div>
           <div class="head-tip">
             <span>{{ hasCustomRange ? "自定义时间范围" : "推荐周期" }}</span>
@@ -314,7 +316,7 @@
         <div class="card-head">
           <div>
             <h3>当前状态</h3>
-            <p>如果报表还在生成中，这里会持续提示并自动刷新，不需要让用户猜接口有没有成功。</p>
+            <p>报表生成中会持续提示并自动刷新。</p>
           </div>
           <div class="head-tip">
             <span>{{ autoRefreshing ? "自动刷新中" : "已稳定" }}</span>
@@ -1458,8 +1460,24 @@ h2 {
   gap: 14px;
 }
 
+.reports-topline-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.72fr) minmax(0, 1.28fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.reports-summary-column {
+  min-width: 0;
+}
+
 .summary-grid {
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.compact-summary-grid {
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 
 .grid {
@@ -1516,6 +1534,21 @@ h2 {
   font-size: 24px;
 }
 
+.compact-summary-grid article {
+  padding: 16px;
+  border-radius: 18px;
+}
+
+.compact-summary-grid strong {
+  font-size: 20px;
+}
+
+.compact-summary-grid p {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .coverage-grid strong {
   display: block;
   margin-top: 8px;
@@ -1558,6 +1591,19 @@ h2 {
   font-size: 18px;
 }
 
+.review-hero-copy p,
+.review-metric p,
+.review-conclusion p,
+.status-item p,
+.helper-box p,
+.plan-copy p,
+.weekly-review-item p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
 .review-hero {
   display: flex;
   justify-content: space-between;
@@ -1582,7 +1628,7 @@ h2 {
   flex-direction: column;
   align-items: flex-start;
   gap: 10px;
-  min-width: 180px;
+  min-width: 168px;
 }
 
 .review-link {
@@ -1797,6 +1843,7 @@ h2 {
 }
 
 @media (max-width: 960px) {
+  .reports-topline-layout,
   .grid,
   .coverage-grid,
   .review-metrics,
@@ -1815,6 +1862,7 @@ h2 {
   }
 
   .summary-grid,
+  .compact-summary-grid,
   .meta {
     grid-template-columns: 1fr;
   }

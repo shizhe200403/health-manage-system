@@ -1175,10 +1175,10 @@ h2 {
 
 .hero-pulse-card {
   display: grid;
-  gap: 8px;
-  margin-top: 18px;
-  padding: 16px 18px;
-  border-radius: 20px;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 16px;
   background:
     radial-gradient(circle at top right, rgba(255, 244, 222, 0.72), transparent 36%),
     linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(247, 251, 255, 0.94));
@@ -1195,7 +1195,7 @@ h2 {
 }
 
 .hero-pulse-card strong {
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1.35;
   color: #173042;
 }
@@ -1203,7 +1203,12 @@ h2 {
 .hero-pulse-card p {
   margin: 0;
   color: #476072;
-  line-height: 1.7;
+  line-height: 1.5;
+  font-size: 13px;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .hero-pulse-card:hover,
@@ -1223,8 +1228,8 @@ h2 {
 .hero-status-strip,
 .hero-meta-grid {
   display: grid;
-  gap: 12px;
-  margin-top: 18px;
+  gap: 10px;
+  margin-top: 14px;
 }
 
 .hero-status-strip {
@@ -1232,14 +1237,14 @@ h2 {
 }
 
 .hero-status-strip span {
-  padding: 10px 12px;
-  border-radius: 16px;
+  padding: 8px 10px;
+  border-radius: 14px;
   background: rgba(247, 251, 255, 0.92);
   border: 1px solid rgba(16, 34, 42, 0.06);
   color: #24566a;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  line-height: 1.5;
+  line-height: 1.35;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.64);
 }
 
@@ -1452,10 +1457,10 @@ h2 {
 .extension-spotlight {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   align-items: flex-start;
-  padding: 18px 20px;
-  border-radius: 22px;
+  padding: 14px 16px;
+  border-radius: 18px;
   background:
     radial-gradient(circle at top right, rgba(87, 181, 231, 0.16), transparent 34%),
     rgba(247, 251, 255, 0.92);
@@ -1464,14 +1469,19 @@ h2 {
 
 .extension-spotlight strong {
   display: block;
-  margin-top: 8px;
-  font-size: 24px;
+  margin-top: 6px;
+  font-size: 18px;
 }
 
 .extension-spotlight p {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: #476072;
-  line-height: 1.7;
+  line-height: 1.5;
+  font-size: 13px;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .extension-body {

@@ -31,36 +31,38 @@
     <template v-else>
       <CollectionSkeleton v-if="loading && !overview" variant="dashboard" :card-count="5" />
       <RefreshFrame v-else :active="loading" label="正在同步后台工作台总览">
-        <div class="summary-grid">
-          <article v-spotlight>
-            <span>待处理账号</span>
-            <strong>{{ summary.users_pending }}</strong>
-            <p>manager 最值得优先看的入口，直接决定是否有人卡在账号确认链路里。</p>
-          </article>
-          <article v-spotlight>
-            <span>当前活跃用户</span>
-            <strong>{{ summary.users_active }}</strong>
-            <p>和最近真实记录量一起看，能更快判断问题偏增长、留存还是链路摩擦。</p>
-          </article>
-          <article v-spotlight>
-            <span>内容待处理总量</span>
-            <strong>{{ moderationBacklog }}</strong>
-            <p>帖子、菜谱和举报如果同时堆积，说明后台已经偏离日常维护节奏。</p>
-          </article>
-          <article v-spotlight>
-            <span>报表失败任务</span>
-            <strong>{{ summary.report_tasks_failed }}</strong>
-            <p>失败任务会直接影响复盘稳定性，manager 也需要及时感知这条链路是否失衡。</p>
-          </article>
-        </div>
+        <div class="overview-topline-layout">
+          <div class="summary-grid compact-admin-summary-grid">
+            <article v-spotlight>
+              <span>待处理账号</span>
+              <strong>{{ summary.users_pending }}</strong>
+              <p>先看账号是否卡链路</p>
+            </article>
+            <article v-spotlight>
+              <span>当前活跃用户</span>
+              <strong>{{ summary.users_active }}</strong>
+              <p>辅助判断活跃与留存</p>
+            </article>
+            <article v-spotlight>
+              <span>内容待处理总量</span>
+              <strong>{{ moderationBacklog }}</strong>
+              <p>审核与举报是否积压</p>
+            </article>
+            <article v-spotlight>
+              <span>报表失败任务</span>
+              <strong>{{ summary.report_tasks_failed }}</strong>
+              <p>复盘链路是否失衡</p>
+            </article>
+          </div>
 
-        <div class="ops-alert-strip">
-          <article v-for="item in queueSummaries" :key="item.key" class="ops-alert-card" :class="`tone-${item.tone}`" v-spotlight>
-            <span>{{ item.label }}</span>
-            <strong>{{ item.count }}</strong>
-            <p>{{ item.description }}</p>
-            <el-button text type="primary" @click="goToWorkbench(item.link)">{{ item.title }}</el-button>
-          </article>
+          <div class="ops-alert-strip">
+            <article v-for="item in queueSummaries" :key="item.key" class="ops-alert-card" :class="`tone-${item.tone}`" v-spotlight>
+              <span>{{ item.label }}</span>
+              <strong>{{ item.count }}</strong>
+              <p>{{ item.description }}</p>
+              <el-button text type="primary" @click="goToWorkbench(item.link)">{{ item.title }}</el-button>
+            </article>
+          </div>
         </div>
 
         <div class="admin-grid">
@@ -125,26 +127,28 @@
                 <p>manager 高频动作继续收口在这里，但都直接落到可处理页面。</p>
               </div>
             </div>
-            <RouterLink class="action-link action-link-primary" to="/ops/users?preset=pending&status=pending">
-              <strong>处理待确认账号</strong>
-              <span>直接进入用户队列，优先看 pending 账号和状态异常。</span>
-            </RouterLink>
-            <RouterLink class="action-link" to="/ops/community?preset=pending_reports&report_status=pending">
-              <strong>处理社区举报</strong>
-              <span>直接落到待处理举报视角，不再从总览页二次筛选。</span>
-            </RouterLink>
-            <RouterLink class="action-link" to="/ops/recipes?preset=pending&audit_status=pending">
-              <strong>处理待审核菜谱</strong>
-              <span>直接看 audit pending 的菜谱队列，压平内容处理积压。</span>
-            </RouterLink>
-            <RouterLink class="action-link" to="/ops/reports">
-              <strong>查看报表链路</strong>
-              <span>回到运营复核页确认失败任务、近期报表和活跃记录信号。</span>
-            </RouterLink>
-            <RouterLink class="action-link" to="/ops/logs">
-              <strong>回看最近操作</strong>
-              <span>先确认后台是谁改了什么，避免处理结果和上下文断开。</span>
-            </RouterLink>
+            <div class="action-link-grid">
+              <RouterLink class="action-link action-link-primary" to="/ops/users?preset=pending&status=pending">
+                <strong>处理待确认账号</strong>
+                <span>优先看 pending 账号</span>
+              </RouterLink>
+              <RouterLink class="action-link" to="/ops/community?preset=pending_reports&report_status=pending">
+                <strong>处理社区举报</strong>
+                <span>直接落到待处理举报</span>
+              </RouterLink>
+              <RouterLink class="action-link" to="/ops/recipes?preset=pending&audit_status=pending">
+                <strong>处理待审核菜谱</strong>
+                <span>直接看待审核队列</span>
+              </RouterLink>
+              <RouterLink class="action-link" to="/ops/reports">
+                <strong>查看报表链路</strong>
+                <span>确认失败任务和近期报表</span>
+              </RouterLink>
+              <RouterLink class="action-link" to="/ops/logs">
+                <strong>回看最近操作</strong>
+                <span>先确认改动上下文</span>
+              </RouterLink>
+            </div>
           </article>
         </div>
 
@@ -410,9 +414,21 @@ function formatDateRange(start?: string, end?: string) {
   gap: 10px;
 }
 
+.overview-topline-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.compact-admin-summary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .ops-alert-strip {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 
@@ -434,13 +450,17 @@ function formatDateRange(start?: string, end?: string) {
 
 .ops-alert-card strong {
   color: #173042;
-  font-size: 28px;
+  font-size: 24px;
 }
 
 .ops-alert-card p {
   margin: 0;
   color: #557383;
-  line-height: 1.6;
+  line-height: 1.5;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .ghost-link {
@@ -467,13 +487,13 @@ function formatDateRange(start?: string, end?: string) {
 .admin-grid {
   display: grid;
   grid-template-columns: 1.1fr 1fr 0.95fr;
-  gap: 16px;
+  gap: 18px;
 }
 
 .admin-lower-grid {
   display: grid;
   grid-template-columns: 1.1fr 1fr;
-  gap: 16px;
+  gap: 18px;
 }
 
 .console-card {
@@ -532,7 +552,7 @@ function formatDateRange(start?: string, end?: string) {
 
 .review-stage-card p {
   margin: 8px 0 0;
-  line-height: 1.7;
+  line-height: 1.55;
   color: rgba(242, 247, 251, 0.84);
 }
 
@@ -581,7 +601,11 @@ function formatDateRange(start?: string, end?: string) {
 .action-link span {
   margin: 0;
   color: #557383;
-  line-height: 1.65;
+  line-height: 1.5;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .tone-good {
@@ -658,6 +682,11 @@ function formatDateRange(start?: string, end?: string) {
   font-weight: 700;
 }
 
+.action-link-grid {
+  display: grid;
+  gap: 10px;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -665,10 +694,7 @@ function formatDateRange(start?: string, end?: string) {
 }
 
 @media (max-width: 1240px) {
-  .ops-alert-strip {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
+  .overview-topline-layout,
   .admin-grid,
   .admin-lower-grid {
     grid-template-columns: 1fr;
@@ -676,6 +702,7 @@ function formatDateRange(start?: string, end?: string) {
 }
 
 @media (max-width: 900px) {
+  .compact-admin-summary-grid,
   .ops-alert-strip,
   .stats-grid {
     grid-template-columns: 1fr;
