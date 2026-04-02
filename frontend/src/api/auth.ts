@@ -15,6 +15,11 @@ export async function getMe() {
   return data;
 }
 
+export async function getPublicUserProfile(userId: number) {
+  const { data } = await http.get(`/accounts/users/${userId}/public/`);
+  return data;
+}
+
 export async function updateMe(payload: Record<string, unknown>) {
   const { data } = await http.put("/accounts/me/", payload);
   return data;

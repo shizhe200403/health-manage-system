@@ -641,6 +641,35 @@ class ProductApiSmokeTests(APITestCase):
         self.assertEqual(unfavorite_response.status_code, 200)
         self.assertFalse(UserFavoriteRecipe.objects.filter(user__username="favoriter", recipe=recipe).exists())
 
+    def test_authenticated_user_can_view_public_user_profile(self):
+        author = self._create_user(username="writer2", email="writer2@example.com", phone="13800000022")
+        author.nickname = "健康写手"
+        author.signature = "认真吃饭，长期主义。"
+        author.save(update_fields=["nickname", "signature"])
+        author.profile.occupation = "设计师"
+        author.profile.cooking_skill = "intermediate"
+        author.profile.diet_type = "balanced"
+        author.profile.save(update_fields=["occupation", "cooking_skill", "diet_type"])
+
+        post = Post.objects.create(
+            user=author,
+            title="我的轻食午餐",
+            content="今天继续保持高蛋白轻负担。",
+            status="published",
+            audit_status="approved",
+        )
+        PostComment.objects.create(post=post, user=author, content="补充一点做法", status="visible")
+
+        self._create_user(username="reader2", email="reader2@example.com", phone="13800000023")
+        self._login("reader2@example.com")
+
+        response = self.client.get(f"/api/v1/accounts/users/{author.id}/public/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["account"]["nickname"], "健康写手")
+        self.assertEqual(response.data["data"]["stats"]["published_posts"], 1)
+        self.assertEqual(response.data["data"]["stats"]["comment_count"], 1)
+        self.assertEqual(response.data["data"]["recent_posts"][0]["title"], "我的轻食午餐")
+
     def test_health_goal_progress_flow(self):
         self._create_user()
         self._login("alice")

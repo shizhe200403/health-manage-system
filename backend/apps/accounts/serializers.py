@@ -83,6 +83,40 @@ class UserSerializer(serializers.ModelSerializer):
         return UserHealthConditionSerializer(health_condition).data
 
 
+class PublicUserProfileSerializer(serializers.ModelSerializer):
+    profile = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "username",
+            "nickname",
+            "signature",
+            "avatar_url",
+            "date_joined",
+            "profile",
+        ]
+
+    @extend_schema_field(
+        serializers.DictField(
+            child=serializers.CharField(allow_blank=True),
+            allow_null=True,
+        )
+    )
+    def get_profile(self, obj):
+        profile = getattr(obj, "profile", None)
+        if profile is None:
+            return None
+        return {
+            "gender": profile.gender or "",
+            "occupation": profile.occupation or "",
+            "cooking_skill": profile.cooking_skill or "",
+            "meal_preference": profile.meal_preference or "",
+            "diet_type": profile.diet_type or "",
+        }
+
+
 class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User

@@ -1,12 +1,13 @@
 from django.urls import path
 
 from .token_views import ActiveStatusTokenRefreshView
-from .views import AdminUserBulkActionView, AdminUserDetailView, AdminUserListView, AvatarUploadView, ChangePasswordView, DeleteAccountView, FullProfileView, GetSecurityQuestionView, HealthConditionView, LoginView, MeView, ProfileView, RegisterView, ResetPasswordBySecurityView, SecurityQuestionListView, SetSecurityQuestionView
+from .views import AdminUserBulkActionView, AdminUserDetailView, AdminUserListView, AvatarUploadView, ChangePasswordView, DeleteAccountView, FullProfileView, GetSecurityQuestionView, HealthConditionView, LoginView, MeView, ProfileView, PublicUserProfileView, RegisterView, ResetPasswordBySecurityView, SecurityQuestionListView, SetSecurityQuestionView
 
 urlpatterns = [
     path("register/", RegisterView.as_view(), name="register"),
     path("me/", MeView.as_view(), name="me"),
     path("me/profile/", ProfileView.as_view(), name="me-profile"),
+    path("users/<int:user_id>/public/", PublicUserProfileView.as_view(), name="public-user-profile"),
     path("me/health-condition/", HealthConditionView.as_view(), name="me-health-condition"),
     path("me/full-profile/", FullProfileView.as_view(), name="me-full-profile"),
     path("me/change-password/", ChangePasswordView.as_view(), name="me-change-password"),

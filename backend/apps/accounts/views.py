@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import permissions, serializers, status
@@ -12,6 +12,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.common.operation_logs import build_change_entries, create_admin_operation_log, snapshot_model_fields
+from apps.community.models import Post, PostComment
 from .auth_state import sync_user_active_flag
 from .models import UserHealthCondition, UserProfile
 from .serializers import (
@@ -19,6 +20,7 @@ from .serializers import (
     AdminUserListSerializer,
     AdminUserUpdateSerializer,
     FlexibleTokenObtainPairSerializer,
+    PublicUserProfileSerializer,
     RegisterSerializer,
     UserHealthConditionSerializer,
     UserProfileSerializer,
@@ -119,6 +121,27 @@ class EnvelopeLoginSerializer(serializers.Serializer):
     data = LoginResponseDataSerializer()
 
 
+class PublicUserPostSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    content = serializers.CharField()
+    cover_image_url = serializers.CharField(allow_blank=True)
+    created_at = serializers.DateTimeField()
+    comment_count = serializers.IntegerField()
+
+
+class PublicUserProfileResponseDataSerializer(serializers.Serializer):
+    account = PublicUserProfileSerializer()
+    stats = serializers.DictField()
+    recent_posts = PublicUserPostSerializer(many=True)
+
+
+class EnvelopePublicUserProfileSerializer(serializers.Serializer):
+    code = serializers.IntegerField()
+    message = serializers.CharField()
+    data = PublicUserProfileResponseDataSerializer()
+
+
 class AdminUserListEnvelopeSerializer(serializers.Serializer):
     code = serializers.IntegerField()
     message = serializers.CharField()
@@ -211,6 +234,49 @@ class MeView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         return Response({"code": 0, "message": "success", "data": UserSerializer(user).data})
+
+
+class PublicUserProfileView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(responses=EnvelopePublicUserProfileSerializer)
+    def get(self, request, user_id):
+        user = get_object_or_404(
+            User.objects.select_related("profile").filter(status="active"),
+            pk=user_id,
+        )
+        recent_posts_qs = (
+            Post.objects.filter(user=user, status="published")
+            .annotate(comment_count=Count("comments", filter=Q(comments__status="visible")))
+            .order_by("-created_at", "-id")[:6]
+        )
+        recent_posts = [
+            {
+                "id": post.id,
+                "title": post.title,
+                "content": post.content,
+                "cover_image_url": post.cover_image_url,
+                "created_at": post.created_at,
+                "comment_count": post.comment_count,
+            }
+            for post in recent_posts_qs
+        ]
+        stats = {
+            "published_posts": Post.objects.filter(user=user, status="published").count(),
+            "comment_count": PostComment.objects.filter(user=user, status="visible").count(),
+            "member_since": user.date_joined,
+        }
+        return Response(
+            {
+                "code": 0,
+                "message": "success",
+                "data": {
+                    "account": PublicUserProfileSerializer(user).data,
+                    "stats": stats,
+                    "recent_posts": recent_posts,
+                },
+            }
+        )
 
 
 class ProfileView(APIView):

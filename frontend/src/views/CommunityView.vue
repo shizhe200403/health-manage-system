@@ -126,8 +126,10 @@
       <article v-for="post in visiblePosts" :key="post.id" class="post-card">
         <div class="row">
           <div class="user-avatar-sm">
-            <img v-if="post.user_info?.avatar_url" :src="post.user_info.avatar_url" alt="" />
-            <span v-else>{{ (post.user_info?.display_name || post.user_info?.username || '?').charAt(0).toUpperCase() }}</span>
+            <button type="button" class="avatar-hit" @click="openUserProfile(Number(post.user))">
+              <img v-if="post.user_info?.avatar_url" :src="post.user_info.avatar_url" alt="" />
+              <span v-else>{{ (post.user_info?.display_name || post.user_info?.username || '?').charAt(0).toUpperCase() }}</span>
+            </button>
           </div>
           <div class="post-main">
             <div class="post-top">
@@ -138,7 +140,8 @@
               </div>
             </div>
             <p class="meta">
-              {{ authorLabel(post) }} · {{ formatDateTime(post.created_at) }}
+              <button type="button" class="author-link" @click="openUserProfile(Number(post.user))">{{ authorLabel(post) }}</button>
+              · {{ formatDateTime(post.created_at) }}
               <span v-if="isMine(post)"> · 我的帖子</span>
               <span> · {{ post.comments?.length || 0 }} 条评论</span>
             </p>
@@ -225,10 +228,12 @@
             <div class="comment-head">
               <div class="comment-author">
                 <div class="user-avatar-xs">
-                  <img v-if="comment.user_info?.avatar_url" :src="comment.user_info.avatar_url" alt="" />
-                  <span v-else>{{ (comment.user_info?.display_name || '?').charAt(0).toUpperCase() }}</span>
+                  <button type="button" class="avatar-hit avatar-hit-small" @click="openUserProfile(Number(comment.user))">
+                    <img v-if="comment.user_info?.avatar_url" :src="comment.user_info.avatar_url" alt="" />
+                    <span v-else>{{ (comment.user_info?.display_name || '?').charAt(0).toUpperCase() }}</span>
+                  </button>
                 </div>
-                <strong>{{ comment.user_info?.display_name || "用户" }}</strong>
+                <strong><button type="button" class="author-link" @click="openUserProfile(Number(comment.user))">{{ comment.user_info?.display_name || "用户" }}</button></strong>
               </div>
               <span>{{ formatDateTime(comment.created_at) }}</span>
               <div class="comment-actions">
@@ -273,6 +278,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
+import { useRouter } from "vue-router";
 import FormActionBar from "../components/FormActionBar.vue";
 import CollectionSkeleton from "../components/CollectionSkeleton.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
@@ -284,6 +290,7 @@ import { trackEvent } from "../api/behavior";
 import { useAuthStore } from "../stores/auth";
 
 const auth = useAuthStore();
+const router = useRouter();
 const posts = ref<any[]>([]);
 const myRecipes = ref<any[]>([]);
 const loadingPosts = ref(false);
@@ -371,6 +378,17 @@ function isMyComment(comment: Record<string, any>) {
 
 function authorLabel(post: Record<string, any>) {
   return post.user_info?.display_name || post.user_info?.username || "用户";
+}
+
+function openUserProfile(userId: number) {
+  if (!userId) {
+    return;
+  }
+  if (Number(auth.user?.id) === Number(userId)) {
+    router.push("/profile");
+    return;
+  }
+  router.push(`/users/${userId}`);
 }
 
 function formatDateTime(value?: string) {
@@ -764,6 +782,14 @@ h2 {
   color: #6f8592;
 }
 
+.author-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #1f4f67;
+  font-weight: 700;
+}
+
 .content {
   white-space: pre-wrap;
 }
@@ -859,6 +885,23 @@ h2 {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.avatar-hit {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+
+.avatar-hit-small {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
 }
 
 .comment-author {
