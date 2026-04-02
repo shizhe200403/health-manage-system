@@ -481,6 +481,58 @@ a[href]:active {
   gap: 14px;
 }
 
+.admin-shell-root .page .card,
+.admin-shell-root .page .summary-grid article,
+.admin-shell-root .page .console-card,
+.admin-shell-root .page .filter-card,
+.admin-shell-root .page .table-card,
+.admin-shell-root .page .moderation-card,
+.admin-shell-root .page .report-card,
+.admin-shell-root .dashboard .panel,
+.admin-shell-root .dashboard .console-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(246, 251, 255, 0.9)) !important;
+  border: 1px solid rgba(16, 34, 42, 0.08) !important;
+  box-shadow: 0 20px 46px rgba(15, 30, 39, 0.08) !important;
+}
+
+.admin-shell-root .page .summary-grid article,
+.admin-shell-root .dashboard .summary-grid article {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top right, rgba(255, 191, 105, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(246, 251, 255, 0.92)) !important;
+}
+
+.admin-shell-root .page .summary-grid article::after,
+.admin-shell-root .dashboard .summary-grid article::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 38%);
+  pointer-events: none;
+}
+
+.admin-shell-root .page .summary-grid article span,
+.admin-shell-root .dashboard .summary-grid article span,
+.admin-shell-root .page .table-meta,
+.admin-shell-root .dashboard .table-meta {
+  color: #607a88;
+}
+
+.admin-shell-root .page .summary-grid article strong,
+.admin-shell-root .dashboard .summary-grid article strong {
+  color: #173042;
+}
+
+.admin-shell-root .page .summary-grid article p,
+.admin-shell-root .dashboard .summary-grid article p,
+.admin-shell-root .page .card-head p,
+.admin-shell-root .dashboard .card-head p {
+  color: #4d6a79;
+}
+
 .admin-shell-root .page .card-head,
 .admin-shell-root .dashboard .card-head {
   display: flex;
@@ -548,8 +600,171 @@ a[href]:active {
 
 .admin-shell-root .page .summary-grid article.active,
 .admin-shell-root .dashboard .summary-grid article.active {
-  box-shadow: 0 0 0 2px rgba(122, 191, 234, 0.35) !important;
-  border-color: rgba(122, 191, 234, 0.3) !important;
+  box-shadow:
+    0 0 0 2px rgba(255, 191, 105, 0.32),
+    0 20px 42px rgba(15, 30, 39, 0.1) !important;
+  border-color: rgba(198, 143, 73, 0.26) !important;
+}
+
+.admin-shell-root .page .ops-alert-card,
+.admin-shell-root .dashboard .ops-alert-card,
+.admin-shell-root .page .review-stage-card,
+.admin-shell-root .dashboard .review-stage-card,
+.admin-shell-root .page .conclusion-item,
+.admin-shell-root .dashboard .conclusion-item,
+.admin-shell-root .page .sample-item,
+.admin-shell-root .dashboard .sample-item,
+.admin-shell-root .page .action-link,
+.admin-shell-root .dashboard .action-link,
+.admin-shell-root .page .stats-grid article,
+.admin-shell-root .dashboard .stats-grid article,
+.admin-shell-root .page .report-item,
+.admin-shell-root .page .status-item,
+.admin-shell-root .page .drawer-summary article,
+.admin-shell-root .page .drawer-focus,
+.admin-shell-root .page .drawer-section {
+  background:
+    linear-gradient(180deg, rgba(250, 253, 255, 0.98), rgba(243, 249, 253, 0.94)) !important;
+  border: 1px solid rgba(16, 34, 42, 0.07) !important;
+  box-shadow: 0 14px 30px rgba(15, 30, 39, 0.06) !important;
+}
+
+.admin-shell-root .page .review-stage-card,
+.admin-shell-root .dashboard .review-stage-card {
+  background:
+    radial-gradient(circle at top right, rgba(255, 191, 105, 0.16), transparent 36%),
+    linear-gradient(135deg, rgba(252, 253, 255, 0.98), rgba(244, 249, 253, 0.94)) !important;
+}
+
+.admin-shell-root .page .ops-alert-card.tone-risk,
+.admin-shell-root .dashboard .ops-alert-card.tone-risk,
+.admin-shell-root .page .conclusion-item.tone-risk,
+.admin-shell-root .dashboard .conclusion-item.tone-risk,
+.admin-shell-root .page .conclusion-item.tone-warning,
+.admin-shell-root .dashboard .conclusion-item.tone-warning {
+  background: linear-gradient(135deg, rgba(255, 247, 239, 0.98), rgba(255, 241, 229, 0.94)) !important;
+  border-color: rgba(198, 116, 62, 0.18) !important;
+}
+
+.admin-shell-root .page .ops-alert-card.tone-good,
+.admin-shell-root .dashboard .ops-alert-card.tone-good,
+.admin-shell-root .page .conclusion-item.tone-good,
+.admin-shell-root .dashboard .conclusion-item.tone-good {
+  background: linear-gradient(135deg, rgba(241, 252, 247, 0.98), rgba(232, 247, 240, 0.94)) !important;
+  border-color: rgba(29, 111, 95, 0.14) !important;
+}
+
+.admin-shell-root .page .ghost-link,
+.admin-shell-root .page .action-link,
+.admin-shell-root .dashboard .action-link {
+  color: #173042 !important;
+  text-decoration: none;
+}
+
+.admin-shell-root .page .action-link-primary,
+.admin-shell-root .dashboard .action-link-primary {
+  background:
+    linear-gradient(135deg, rgba(23, 48, 66, 0.96), rgba(41, 84, 108, 0.92)),
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.18), transparent 40%) !important;
+  border-color: rgba(23, 48, 66, 0.14) !important;
+  box-shadow: 0 18px 36px rgba(23, 48, 66, 0.18) !important;
+}
+
+.admin-shell-root .page .action-link-primary strong,
+.admin-shell-root .page .action-link-primary span,
+.admin-shell-root .dashboard .action-link-primary strong,
+.admin-shell-root .dashboard .action-link-primary span {
+  color: #fff !important;
+}
+
+.admin-shell-root .page .bulk-bar,
+.admin-shell-root .dashboard .bulk-bar {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(247, 251, 255, 0.92);
+  border: 1px solid rgba(16, 34, 42, 0.06);
+  box-shadow: 0 12px 24px rgba(15, 30, 39, 0.05);
+}
+
+.admin-shell-root .page .el-table,
+.admin-shell-root .dashboard .el-table {
+  --el-table-border-color: rgba(16, 34, 42, 0.08);
+  --el-table-header-bg-color: rgba(244, 249, 253, 0.98);
+  --el-table-tr-bg-color: rgba(255, 255, 255, 0.82);
+  --el-table-row-hover-bg-color: rgba(233, 245, 252, 0.82);
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  box-shadow: 0 14px 28px rgba(15, 30, 39, 0.05);
+}
+
+.admin-shell-root .page .el-table th.el-table__cell,
+.admin-shell-root .dashboard .el-table th.el-table__cell {
+  color: #5a7584;
+  font-weight: 700;
+}
+
+.admin-shell-root .page .el-table td.el-table__cell,
+.admin-shell-root .dashboard .el-table td.el-table__cell {
+  color: #173042;
+}
+
+.admin-shell-root .page .el-drawer,
+.admin-shell-root .dashboard .el-drawer {
+  background:
+    linear-gradient(180deg, rgba(251, 254, 255, 0.98), rgba(241, 248, 252, 0.96)) !important;
+}
+
+.admin-shell-root .page .el-drawer__header,
+.admin-shell-root .dashboard .el-drawer__header {
+  margin-bottom: 0 !important;
+  padding: 22px 22px 10px !important;
+}
+
+.admin-shell-root .page .el-drawer__body,
+.admin-shell-root .dashboard .el-drawer__body {
+  padding: 16px 22px 22px !important;
+}
+
+.admin-shell-root .page .drawer-focus-tag,
+.admin-shell-root .dashboard .drawer-focus-tag {
+  background: rgba(255, 191, 105, 0.14) !important;
+  color: #7b5924 !important;
+  border: 1px solid rgba(198, 143, 73, 0.18) !important;
+}
+
+.admin-shell-root .page .el-tag,
+.admin-shell-root .dashboard .el-tag {
+  border-radius: 999px !important;
+  font-weight: 700 !important;
+}
+
+.admin-shell-root .page .el-tag--success,
+.admin-shell-root .dashboard .el-tag--success {
+  background: rgba(35, 192, 109, 0.12) !important;
+  border-color: rgba(35, 192, 109, 0.16) !important;
+  color: #1d6f5f !important;
+}
+
+.admin-shell-root .page .el-tag--warning,
+.admin-shell-root .dashboard .el-tag--warning {
+  background: rgba(255, 138, 28, 0.12) !important;
+  border-color: rgba(255, 138, 28, 0.16) !important;
+  color: #b97326 !important;
+}
+
+.admin-shell-root .page .el-tag--danger,
+.admin-shell-root .dashboard .el-tag--danger {
+  background: rgba(214, 60, 79, 0.12) !important;
+  border-color: rgba(214, 60, 79, 0.16) !important;
+  color: #a53749 !important;
+}
+
+.admin-shell-root .page .el-tag--primary,
+.admin-shell-root .dashboard .el-tag--primary {
+  background: rgba(60, 125, 255, 0.12) !important;
+  border-color: rgba(60, 125, 255, 0.16) !important;
+  color: #3c7dff !important;
 }
 
 @media (max-width: 900px) {

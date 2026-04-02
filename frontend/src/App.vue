@@ -146,12 +146,18 @@
     </template>
 
     <template v-else-if="showChrome && isAdminRoute">
-      <header class="admin-topnav desktop-only">
+      <header class="admin-topnav desktop-only shell-surface">
         <div class="admin-topnav-brand">
-          <span class="admin-topnav-eyebrow">Admin Console</span>
-          <span class="admin-topnav-name">饮食管理台</span>
+          <div class="brand-topline">
+            <p class="eyebrow">Admin Console</p>
+            <span class="brand-date admin-brand-date">{{ todayStamp }}</span>
+          </div>
+          <div class="admin-brand-copy">
+            <span class="admin-topnav-name">饮食管理台</span>
+            <p class="subtitle admin-topnav-subtitle">{{ currentAdminMoment.copy }}</p>
+          </div>
         </div>
-        <nav class="admin-topnav-links" aria-label="后台导航">
+        <nav class="admin-topnav-links shell-surface" aria-label="后台导航">
           <RouterLink
             v-for="item in filteredAdminNavItems"
             :key="item.to"
@@ -188,6 +194,26 @@
 
       <main class="admin-content">
         <div class="admin-content-inner">
+          <Transition name="ribbon-float" mode="out-in">
+            <article :key="route.path" class="floating-ribbon news-ticker admin-pulse">
+              <div class="ticker-label">
+                <span class="ribbon-status-dot" aria-hidden="true" />
+                <strong>后台建议</strong>
+              </div>
+              <div class="ticker-viewport" aria-label="后台建议播报">
+                <div class="ticker-track">
+                  <span
+                    v-for="(message, index) in adminTickerLoopMessages"
+                    :key="`${route.path}-admin-${index}-${message}`"
+                    class="ticker-item"
+                  >
+                    {{ message }}
+                  </span>
+                </div>
+              </div>
+              <RouterLink class="ticker-action" :to="currentAdminAction.to">{{ currentAdminAction.label }}</RouterLink>
+            </article>
+          </Transition>
           <RouterView v-slot="{ Component, route: currentRoute }">
             <Transition name="route-shell" mode="out-in">
               <component :is="Component" :key="currentRoute.path" />
@@ -628,9 +654,10 @@ async function refreshTickerTips() {
 
 .shell.admin-shell-root {
   background:
-    radial-gradient(circle at var(--pointer-x) var(--pointer-y), rgba(87, 181, 231, 0.08), transparent 0, transparent 24%),
-    linear-gradient(180deg, #0f1822 0%, #14212e 100%);
-  color: #ecf5ff;
+    radial-gradient(circle at var(--pointer-x) var(--pointer-y), rgba(255, 191, 105, 0.12), transparent 0, transparent 26%),
+    radial-gradient(circle at top right, rgba(87, 181, 231, 0.12), transparent 28%),
+    linear-gradient(180deg, #fbfcff 0%, #eef4f8 100%);
+  color: #123;
 }
 
 .topbar,
@@ -689,8 +716,8 @@ async function refreshTickerTips() {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  background: rgba(9, 18, 28, 0.88);
-  border-bottom: 1px solid rgba(161, 197, 223, 0.14);
+  background: rgba(249, 252, 255, 0.86);
+  border-bottom: 1px solid rgba(16, 34, 42, 0.08);
 }
 
 .brand {
@@ -717,7 +744,7 @@ async function refreshTickerTips() {
 
 .admin-shell-root .eyebrow,
 .admin-shell-root .mobile-eyebrow {
-  color: rgba(172, 208, 234, 0.82);
+  color: #7d5e2f;
 }
 
 .brand-date {
@@ -754,7 +781,7 @@ h1,
 
 .admin-subtitle,
 .admin-mobile-copy .mobile-subtitle {
-  color: rgba(212, 230, 244, 0.72);
+  color: #5f7684;
 }
 
 .nav {
@@ -899,9 +926,9 @@ h1,
 }
 
 .shell.admin-shell-root .ghost {
-  border-color: rgba(161, 197, 223, 0.16);
-  background: rgba(11, 22, 35, 0.54);
-  color: #eff7ff;
+  border-color: rgba(16, 34, 42, 0.12);
+  background: rgba(255, 255, 255, 0.7);
+  color: #173042;
 }
 
 .ghost:hover,
@@ -913,8 +940,8 @@ h1,
 }
 
 .shell.admin-shell-root .ghost:hover {
-  background: rgba(24, 43, 60, 0.9);
-  border-color: rgba(161, 197, 223, 0.24);
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(16, 34, 42, 0.18);
 }
 
 .user-box {
@@ -951,33 +978,41 @@ h1,
   z-index: 40;
   display: flex;
   align-items: center;
-  height: 52px;
-  padding: 0 24px;
-  background: rgba(9, 18, 28, 0.94);
-  border-bottom: 1px solid rgba(161, 197, 223, 0.1);
+  min-height: 80px;
+  padding: 14px 20px 10px;
+  background: rgba(247, 251, 255, 0.74);
+  border-bottom: 1px solid rgba(16, 34, 42, 0.08);
+  box-shadow: 0 14px 40px rgba(18, 32, 44, 0.06);
   backdrop-filter: blur(20px);
 }
 
 .admin-topnav-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 0 0 auto;
-  margin-right: 24px;
+  display: grid;
+  gap: 6px;
+  flex: 0 0 250px;
+  min-width: 0;
 }
 
-.admin-topnav-eyebrow {
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(172, 208, 234, 0.62);
+.admin-brand-date {
+  background: rgba(255, 244, 231, 0.92);
+  color: #7b5924;
+  border-color: rgba(198, 143, 73, 0.18);
 }
 
 .admin-topnav-name {
-  font-size: 14px;
+  font-size: clamp(21px, 2vw, 26px);
   font-weight: 700;
-  color: #f0f8ff;
-  white-space: nowrap;
+  color: #173042;
+  white-space: normal;
+}
+
+.admin-brand-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-topnav-subtitle {
+  max-width: 320px;
 }
 
 .admin-topnav-links {
@@ -985,34 +1020,45 @@ h1,
   align-items: center;
   flex: 1 1 auto;
   min-width: 0;
-  gap: 2px;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(16, 34, 42, 0.05);
+  backdrop-filter: blur(14px);
 }
 
 .admin-topnav-link {
   display: inline-flex;
   align-items: center;
-  height: 34px;
+  justify-content: center;
+  min-height: 42px;
   padding: 0 12px;
-  border-radius: 10px;
+  border-radius: 14px;
   font-size: 13px;
-  font-weight: 600;
-  color: rgba(224, 239, 250, 0.75);
+  font-weight: 700;
+  color: #234;
   text-decoration: none;
   white-space: nowrap;
-  transition: background 0.18s ease, color 0.18s ease;
+  background: rgba(255, 255, 255, 0.52);
+  border: 1px solid transparent;
+  transition: transform 0.24s ease, background 0.24s ease, border-color 0.24s ease, box-shadow 0.24s ease;
 }
 
 .admin-topnav-link:hover {
-  background: rgba(122, 191, 234, 0.12);
-  color: #f0f8ff;
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.9);
+  color: #173042;
+  border-color: rgba(16, 34, 42, 0.08);
+  box-shadow: 0 14px 26px rgba(15, 30, 39, 0.08);
 }
 
 .admin-topnav-link.router-link-active,
 .admin-topnav-link.router-link-exact-active {
-  background: rgba(123, 192, 235, 0.18);
-  color: #e8f5ff;
+  background: #173042;
+  color: #fff;
   font-weight: 700;
-  box-shadow: inset 0 0 0 1px rgba(122, 191, 234, 0.22);
+  box-shadow: 0 16px 30px rgba(23, 48, 66, 0.22);
 }
 
 .admin-topnav-end {
@@ -1021,6 +1067,7 @@ h1,
   gap: 10px;
   flex: 0 0 auto;
   margin-left: 16px;
+  white-space: nowrap;
 }
 
 .admin-return-soft {
@@ -1030,7 +1077,7 @@ h1,
 .admin-topnav-user {
   font-size: 13px;
   font-weight: 600;
-  color: #f0f8ff;
+  color: #173042;
   white-space: nowrap;
 }
 
@@ -1040,9 +1087,9 @@ h1,
   height: 24px;
   padding: 0 9px;
   border-radius: 999px;
-  background: rgba(123, 192, 235, 0.1);
-  border: 1px solid rgba(123, 192, 235, 0.2);
-  color: #bfe6ff;
+  background: rgba(255, 191, 105, 0.16);
+  border: 1px solid rgba(198, 143, 73, 0.22);
+  color: #7b5924;
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
@@ -1055,13 +1102,17 @@ h1,
 
 .admin-content {
   min-width: 0;
-  padding: 16px 20px 32px;
+  padding: 10px 18px 44px;
 }
 
 .admin-content-inner {
-  width: min(100%, 1320px);
+  width: min(100%, 1440px);
   margin: 0 auto;
   min-width: 0;
+}
+
+.admin-content-inner > * + * {
+  margin-top: 14px;
 }
 
 .ticker-label {
@@ -1130,9 +1181,17 @@ h1,
 }
 
 .admin-pulse .ticker-action {
-  background: #7bc0eb;
-  color: #09121c;
-  box-shadow: 0 12px 22px rgba(24, 74, 103, 0.24);
+  background: linear-gradient(135deg, #ffb25b, #e98a2f);
+  color: #fff;
+  box-shadow: 0 12px 22px rgba(178, 116, 36, 0.22);
+}
+
+.admin-pulse .ticker-label strong {
+  color: #7b5924;
+}
+
+.admin-pulse .ticker-item {
+  color: #516d7b;
 }
 
 .ribbon-status-dot {
@@ -1262,9 +1321,9 @@ h1,
 }
 
 .admin-mobile-rail .mobile-rail-toggle {
-  border-color: rgba(161, 197, 223, 0.12);
-  background: rgba(9, 18, 28, 0.92);
-  color: #eff7ff;
+  border-color: rgba(16, 34, 42, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  color: #173042;
 }
 
 .mobile-rail-scroll {
@@ -1280,8 +1339,8 @@ h1,
 }
 
 .admin-mobile-scroll {
-  background: rgba(9, 18, 28, 0.94);
-  border-color: rgba(161, 197, 223, 0.12);
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(16, 34, 42, 0.08);
 }
 
 .mobile-rail-group {
@@ -1302,7 +1361,7 @@ h1,
 }
 
 .admin-mobile-scroll .mobile-rail-label {
-  color: rgba(172, 208, 234, 0.62);
+  color: #7b5924;
 }
 
 .mobile-rail-link {
@@ -1322,9 +1381,9 @@ h1,
 
 .admin-mobile-link,
 .admin-mobile-scroll .mobile-rail-link {
-  border-color: rgba(161, 197, 223, 0.12);
-  background: rgba(15, 31, 46, 0.92);
-  color: #e9f4ff;
+  border-color: rgba(16, 34, 42, 0.08);
+  background: rgba(247, 251, 255, 0.94);
+  color: #234;
 }
 
 .mobile-rail-link.router-link-active,
@@ -1335,9 +1394,9 @@ h1,
 }
 
 .admin-mobile-scroll .mobile-rail-link.router-link-active {
-  background: #7bc0eb;
-  color: #09121c;
-  border-color: #7bc0eb;
+  background: #173042;
+  color: #fff;
+  border-color: #173042;
 }
 
 .mobile-rail-icon {
@@ -1352,7 +1411,7 @@ h1,
 }
 
 .admin-mobile-scroll .mobile-rail-icon {
-  background: rgba(122, 191, 234, 0.14);
+  background: rgba(23, 48, 66, 0.08);
 }
 
 .mobile-rail-link.router-link-active .mobile-rail-icon,
@@ -1363,7 +1422,7 @@ h1,
 
 .admin-mobile-scroll .mobile-rail-link.router-link-active .mobile-rail-icon,
 .admin-mobile-scroll .mobile-rail-logout .mobile-rail-icon {
-  background: rgba(9, 18, 28, 0.14);
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .mobile-rail-logout {
@@ -1380,15 +1439,7 @@ h1,
 
 @media (max-width: 1100px) {
   .admin-topnav {
-    padding: 0 16px;
-  }
-
-  .admin-topnav-brand {
-    margin-right: 12px;
-  }
-
-  .admin-topnav-name {
-    display: none;
+    padding: 14px 16px 10px;
   }
 
   .admin-topnav-link {
