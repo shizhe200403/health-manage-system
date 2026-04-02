@@ -6,6 +6,7 @@
         <h2>社区审核</h2>
       </div>
       <div class="head-actions">
+        <CompactHint tone="warm" title="社区审核说明" description="先看列表和批量动作，帖子筛选和举报筛选都已经支持按需展开，不必默认读说明。" />
         <el-button plain @click="resetFilters">重置筛选</el-button>
         <el-button type="primary" :loading="loadingPosts || loadingReports" @click="refreshAll">刷新后台内容</el-button>
         <el-button plain @click="router.push('/community')">去前台社区页</el-button>
@@ -48,8 +49,10 @@
           <article class="card moderation-card" v-spotlight>
             <div class="card-head">
               <div>
-                <h3>帖子审核</h3>
-                <p>{{ postFilterHint }}</p>
+                <div class="section-title-row">
+                  <h3>帖子审核</h3>
+                  <CompactHint description="先判断状态和审核，再决定是否需要打开详情。评论和举报信息只是辅助判断，不是主阅读入口。" />
+                </div>
               </div>
               <div class="card-head-actions">
                 <el-button class="filter-toggle" plain @click="postFiltersExpanded = !postFiltersExpanded">
@@ -136,8 +139,10 @@
           <article class="card report-card" v-spotlight>
             <div class="card-head">
               <div>
-                <h3>举报处理</h3>
-                <p>{{ reportFilterHint }}</p>
+                <div class="section-title-row">
+                  <h3>举报处理</h3>
+                  <CompactHint description="先处理待处理举报，再看优先级和指派；只有复杂协作场景才需要展开完整信息。" />
+                </div>
               </div>
               <div class="card-head-actions">
                 <el-button class="filter-toggle" plain @click="reportFiltersExpanded = !reportFiltersExpanded">
@@ -506,6 +511,7 @@ import { computed, nextTick, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AdminObjectTimeline from "../components/AdminObjectTimeline.vue";
 import CollectionSkeleton from "../components/CollectionSkeleton.vue";
+import CompactHint from "../components/CompactHint.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import { bulkUpdateAdminCommunityPosts, bulkUpdateAdminCommunityReports, getAdminCommunityPostDetail, getAdminCommunityReportDetail, listAdminCommunityPosts, listAdminCommunityReports, updateAdminCommunityPost, updateAdminCommunityReport } from "../api/adminContent";

@@ -6,6 +6,7 @@
         <h2>用户管理</h2>
       </div>
       <div class="head-actions">
+        <CompactHint tone="warm" title="用户管理说明" description="高频动作先处理列表，再按需展开筛选和详情抽屉，不需要先读完整说明。" />
         <el-button plain @click="resetFilters">重置筛选</el-button>
         <el-button type="primary" :loading="loadingUsers" @click="applyFilters">应用筛选</el-button>
       </div>
@@ -46,8 +47,10 @@
         <div class="card filter-card" v-spotlight>
           <div class="card-head">
             <div>
-              <h3>筛选与搜索</h3>
-              <p>{{ filterHint }}</p>
+              <div class="section-title-row">
+                <h3>筛选与搜索</h3>
+                <CompactHint description="先快速定位用户名、邮箱或手机号，再按角色和状态收窄；默认高频使用可以直接先看列表。" />
+              </div>
             </div>
             <div class="card-head-actions">
               <el-button class="filter-toggle" plain @click="filtersExpanded = !filtersExpanded">
@@ -78,8 +81,10 @@
         <div class="card table-card" v-spotlight>
           <div class="card-head">
             <div>
-              <h3>用户列表</h3>
-              <p>默认按注册时间倒序展示。现在聚焦的是{{ focusPresetLabel }}，适合先处理这一批账号。</p>
+              <div class="section-title-row">
+                <h3>用户列表</h3>
+                <CompactHint description="默认按注册时间倒序展示；当前聚焦视角只用来帮助你更快锁定处理批次。" />
+              </div>
             </div>
             <span class="table-meta">当前页显示 {{ displayUsers.length }} / {{ users.length }} 人</span>
           </div>
@@ -394,6 +399,7 @@ import { computed, nextTick, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AdminObjectTimeline from "../components/AdminObjectTimeline.vue";
 import CollectionSkeleton from "../components/CollectionSkeleton.vue";
+import CompactHint from "../components/CompactHint.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import { bulkUpdateAdminUsers, getAdminUserDetail, listAdminUsers, updateAdminUser } from "../api/admin";

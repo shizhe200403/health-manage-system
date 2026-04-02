@@ -6,9 +6,7 @@
       <article class="hero-copy">
         <p class="tag">Today</p>
         <h2>{{ greetingTitle }}</h2>
-        <p class="desc">
-          先看今天还差什么，再决定下一餐怎么吃、怎么记，不把首页做成一块只读看板。
-        </p>
+        <CompactHint tone="accent" title="首页说明" description="首页优先回答今天下一步是什么，延展工作区和推荐区都只是辅助，不必逐块阅读。" />
         <article v-spotlight class="hero-pulse-card">
           <span>今日一句话</span>
           <strong>{{ todayWorkbenchHeadline }}</strong>
@@ -29,8 +27,10 @@
       <article class="panel today-workbench">
         <div class="panel-header">
           <div>
-            <h3>今天工作台</h3>
-            <p>先回答还差什么、下一餐怎么选、能不能一键记上，不让首页变成只读总览。</p>
+            <div class="section-title-row">
+              <h3>今天工作台</h3>
+              <CompactHint description="这块只负责今天下一步，不负责展示全量信息。先做动作，再去延展区看补充。" />
+            </div>
           </div>
         </div>
 
@@ -100,8 +100,10 @@
     <div class="panel">
       <div class="panel-header">
         <div>
-          <h3>推荐菜谱</h3>
-          <p>优先展示更适合你当前目标和饮食约束的选择，让“下一餐吃什么”更容易落地。</p>
+          <div class="section-title-row">
+            <h3>推荐菜谱</h3>
+            <CompactHint description="这里只是给下一餐决策捷径，不需要在首页把完整菜谱库说明铺开。" />
+          </div>
         </div>
         <div class="head-actions">
           <el-button plain @click="loadDashboard">刷新推荐</el-button>
@@ -134,8 +136,10 @@
     <article class="panel extension-panel">
       <div class="panel-header">
         <div>
-          <h3>延展工作区</h3>
-          <p>把收藏、记录、趋势、目标和报表收在这里按需切换，首页先聚焦今天该做的动作。</p>
+          <div class="section-title-row">
+            <h3>延展工作区</h3>
+            <CompactHint description="延展区负责按需切换低频信息，不和今天工作台抢主视觉。" />
+          </div>
         </div>
         <el-button text @click="router.push(activeExtensionMeta.to)">{{ activeExtensionMeta.cta }}</el-button>
       </div>
@@ -301,6 +305,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import CollectionSkeleton from "../components/CollectionSkeleton.vue";
+import CompactHint from "../components/CompactHint.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import TrendMiniBars from "../components/TrendMiniBars.vue";

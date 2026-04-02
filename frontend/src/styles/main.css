@@ -261,6 +261,17 @@ video {
   font-weight: 700;
 }
 
+.section-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.section-title-row h3 {
+  margin: 0;
+}
+
 .page .empty-state,
 .page .status-item,
 .page .action-item,

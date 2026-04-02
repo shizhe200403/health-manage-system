@@ -4,9 +4,11 @@
       <div>
         <p class="tag">Reports</p>
         <h2>健康报表</h2>
-        <p class="desc">查看历史报表、生成新的周报或月报，快速了解最近一段时间的饮食变化。</p>
       </div>
-      <el-button :loading="loadingTasks" @click="loadReportTasks()">刷新记录</el-button>
+      <div class="head-actions">
+        <CompactHint tone="accent" title="报表页说明" description="优先看看板和复盘主线，生成器与历史记录只是支持区，不需要每次都重新生成报表。" />
+        <el-button :loading="loadingTasks" @click="loadReportTasks()">刷新记录</el-button>
+      </div>
     </div>
 
     <CollectionSkeleton v-if="showReportsSkeleton" variant="list" :card-count="5" :show-toolbar="false" />
@@ -43,8 +45,10 @@
         <div class="review-stage-head">
           <div>
             <p class="section-kicker">Stage Review</p>
-            <h3>阶段复盘</h3>
-            <p>先看结论，再决定补记录、回看旧报表，还是生成新周期复盘。</p>
+            <div class="section-title-row">
+              <h3>阶段复盘</h3>
+              <CompactHint description="这块只负责一句话结论和当前最该做的事，细节解释交给下方看板和 AI。" />
+            </div>
           </div>
           <span class="status-pill" :class="reviewStageTone">{{ reviewStageLabel }}</span>
         </div>
@@ -87,8 +91,10 @@
       <div class="card">
         <div class="card-head">
           <div>
-            <h3>下周动作计划</h3>
-            <p>把复盘真正落成动作，只保留最值得执行的 3 件事。</p>
+            <div class="section-title-row">
+              <h3>下周动作计划</h3>
+              <CompactHint description="这里只保留最值得执行的少量动作，避免把计划页做成第二个说明区。" />
+            </div>
           </div>
           <el-button text @click="openAssistantForNextWeekPlan">让 AI 生成行动版</el-button>
         </div>
@@ -125,8 +131,10 @@
       <div class="card">
         <div class="card-head">
           <div>
-            <h3>本周复盘卡</h3>
-            <p>把本周状态压成一眼能看懂的结论。</p>
+            <div class="section-title-row">
+              <h3>本周复盘卡</h3>
+              <CompactHint description="这一栏主要是压缩结论，不负责讲完整故事，详细趋势已经放在数据看板里。" />
+            </div>
           </div>
         </div>
 
@@ -387,6 +395,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import FormActionBar from "../components/FormActionBar.vue";
 import CollectionSkeleton from "../components/CollectionSkeleton.vue";
+import CompactHint from "../components/CompactHint.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import ReportsDashboardBoard from "../components/ReportsDashboardBoard.vue";

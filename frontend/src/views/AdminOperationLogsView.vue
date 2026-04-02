@@ -6,6 +6,7 @@
         <h2>操作日志</h2>
       </div>
       <div class="head-actions">
+        <CompactHint tone="accent" title="操作日志说明" description="高频路径是先按模块/人/关键词缩小范围，再看字段差异，不需要一开始就阅读解释文本。" />
         <el-button plain @click="resetFilters">重置筛选</el-button>
         <el-button type="primary" :loading="loading" @click="applyFilters">应用筛选</el-button>
         <el-button plain @click="router.push(resolveOpsHome(auth.user))">回后台首页</el-button>
@@ -47,8 +48,10 @@
         <article class="card console-card filter-card" v-spotlight>
           <div class="card-head">
             <div>
-              <h3>筛选与检索</h3>
-              <p>{{ filterHint }}</p>
+              <div class="section-title-row">
+                <h3>筛选与检索</h3>
+                <CompactHint description="先按模块或操作人收窄，再看字段前后变化；全量日志不适合直接硬翻。" />
+              </div>
             </div>
             <div class="card-head-actions">
               <el-button class="filter-toggle" plain @click="filtersExpanded = !filtersExpanded">
@@ -76,8 +79,10 @@
         <article class="card console-card table-card" v-spotlight>
           <div class="card-head">
             <div>
-              <h3>最近处理动作</h3>
-              <p>重点看本轮处理到底改了哪些字段，避免后台只有结果、没有过程。</p>
+              <div class="section-title-row">
+                <h3>最近处理动作</h3>
+                <CompactHint description="重点只看这轮处理改了哪些字段；没有字段差异的日志主要用来保留轨迹。" />
+              </div>
             </div>
             <span class="table-meta">当前显示 {{ logs.length }} / {{ total }} 条</span>
           </div>
@@ -141,6 +146,7 @@
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import CollectionSkeleton from "../components/CollectionSkeleton.vue";
+import CompactHint from "../components/CompactHint.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import { listAdminOperationLogs } from "../api/adminLogs";

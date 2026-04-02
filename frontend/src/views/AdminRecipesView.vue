@@ -6,6 +6,7 @@
         <h2>菜谱管理</h2>
       </div>
       <div class="head-actions">
+        <CompactHint tone="warm" title="菜谱管理说明" description="先在列表处理状态和审核，只有需要深看内容结构时再展开详情抽屉。" />
         <el-button plain @click="resetFilters">重置筛选</el-button>
         <el-button type="primary" :loading="loadingRecipes" @click="applyFilters">应用筛选</el-button>
         <el-button plain @click="router.push('/recipes')">去前台菜谱页</el-button>
@@ -47,8 +48,10 @@
         <div class="card filter-card" v-spotlight>
           <div class="card-head">
             <div>
-              <h3>筛选与搜索</h3>
-              <p>{{ filterHint }}</p>
+              <div class="section-title-row">
+                <h3>筛选与搜索</h3>
+                <CompactHint description="先用菜名、审核、状态和来源快速收窄，只有必要时再切换聚焦视角。" />
+              </div>
             </div>
             <div class="card-head-actions">
               <el-button class="filter-toggle" plain @click="filtersExpanded = !filtersExpanded">
@@ -82,8 +85,10 @@
         <div class="card table-card" v-spotlight>
           <div class="card-head">
             <div>
-              <h3>菜谱列表</h3>
-              <p>当前聚焦的是{{ focusPresetLabel }}，适合先处理这一批内容，再回到全量视角。</p>
+              <div class="section-title-row">
+                <h3>菜谱列表</h3>
+                <CompactHint description="聚焦视角的目的是帮助你先清一批高优先项，不需要在列表里阅读完整说明。" />
+              </div>
             </div>
             <span class="table-meta">当前显示 {{ displayRecipes.length }} / {{ recipes.length }} 份菜谱</span>
           </div>
@@ -309,6 +314,7 @@ import { computed, nextTick, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AdminObjectTimeline from "../components/AdminObjectTimeline.vue";
 import CollectionSkeleton from "../components/CollectionSkeleton.vue";
+import CompactHint from "../components/CompactHint.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import { listAdminOperationLogs } from "../api/adminLogs";
