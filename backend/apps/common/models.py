@@ -37,3 +37,33 @@ class AdminOperationLog(TimeStampedModel):
     class Meta:
         db_table = "admin_operation_log"
         ordering = ["-created_at", "-id"]
+
+
+class UserNotification(TimeStampedModel):
+    TYPE_CHOICES = [
+        ("mention_post", "Mention Post"),
+        ("mention_comment", "Mention Comment"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="sent_notifications",
+    )
+    notification_type = models.CharField(max_length=32, choices=TYPE_CHOICES)
+    title = models.CharField(max_length=120)
+    body = models.CharField(max_length=255, blank=True, default="")
+    link_path = models.CharField(max_length=255, blank=True, default="")
+    metadata = models.JSONField(default=dict, blank=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "user_notification"
+        ordering = ["-created_at", "-id"]

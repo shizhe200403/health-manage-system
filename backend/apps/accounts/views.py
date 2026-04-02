@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.common.operation_logs import build_change_entries, create_admin_operation_log, snapshot_model_fields
-from apps.community.models import Post, PostComment
+from apps.community.models import Post, PostComment, PostLike
 from apps.recipes.models import Recipe, UserFavoriteRecipe
 from .auth_state import sync_user_active_flag
 from .models import UserHealthCondition, UserProfile
@@ -136,6 +136,10 @@ class PublicUserProfileResponseDataSerializer(serializers.Serializer):
     account = PublicUserProfileSerializer()
     stats = serializers.DictField()
     recent_posts = PublicUserPostSerializer(many=True)
+    public_favorites = serializers.JSONField()
+    recent_meal_types = serializers.JSONField()
+    recent_interactions = serializers.JSONField()
+    hot_posts = serializers.JSONField()
 
 
 class EnvelopePublicUserProfileSerializer(serializers.Serializer):
@@ -285,9 +289,23 @@ class PublicUserProfileView(APIView):
             .annotate(count=Count("id"))
             .order_by("-count", "-linked_recipe__meal_type")[:4]
         )
+        recent_interactions_qs = (
+            PostComment.objects.select_related("post")
+            .filter(user=user, status="visible", post__status="published")
+            .order_by("-created_at", "-id")[:6]
+        )
+        hot_posts_qs = (
+            Post.objects.filter(user=user, status="published")
+            .annotate(
+                like_count=Count("likes", distinct=True),
+                comment_count=Count("comments", filter=Q(comments__status="visible"), distinct=True),
+            )
+            .order_by("-like_count", "-comment_count", "-created_at", "-id")[:4]
+        )
         stats = {
             "published_posts": Post.objects.filter(user=user, status="published").count(),
             "comment_count": PostComment.objects.filter(user=user, status="visible").count(),
+            "like_count": PostLike.objects.filter(user=user).count(),
             "member_since": user.date_joined,
         }
         return Response(
@@ -314,6 +332,26 @@ class PublicUserProfileView(APIView):
                             "count": item["count"],
                         }
                         for item in recent_meal_type_counts
+                    ],
+                    "recent_interactions": [
+                        {
+                            "id": item.id,
+                            "post_id": item.post_id,
+                            "post_title": item.post.title if item.post else "",
+                            "content": item.content,
+                            "created_at": item.created_at,
+                        }
+                        for item in recent_interactions_qs
+                    ],
+                    "hot_posts": [
+                        {
+                            "id": post.id,
+                            "title": post.title,
+                            "cover_image_url": post.cover_image_url,
+                            "like_count": post.like_count,
+                            "comment_count": post.comment_count,
+                        }
+                        for post in hot_posts_qs
                     ],
                 },
             }

@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import AdminOperationLog
+from .models import UserNotification
 from .operation_logs import IsAdminOperatorPermission
 
 
@@ -20,6 +21,38 @@ class HealthCheckResponseSerializer(serializers.Serializer):
     data = HealthCheckDataSerializer()
 
 
+class UserNotificationActorSerializer(serializers.Serializer):
+    id = serializers.IntegerField(allow_null=True)
+    username = serializers.CharField(allow_blank=True)
+    nickname = serializers.CharField(allow_blank=True)
+    display_name = serializers.CharField(allow_blank=True)
+    avatar_url = serializers.CharField(allow_blank=True)
+
+
+class UserNotificationSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    notification_type = serializers.CharField()
+    title = serializers.CharField()
+    body = serializers.CharField()
+    link_path = serializers.CharField()
+    metadata = serializers.JSONField()
+    created_at = serializers.DateTimeField()
+    read_at = serializers.DateTimeField(allow_null=True)
+    actor = UserNotificationActorSerializer(allow_null=True)
+
+
+class UserNotificationEnvelopeSerializer(serializers.Serializer):
+    code = serializers.IntegerField()
+    message = serializers.CharField()
+    data = inline_serializer(
+        name="UserNotificationListData",
+        fields={
+            "unread_count": serializers.IntegerField(),
+            "items": UserNotificationSerializer(many=True),
+        },
+    )
+
+
 class HealthCheckView(APIView):
     authentication_classes = []
     permission_classes = []
@@ -27,6 +60,44 @@ class HealthCheckView(APIView):
     @extend_schema(responses=HealthCheckResponseSerializer)
     def get(self, request):
         return Response({"code": 0, "message": "success", "data": {"status": "ok"}})
+
+
+class UserNotificationListView(APIView):
+    def get(self, request):
+        queryset = UserNotification.objects.select_related("actor").filter(user=request.user).order_by("-created_at", "-id")[:12]
+        unread_count = UserNotification.objects.filter(user=request.user, read_at__isnull=True).count()
+        items = [
+            {
+                "id": item.id,
+                "notification_type": item.notification_type,
+                "title": item.title,
+                "body": item.body,
+                "link_path": item.link_path,
+                "metadata": item.metadata,
+                "created_at": item.created_at,
+                "read_at": item.read_at,
+                "actor": {
+                    "id": item.actor_id,
+                    "username": item.actor.username if item.actor else "",
+                    "nickname": item.actor.nickname if item.actor else "",
+                    "display_name": (item.actor.nickname or item.actor.username) if item.actor else "",
+                    "avatar_url": item.actor.avatar_url if item.actor else "",
+                } if item.actor_id else None,
+            }
+            for item in queryset
+        ]
+        return Response({"code": 0, "message": "success", "data": {"unread_count": unread_count, "items": items}})
+
+
+class UserNotificationReadView(APIView):
+    def post(self, request, notification_id):
+        notification = UserNotification.objects.filter(id=notification_id, user=request.user).first()
+        if notification is None:
+            return Response({"code": 404, "message": "not found", "data": None}, status=404)
+        if notification.read_at is None:
+            notification.read_at = timezone.now()
+            notification.save(update_fields=["read_at", "updated_at"])
+        return Response({"code": 0, "message": "success", "data": {"read": True}})
 
 
 class AdminOperationLogActorSerializer(serializers.Serializer):

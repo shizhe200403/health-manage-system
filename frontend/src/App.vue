@@ -23,6 +23,12 @@
         </nav>
         <div class="user-box">
           <RouterLink v-if="hasOpsUser" class="ghost admin-entry" :to="opsHomeRoute">后台</RouterLink>
+          <div ref="notificationWrapRef" class="notification-wrap">
+            <button class="ghost notification-trigger" type="button" :aria-expanded="notificationOpen" @click="toggleNotifications">
+              提醒
+              <span v-if="notificationUnreadCount" class="notification-badge">{{ notificationUnreadCount }}</span>
+            </button>
+          </div>
           <div ref="moreMenuWrapRef" class="more-menu-wrap">
             <button ref="moreTriggerRef" class="ghost more-trigger" type="button" :aria-expanded="moreMenuOpen" @click="toggleMoreMenu">
               更多
@@ -60,6 +66,34 @@
               <strong>{{ item.label }}</strong>
               <span>{{ item.copy }}</span>
             </RouterLink>
+          </div>
+        </Transition>
+      </Teleport>
+
+      <Teleport to="body">
+        <Transition name="menu-float">
+          <div v-if="notificationOpen" ref="notificationPanelRef" class="notification-panel" :style="notificationPanelStyle">
+            <div class="notification-panel-head">
+              <strong>站内提醒</strong>
+              <span>{{ notificationUnreadCount ? `${notificationUnreadCount} 条未读` : "已读完" }}</span>
+            </div>
+            <div v-if="notifications.length" class="notification-list">
+              <button
+                v-for="item in notifications"
+                :key="item.id"
+                type="button"
+                class="notification-item"
+                :class="{ unread: !item.read_at }"
+                @click="openNotification(item)"
+              >
+                <div class="notification-item-head">
+                  <strong>{{ item.title }}</strong>
+                  <span>{{ formatNotificationTime(item.created_at) }}</span>
+                </div>
+                <p>{{ item.body || "有一条新的站内提醒。" }}</p>
+              </button>
+            </div>
+            <div v-else class="notification-empty">当前还没有新的站内提醒</div>
           </div>
         </Transition>
       </Teleport>
@@ -169,6 +203,12 @@
           </RouterLink>
         </nav>
         <div class="admin-topnav-end">
+          <div ref="notificationWrapRef" class="notification-wrap">
+            <button class="ghost notification-trigger" type="button" :aria-expanded="notificationOpen" @click="toggleNotifications">
+              提醒
+              <span v-if="notificationUnreadCount" class="notification-badge">{{ notificationUnreadCount }}</span>
+            </button>
+          </div>
           <RouterLink class="ghost admin-return-soft" to="/">回到前台</RouterLink>
           <span class="admin-topnav-user">{{ auth.user?.nickname || auth.user?.username }}</span>
           <span class="admin-topnav-role">{{ adminRoleLabel }}</span>
@@ -283,6 +323,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { useRoute, useRouter } from "vue-router";
 import GlobalAssistantFloat from "./components/GlobalAssistantFloat.vue";
 import { listHealthGoals } from "./api/goals";
+import { listNotifications, markNotificationRead } from "./api/notifications";
 import { listMealRecords } from "./api/tracking";
 import { useAuthStore } from "./stores/auth";
 import { canAccessOpsScope, hasOpsAccess, isOpsManager, resolveOpsHome } from "./lib/opsAccess";
@@ -297,6 +338,11 @@ const moreMenuWrapRef = ref<HTMLElement | null>(null);
 const moreTriggerRef = ref<HTMLElement | null>(null);
 const moreMenuRef = ref<HTMLElement | null>(null);
 const moreMenuStyle = ref<Record<string, string>>({});
+const notificationWrapRef = ref<HTMLElement | null>(null);
+const notificationPanelRef = ref<HTMLElement | null>(null);
+const notificationOpen = ref(false);
+const notificationPanelStyle = ref<Record<string, string>>({});
+const notifications = ref<any[]>([]);
 const shellPointer = reactive({ x: 16, y: 10 });
 const personalizedTickerTips = ref<string[]>([]);
 let tickerRequestId = 0;
@@ -345,6 +391,7 @@ const adminRouteMoments = [
 
 const showChrome = computed(() => route.path !== "/login");
 const isAdminRoute = computed(() => route.path.startsWith("/ops"));
+const notificationUnreadCount = computed(() => notifications.value.filter((item) => !item.read_at).length);
 const primaryNavItems = computed(() => navItems.filter((item) => primaryNavPaths.includes(item.to)));
 const secondaryNavItems = computed(() => navItems.filter((item) => !primaryNavPaths.includes(item.to)));
 const hasOpsUser = computed(() => hasOpsAccess(auth.user));
@@ -419,9 +466,10 @@ watch(
   () => {
     if (!isAdminRoute.value) {
       void refreshTickerTips();
-      return;
+    } else {
+      personalizedTickerTips.value = [];
     }
-    personalizedTickerTips.value = [];
+    void loadNotificationsList();
   },
   { immediate: true },
 );
@@ -473,28 +521,36 @@ function handleAdminMobileLogout() {
 }
 
 function handleDocumentPointerDown(event: PointerEvent) {
-  if (!moreMenuOpen.value) {
-    return;
+  if (moreMenuOpen.value) {
+    const wrap = moreMenuWrapRef.value;
+    const menu = moreMenuRef.value;
+    if (event.target instanceof Node && !wrap?.contains(event.target) && !menu?.contains(event.target)) {
+      moreMenuOpen.value = false;
+    }
   }
 
-  const wrap = moreMenuWrapRef.value;
-  const menu = moreMenuRef.value;
-  if (!(event.target instanceof Node) || wrap?.contains(event.target) || menu?.contains(event.target)) {
-    return;
+  if (notificationOpen.value) {
+    const wrap = notificationWrapRef.value;
+    const panel = notificationPanelRef.value;
+    if (event.target instanceof Node && !wrap?.contains(event.target) && !panel?.contains(event.target)) {
+      notificationOpen.value = false;
+    }
   }
-
-  moreMenuOpen.value = false;
 }
 
 function handleDocumentKeydown(event: KeyboardEvent) {
   if (event.key === "Escape") {
     moreMenuOpen.value = false;
+    notificationOpen.value = false;
   }
 }
 
 function handleViewportChange() {
   if (moreMenuOpen.value) {
     updateMoreMenuPosition();
+  }
+  if (notificationOpen.value) {
+    updateNotificationPosition();
   }
 }
 
@@ -518,6 +574,64 @@ function updateMoreMenuPosition() {
     width: `${menuWidth}px`,
     maxHeight: `${maxHeight}px`,
   };
+}
+
+function updateNotificationPosition() {
+  const trigger = notificationWrapRef.value;
+  if (!trigger) {
+    return;
+  }
+  const bounds = trigger.getBoundingClientRect();
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const panelWidth = Math.min(340, viewportWidth - 32);
+  const left = Math.min(Math.max(16, bounds.right - panelWidth), Math.max(16, viewportWidth - panelWidth - 16));
+  const top = Math.max(16, bounds.bottom + 12);
+  notificationPanelStyle.value = {
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${panelWidth}px`,
+    maxHeight: `${Math.max(220, viewportHeight - top - 16)}px`,
+  };
+}
+
+async function loadNotificationsList() {
+  if (!auth.isAuthenticated) {
+    notifications.value = [];
+    return;
+  }
+  try {
+    const response = await listNotifications();
+    notifications.value = response.data?.items ?? [];
+  } catch {
+    notifications.value = [];
+  }
+}
+
+function toggleNotifications() {
+  notificationOpen.value = !notificationOpen.value;
+  if (notificationOpen.value) {
+    void loadNotificationsList();
+    void nextTick(() => updateNotificationPosition());
+  }
+}
+
+async function openNotification(item: any) {
+  if (!item.read_at) {
+    await markNotificationRead(item.id).catch(() => undefined);
+    item.read_at = new Date().toISOString();
+  }
+  notificationOpen.value = false;
+  if (item.link_path) {
+    router.push(item.link_path);
+  }
+}
+
+function formatNotificationTime(value?: string) {
+  if (!value) {
+    return "刚刚";
+  }
+  return value.replace("T", " ").slice(5, 16);
 }
 
 function handleShellPointerMove(event: PointerEvent) {
@@ -952,6 +1066,112 @@ h1,
   gap: 10px;
   white-space: nowrap;
   font-size: 13px;
+}
+
+.notification-wrap {
+  position: relative;
+}
+
+.notification-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notification-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #ff6b5f;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.notification-panel {
+  position: fixed;
+  z-index: 2100;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  box-shadow: 0 28px 48px rgba(15, 30, 39, 0.16);
+  backdrop-filter: blur(22px);
+  overflow: auto;
+}
+
+.notification-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 4px 0;
+}
+
+.notification-panel-head strong {
+  color: #173042;
+  font-size: 15px;
+}
+
+.notification-panel-head span {
+  color: #5a7a8a;
+  font-size: 12px;
+}
+
+.notification-list {
+  display: grid;
+  gap: 8px;
+}
+
+.notification-item {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(16, 34, 42, 0.06);
+  background: rgba(247, 251, 255, 0.94);
+  text-align: left;
+}
+
+.notification-item.unread {
+  border-color: rgba(255, 138, 28, 0.2);
+  background: linear-gradient(135deg, rgba(255, 248, 239, 0.98), rgba(247, 251, 255, 0.94));
+}
+
+.notification-item-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.notification-item-head strong {
+  color: #173042;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.notification-item-head span,
+.notification-item p,
+.notification-empty {
+  color: #5a7a8a;
+  font-size: 12px;
+}
+
+.notification-item p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.notification-empty {
+  padding: 18px 14px;
+  text-align: center;
 }
 
 .content {

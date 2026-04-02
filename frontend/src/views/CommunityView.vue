@@ -55,8 +55,27 @@
               maxlength="500"
               show-word-limit
               placeholder="尽量写清楚场景、做法、踩坑和结论，用户更容易互动。"
+              @input="handlePostDraftInput"
             />
           </el-form-item>
+          <div v-if="inlineMentionTarget === 'post'" class="mention-inline-panel">
+            <button
+              v-for="item in inlineMentionCandidates"
+              :key="item.id"
+              type="button"
+              class="mention-candidate"
+              @click="insertInlineMention(item)"
+            >
+              <div class="user-avatar-xs">
+                <img v-if="item.avatar_url" :src="item.avatar_url" alt="" />
+                <span v-else>{{ (item.display_name || item.username).charAt(0).toUpperCase() }}</span>
+              </div>
+              <div class="mention-candidate-copy">
+                <strong>{{ item.display_name }}</strong>
+                <span>@{{ item.username }}</span>
+              </div>
+            </button>
+          </div>
           <div class="mention-entry">
             <el-button plain @click="openMentionPicker('post')">@用户</el-button>
             <span class="mention-entry-copy">需要提到某位用户时，先选人再插入到正文。</span>
@@ -229,7 +248,7 @@
             <span class="like-heart">{{ post.is_liked_by_me ? '❤️' : '🤍' }}</span>
             <span class="like-count">{{ post.like_count ?? 0 }}</span>
           </el-button>
-          <el-input v-model.trim="commentDrafts[post.id]" placeholder="写评论" />
+          <el-input v-model.trim="commentDrafts[post.id]" placeholder="写评论" @input="handleCommentDraftInput(post.id)" />
           <el-button plain @click="openMentionPicker(post.id)">@用户</el-button>
           <input
             :id="`comment-img-input-${post.id}`"
@@ -239,6 +258,24 @@
           <el-button plain @click="triggerCommentImageInput(post.id)">{{ commentImageFiles[post.id] ? '已选图' : '附图' }}</el-button>
           <el-button :disabled="!commentDrafts[post.id]?.trim()" :loading="commentSubmittingId === post.id" @click="submitComment(post.id)">评论</el-button>
           <el-button plain @click="report(post.id)">举报</el-button>
+        </div>
+        <div v-if="inlineMentionTarget === post.id" class="mention-inline-panel mention-inline-panel-comment">
+          <button
+            v-for="item in inlineMentionCandidates"
+            :key="`${post.id}-${item.id}`"
+            type="button"
+            class="mention-candidate"
+            @click="insertInlineMention(item)"
+          >
+            <div class="user-avatar-xs">
+              <img v-if="item.avatar_url" :src="item.avatar_url" alt="" />
+              <span v-else>{{ (item.display_name || item.username).charAt(0).toUpperCase() }}</span>
+            </div>
+            <div class="mention-candidate-copy">
+              <strong>{{ item.display_name }}</strong>
+              <span>@{{ item.username }}</span>
+            </div>
+          </button>
         </div>
 
         <div class="comments" v-if="post.comments?.length">
@@ -376,6 +413,9 @@ const mentionDialogVisible = ref(false);
 const mentionKeyword = ref("");
 const mentionCandidates = ref<any[]>([]);
 const mentionTarget = ref<"post" | number | null>(null);
+const inlineMentionTarget = ref<"post" | number | null>(null);
+const inlineMentionCandidates = ref<any[]>([]);
+const inlineMentionKeyword = ref("");
 const form = reactive({
   title: "",
   content: "",
@@ -511,6 +551,15 @@ async function loadMentionCandidates() {
   }
 }
 
+async function loadInlineMentionCandidates(keyword: string) {
+  try {
+    const response = await searchPublicUsers(keyword);
+    inlineMentionCandidates.value = response.data ?? [];
+  } catch {
+    inlineMentionCandidates.value = [];
+  }
+}
+
 function openMentionPicker(target: "post" | number) {
   mentionTarget.value = target;
   mentionKeyword.value = "";
@@ -527,6 +576,54 @@ function insertMention(user: Record<string, any>) {
     commentDrafts[mentionTarget.value] = `${current}${mentionText}`.trimStart();
   }
   mentionDialogVisible.value = false;
+}
+
+function extractTrailingMention(text: string) {
+  const matched = text.match(/(?:^|\s)@([^\s@]{1,20})$/);
+  return matched ? matched[1] : "";
+}
+
+async function handlePostDraftInput() {
+  const keywordValue = extractTrailingMention(form.content);
+  if (!keywordValue) {
+    inlineMentionTarget.value = null;
+    inlineMentionCandidates.value = [];
+    inlineMentionKeyword.value = "";
+    return;
+  }
+  inlineMentionTarget.value = "post";
+  inlineMentionKeyword.value = keywordValue;
+  await loadInlineMentionCandidates(keywordValue);
+}
+
+async function handleCommentDraftInput(postId: number) {
+  const current = commentDrafts[postId] || "";
+  const keywordValue = extractTrailingMention(current);
+  if (!keywordValue) {
+    if (inlineMentionTarget.value === postId) {
+      inlineMentionTarget.value = null;
+      inlineMentionCandidates.value = [];
+      inlineMentionKeyword.value = "";
+    }
+    return;
+  }
+  inlineMentionTarget.value = postId;
+  inlineMentionKeyword.value = keywordValue;
+  await loadInlineMentionCandidates(keywordValue);
+}
+
+function insertInlineMention(user: Record<string, any>) {
+  const mentionText = `@[${user.display_name}](user:${user.id}) `;
+  const replacePattern = new RegExp(`@${inlineMentionKeyword.value.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}$`);
+  if (inlineMentionTarget.value === "post") {
+    form.content = form.content.replace(replacePattern, mentionText);
+  } else if (typeof inlineMentionTarget.value === "number") {
+    const current = commentDrafts[inlineMentionTarget.value] || "";
+    commentDrafts[inlineMentionTarget.value] = current.replace(replacePattern, mentionText);
+  }
+  inlineMentionTarget.value = null;
+  inlineMentionCandidates.value = [];
+  inlineMentionKeyword.value = "";
 }
 
 function parseMentionSegments(content: string) {
@@ -983,6 +1080,20 @@ h2 {
 .mention-entry-copy {
   color: #6f8592;
   font-size: 12px;
+}
+
+.mention-inline-panel {
+  display: grid;
+  gap: 10px;
+  margin: -2px 0 12px;
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(247, 251, 255, 0.96);
+  border: 1px solid rgba(16, 34, 42, 0.08);
+}
+
+.mention-inline-panel-comment {
+  margin-top: 10px;
 }
 
 .comment-item strong {

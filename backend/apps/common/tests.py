@@ -9,6 +9,7 @@ from rest_framework.test import APITestCase
 
 from apps.accounts.models import UserHealthCondition, UserProfile
 from apps.common.models import AdminOperationLog
+from apps.common.models import UserNotification
 from apps.community.models import ContentReport, Post, PostComment
 from apps.recipes.models import Ingredient, Recipe, RecipeNutritionSummary, RecipeStep, UserFavoriteRecipe
 from apps.reports.models import ReportTask
@@ -673,6 +674,29 @@ class ProductApiSmokeTests(APITestCase):
         search_response = self.client.get("/api/v1/accounts/users/public-search/?keyword=健康")
         self.assertEqual(search_response.status_code, 200)
         self.assertEqual(search_response.data["data"][0]["display_name"], "健康写手")
+
+    def test_mentioned_user_receives_notification(self):
+        author = self._create_user(username="mentioner", email="mentioner@example.com", phone="13800000024")
+        target = self._create_user(username="targetuser", email="targetuser@example.com", phone="13800000025")
+
+        self._login("mentioner@example.com")
+        post_response = self.client.post(
+            "/api/v1/posts/",
+            {
+                "title": "艾特提醒测试",
+                "content": f"今天想请 @[targetuser](user:{target.id}) 看看这份饮食记录",
+            },
+            format="json",
+        )
+        self.assertEqual(post_response.status_code, 201)
+        self.assertTrue(UserNotification.objects.filter(user=target, notification_type="mention_post").exists())
+
+        self.client.credentials()
+        self._login("targetuser@example.com")
+        notification_response = self.client.get("/api/v1/notifications/")
+        self.assertEqual(notification_response.status_code, 200)
+        self.assertEqual(notification_response.data["data"]["unread_count"], 1)
+        self.assertEqual(notification_response.data["data"]["items"][0]["notification_type"], "mention_post")
 
     def test_health_goal_progress_flow(self):
         self._create_user()

@@ -1,3 +1,5 @@
+import re
+
 from django.utils import timezone
 from django.db import models, transaction
 from django.shortcuts import get_object_or_404
@@ -17,6 +19,7 @@ from apps.common.operation_logs import (
     is_admin_operator,
     snapshot_model_fields,
 )
+from apps.common.models import UserNotification
 from apps.common.views import EnvelopeModelViewSet
 from .models import ContentReport, Post, PostComment, PostLike, CommentLike
 from .serializers import (
@@ -45,6 +48,35 @@ POST_FIELD_LABELS = {
     "status": "帖子状态",
     "audit_status": "审核结论",
 }
+
+MENTION_PATTERN = re.compile(r"@\[(.+?)\]\(user:(\d+)\)")
+
+
+def extract_mentioned_user_ids(content):
+    if not content:
+        return []
+    return list(dict.fromkeys(int(match.group(2)) for match in MENTION_PATTERN.finditer(content)))
+
+
+def create_mention_notifications(*, actor, content, notification_type, title, body, link_path, metadata=None):
+    mentioned_ids = extract_mentioned_user_ids(content)
+    if not mentioned_ids:
+        return
+    recipients = actor.__class__.objects.filter(id__in=mentioned_ids, status="active").exclude(id=actor.id)
+    notifications = [
+        UserNotification(
+            user=recipient,
+            actor=actor,
+            notification_type=notification_type,
+            title=title,
+            body=body,
+            link_path=link_path,
+            metadata=metadata or {},
+        )
+        for recipient in recipients
+    ]
+    if notifications:
+        UserNotification.objects.bulk_create(notifications)
 
 
 def user_display(user):
@@ -233,13 +265,31 @@ class PostViewSet(EnvelopeModelViewSet):
         )
 
     def perform_create(self, serializer):
-        serializer.save()
+        post = serializer.save()
+        create_mention_notifications(
+            actor=self.request.user,
+            content=post.content,
+            notification_type="mention_post",
+            title=f"{user_display(self.request.user) or self.request.user.username} 在帖子中提到了你",
+            body=f"帖子《{post.title}》中出现了你的提及",
+            link_path="/community",
+            metadata={"post_id": post.id},
+        )
 
     def perform_update(self, serializer):
         post = serializer.instance
         if post.user_id != self.request.user.id and not is_admin_operator(self.request.user):
             raise PermissionDenied("只有作者或管理员可以编辑帖子")
-        serializer.save()
+        updated_post = serializer.save()
+        create_mention_notifications(
+            actor=self.request.user,
+            content=updated_post.content,
+            notification_type="mention_post",
+            title=f"{user_display(self.request.user) or self.request.user.username} 更新帖子并提到了你",
+            body=f"帖子《{updated_post.title}》中出现了你的提及",
+            link_path="/community",
+            metadata={"post_id": updated_post.id},
+        )
 
     def destroy(self, request, *args, **kwargs):
         post = self.get_object()
@@ -255,6 +305,15 @@ class PostViewSet(EnvelopeModelViewSet):
         serializer = PostCommentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         comment = PostComment.objects.create(post=post, user=request.user, **serializer.validated_data)
+        create_mention_notifications(
+            actor=request.user,
+            content=comment.content,
+            notification_type="mention_comment",
+            title=f"{user_display(request.user) or request.user.username} 在评论中提到了你",
+            body=f"帖子《{post.title}》下有一条提及你的评论",
+            link_path="/community",
+            metadata={"post_id": post.id, "comment_id": comment.id},
+        )
         return Response({"code": 0, "message": "success", "data": PostCommentSerializer(comment).data}, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])

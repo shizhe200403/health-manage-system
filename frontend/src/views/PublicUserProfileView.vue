@@ -39,12 +39,12 @@
               <strong>{{ profileData.stats.comment_count }}</strong>
             </article>
             <article>
-              <span>加入时间</span>
-              <strong>{{ formatDate(profileData.stats.member_since) }}</strong>
+              <span>互动点赞</span>
+              <strong>{{ profileData.stats.like_count }}</strong>
             </article>
             <article>
-              <span>饮食风格</span>
-              <strong>{{ dietTypeLabel(profileData.account.profile?.diet_type) }}</strong>
+              <span>加入时间</span>
+              <strong>{{ formatDate(profileData.stats.member_since) }}</strong>
             </article>
           </div>
         </div>
@@ -105,6 +105,56 @@
               tone="empty"
               title="这个人还没有公开帖子"
               description="等他在社区里发布内容后，这里就会展示最近的沉淀。"
+              compact
+            />
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3>最近互动</h3>
+                <p>看看 TA 最近在哪些帖子下留下了互动痕迹。</p>
+              </div>
+            </div>
+            <div v-if="profileData.recent_interactions?.length" class="interaction-list">
+              <article v-for="item in profileData.recent_interactions" :key="item.id" class="interaction-card">
+                <strong>{{ item.post_title || "帖子互动" }}</strong>
+                <p>{{ item.content }}</p>
+                <span>{{ formatDateTime(item.created_at) }}</span>
+              </article>
+            </div>
+            <PageStateBlock
+              v-else
+              tone="empty"
+              title="TA 最近还没有公开互动"
+              description="等他在社区里评论、参与讨论后，这里会更像真实互动轨迹。"
+              compact
+            />
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3>热门帖子</h3>
+                <p>从 TA 的公开帖子里挑出互动热度更高的内容。</p>
+              </div>
+            </div>
+            <div v-if="profileData.hot_posts?.length" class="hot-post-list">
+              <article v-for="post in profileData.hot_posts" :key="post.id" class="hot-post-card">
+                <img v-if="post.cover_image_url" :src="post.cover_image_url" class="hot-post-cover" alt="" />
+                <div class="hot-post-copy">
+                  <strong>{{ post.title }}</strong>
+                  <p>{{ post.like_count }} 赞 · {{ post.comment_count }} 条评论</p>
+                </div>
+              </article>
+            </div>
+            <PageStateBlock
+              v-else
+              tone="empty"
+              title="TA 还没有形成明显热门帖子"
+              description="等帖子和互动积累更多后，这里会更有参考价值。"
               compact
             />
           </div>
@@ -289,7 +339,9 @@ onMounted(loadProfile);
 .public-info-list,
 .public-post-list,
 .favorite-public-list,
-.meal-type-list {
+.meal-type-list,
+.interaction-list,
+.hot-post-list {
   display: grid;
   gap: 14px;
 }
@@ -302,7 +354,9 @@ onMounted(loadProfile);
 .public-info-list article,
 .public-post-card,
 .favorite-public-card,
-.meal-type-card {
+.meal-type-card,
+.interaction-card,
+.hot-post-card {
   padding: 20px;
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.9);
@@ -452,6 +506,43 @@ onMounted(loadProfile);
 .meal-type-card strong {
   color: #173042;
   font-size: 20px;
+}
+
+.interaction-card,
+.hot-post-card {
+  display: grid;
+  gap: 8px;
+}
+
+.interaction-card p,
+.hot-post-copy p {
+  margin: 0;
+  color: #476072;
+  line-height: 1.5;
+}
+
+.interaction-card span {
+  color: #5a7a8a;
+  font-size: 12px;
+}
+
+.hot-post-card {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.hot-post-cover {
+  width: 76px;
+  height: 76px;
+  border-radius: 14px;
+  object-fit: cover;
+  border: 1px solid rgba(16, 34, 42, 0.08);
+}
+
+.hot-post-copy {
+  display: grid;
+  gap: 6px;
 }
 
 .lightbox {
