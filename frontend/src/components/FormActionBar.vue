@@ -58,29 +58,29 @@ const badgeLabel = computed(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  margin-top: 18px;
-  padding: 18px 20px;
-  border-radius: 20px;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 18px;
   border: 1px solid rgba(16, 34, 42, 0.08);
   background: rgba(247, 251, 255, 0.94);
 }
 
 .form-action-bar.is-compact {
-  padding: 16px 18px;
+  padding: 12px 14px;
 }
 
 .copy {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .badge {
   justify-self: flex-start;
-  padding: 6px 10px;
+  padding: 5px 8px;
   border-radius: 999px;
-  font-size: 12px;
-  letter-spacing: 0.12em;
+  font-size: 11px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   background: #e8f1f7;
   color: #24566a;
@@ -88,20 +88,22 @@ const badgeLabel = computed(() => {
 
 .copy strong {
   color: #173042;
-  font-size: 16px;
+  font-size: 15px;
+  line-height: 1.35;
 }
 
 .copy p {
   margin: 0;
   color: #476072;
-  line-height: 1.6;
+  line-height: 1.5;
+  font-size: 13px;
 }
 
 .actions {
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
 .is-warning .badge {

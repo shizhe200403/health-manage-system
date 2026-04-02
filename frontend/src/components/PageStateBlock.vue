@@ -50,9 +50,9 @@ const toneLabel = computed(() => {
 <style scoped>
 .state-block {
   display: grid;
-  gap: 10px;
-  padding: 20px;
-  border-radius: 22px;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 18px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 251, 255, 0.94)),
     radial-gradient(circle at top right, rgba(87, 181, 231, 0.1), transparent 30%);
@@ -62,16 +62,17 @@ const toneLabel = computed(() => {
 }
 
 .state-block.is-compact {
-  padding: 16px 18px;
-  border-radius: 18px;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 16px;
 }
 
 .state-badge {
   justify-self: flex-start;
-  padding: 6px 10px;
+  padding: 5px 8px;
   border-radius: 999px;
-  font-size: 12px;
-  letter-spacing: 0.12em;
+  font-size: 11px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #24566a;
   background: #e8f1f7;
@@ -84,21 +85,23 @@ const toneLabel = computed(() => {
 }
 
 .state-block strong {
-  font-size: 18px;
+  font-size: 16px;
   color: #173042;
+  line-height: 1.35;
 }
 
 .state-block p {
   margin: 0;
   color: #476072;
-  line-height: 1.65;
+  line-height: 1.55;
+  font-size: 13px;
 }
 
 .state-extra,
 .state-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
 .state-block.is-loading {

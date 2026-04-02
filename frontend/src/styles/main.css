@@ -261,6 +261,57 @@ video {
   font-weight: 700;
 }
 
+.page .empty-state,
+.page .status-item,
+.page .action-item,
+.page .helper-panel,
+.page .focus-box,
+.page .report-overview,
+.dashboard .focus-box,
+.dashboard .action-item {
+  padding: 14px 16px !important;
+  border-radius: 18px !important;
+}
+
+.page .empty-state strong,
+.page .status-item strong,
+.page .action-item strong,
+.page .helper-panel strong,
+.page .focus-box strong,
+.page .report-overview strong,
+.dashboard .focus-box strong,
+.dashboard .action-item strong {
+  font-size: 16px !important;
+  line-height: 1.35 !important;
+}
+
+.page .empty-state p,
+.page .status-item p,
+.page .action-item p,
+.page .helper-panel p,
+.page .focus-box p,
+.page .report-overview p,
+.dashboard .focus-box p,
+.dashboard .action-item p {
+  font-size: 13px !important;
+  line-height: 1.55 !important;
+}
+
+.page .head,
+.dashboard .head {
+  margin-bottom: 2px;
+}
+
+.page .summary-grid,
+.page .grid,
+.page .stats,
+.page .summary,
+.dashboard .summary-grid,
+.dashboard .workbench-grid,
+.dashboard .secondary-grid {
+  gap: 18px !important;
+}
+
 .page .desc,
 .dashboard .desc {
   max-width: 860px;

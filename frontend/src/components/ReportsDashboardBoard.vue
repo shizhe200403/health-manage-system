@@ -625,8 +625,8 @@ function goalSparkline(points: Array<Record<string, any>>) {
 .dashboard-kpi-card,
 .dashboard-panel,
 .dashboard-insight-card {
-  padding: 22px;
-  border-radius: 24px;
+  padding: 18px;
+  border-radius: 22px;
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(16, 34, 42, 0.08);
   box-shadow: 0 18px 48px rgba(15, 30, 39, 0.08);
@@ -636,7 +636,7 @@ function goalSparkline(points: Array<Record<string, any>>) {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 18px;
+  gap: 14px;
   background:
     radial-gradient(circle at top right, rgba(255, 184, 108, 0.18), transparent 26%),
     linear-gradient(135deg, rgba(247, 251, 255, 0.98), rgba(238, 246, 251, 0.96));
@@ -653,7 +653,7 @@ function goalSparkline(points: Array<Record<string, any>>) {
 
 .dashboard-hero-copy h3,
 .dashboard-panel h4 {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
 }
 
 .dashboard-hero-copy p,
@@ -662,20 +662,21 @@ function goalSparkline(points: Array<Record<string, any>>) {
 .dashboard-insight-card p,
 .dashboard-goal-copy p,
 .dashboard-chart-empty {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   color: #4d6a79;
-  line-height: 1.7;
+  line-height: 1.55;
+  font-size: 13px;
 }
 
 .dashboard-hero-chips {
   display: grid;
-  gap: 10px;
-  min-width: 220px;
+  gap: 8px;
+  min-width: 200px;
 }
 
 .dashboard-chip {
-  padding: 14px 16px;
-  border-radius: 18px;
+  padding: 10px 12px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.76);
   border: 1px solid rgba(16, 34, 42, 0.08);
 }
@@ -702,8 +703,8 @@ function goalSparkline(points: Array<Record<string, any>>) {
 
 .dashboard-chip strong {
   display: block;
-  margin-top: 8px;
-  font-size: 18px;
+  margin-top: 6px;
+  font-size: 16px;
 }
 
 .dashboard-kpi-grid,
@@ -711,7 +712,7 @@ function goalSparkline(points: Array<Record<string, any>>) {
 .dashboard-bottom-grid,
 .dashboard-insight-grid {
   display: grid;
-  gap: 14px;
+  gap: 18px;
 }
 
 .dashboard-kpi-grid {
