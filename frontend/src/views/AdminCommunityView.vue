@@ -51,9 +51,17 @@
                 <h3>帖子审核</h3>
                 <p>{{ postFilterHint }}</p>
               </div>
-              <el-button v-if="focusPreset !== 'all'" text type="primary" @click="applyFocusPreset('all')">回到全部视角</el-button>
+              <div class="card-head-actions">
+                <el-button class="filter-toggle" plain @click="postFiltersExpanded = !postFiltersExpanded">
+                  {{ postFiltersExpanded ? "收起筛选" : "展开筛选" }}
+                </el-button>
+                <el-button v-if="focusPreset !== 'all'" text type="primary" @click="applyFocusPreset('all')">回到全部视角</el-button>
+              </div>
             </div>
-            <div class="toolbar-grid">
+            <div v-if="!postFiltersExpanded" class="filter-summary-strip">
+              <span v-for="item in postFilterSummary" :key="item" class="filter-summary-chip">{{ item }}</span>
+            </div>
+            <div v-else class="toolbar-grid">
               <el-input v-model.trim="postFilters.keyword" placeholder="搜索标题、正文或作者" clearable @keyup.enter="applyPostFilters" />
               <el-select v-model="postFilters.status" clearable placeholder="状态">
                 <el-option label="公开中" value="published" />
@@ -131,9 +139,17 @@
                 <h3>举报处理</h3>
                 <p>{{ reportFilterHint }}</p>
               </div>
-              <el-button v-if="focusPreset !== 'all'" text type="primary" @click="applyFocusPreset('all')">回到全部视角</el-button>
+              <div class="card-head-actions">
+                <el-button class="filter-toggle" plain @click="reportFiltersExpanded = !reportFiltersExpanded">
+                  {{ reportFiltersExpanded ? "收起筛选" : "展开筛选" }}
+                </el-button>
+                <el-button v-if="focusPreset !== 'all'" text type="primary" @click="applyFocusPreset('all')">回到全部视角</el-button>
+              </div>
             </div>
-            <div class="toolbar-grid reports-toolbar">
+            <div v-if="!reportFiltersExpanded" class="filter-summary-strip">
+              <span v-for="item in reportFilterSummary" :key="item" class="filter-summary-chip">{{ item }}</span>
+            </div>
+            <div v-else class="toolbar-grid reports-toolbar">
               <el-input v-model.trim="reportFilters.keyword" placeholder="搜索举报原因、举报人或内部备注" clearable @keyup.enter="applyReportFilters" />
               <el-select v-model="reportFilters.status" clearable placeholder="处理状态">
                 <el-option label="待处理" value="pending" />
@@ -534,6 +550,8 @@ const selectedPostIds = ref<number[]>([]);
 const selectedReportIds = ref<number[]>([]);
 const postLogs = ref<any[]>([]);
 const reportLogs = ref<any[]>([]);
+const postFiltersExpanded = ref(false);
+const reportFiltersExpanded = ref(false);
 const focusPreset = ref<CommunityFocusPreset>("all");
 const syncingRoute = ref(false);
 
@@ -641,6 +659,23 @@ const postFilterHint = computed(() => {
 const reportFilterHint = computed(() => {
   if (focusPreset.value === "pending_reports") return "当前聚焦：待处理举报。建议先核对目标帖子，再直接给出处理结论。";
   return "举报处理要先看原因，再回到目标帖子确认是否真的需要介入。";
+});
+const postFilterSummary = computed(() => {
+  const items = [];
+  if (focusPreset.value !== "all") items.push(`视角：${focusCards.value.find((item) => item.key === focusPreset.value)?.label || "当前聚焦"}`);
+  if (postFilters.keyword) items.push(`搜索：${postFilters.keyword}`);
+  if (postFilters.status) items.push(`状态：${postStatusLabel(postFilters.status)}`);
+  if (postFilters.auditStatus) items.push(`审核：${auditLabel(postFilters.auditStatus)}`);
+  return items.length ? items : ["帖子侧当前无额外筛选"];
+});
+const reportFilterSummary = computed(() => {
+  const items = [];
+  if (focusPreset.value === "pending_reports") items.push("视角：待处理举报");
+  if (reportFilters.keyword) items.push(`搜索：${reportFilters.keyword}`);
+  if (reportFilters.status) items.push(`状态：${reportStatusLabel(reportFilters.status)}`);
+  if (reportFilters.priority) items.push(`优先级：${priorityLabel(reportFilters.priority)}`);
+  if (reportFilters.assignedTo) items.push(reportFilters.assignedTo === "unassigned" ? "未指派" : "已指定处理人");
+  return items.length ? items : ["举报侧当前无额外筛选"];
 });
 const postDrawerTitle = computed(() => (selectedPost.value ? `处理帖子：${selectedPost.value.title}` : "处理帖子"));
 const reportDrawerTitle = computed(() => (selectedReport.value ? `处理举报 #${selectedReport.value.id}` : "处理举报"));
@@ -877,10 +912,12 @@ async function applyBulkReportAction(action: "processed" | "rejected") {
 }
 
 function applyPostFilters() {
+  postFiltersExpanded.value = false;
   void syncRouteFromState();
 }
 
 function applyReportFilters() {
+  reportFiltersExpanded.value = false;
   void syncRouteFromState();
 }
 
@@ -893,6 +930,8 @@ function resetFilters() {
   reportFilters.status = "";
   reportFilters.priority = "";
   reportFilters.assignedTo = "";
+  postFiltersExpanded.value = false;
+  reportFiltersExpanded.value = false;
   void syncRouteFromState();
 }
 

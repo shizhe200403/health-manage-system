@@ -50,9 +50,17 @@
               <h3>筛选与搜索</h3>
               <p>{{ filterHint }}</p>
             </div>
-            <el-button v-if="focusPreset !== 'all'" text type="primary" @click="applyFocusPreset('all')">回到全部视角</el-button>
+            <div class="card-head-actions">
+              <el-button class="filter-toggle" plain @click="filtersExpanded = !filtersExpanded">
+                {{ filtersExpanded ? "收起筛选" : "展开筛选" }}
+              </el-button>
+              <el-button v-if="focusPreset !== 'all'" text type="primary" @click="applyFocusPreset('all')">回到全部视角</el-button>
+            </div>
           </div>
-          <div class="toolbar-grid">
+          <div v-if="!filtersExpanded" class="filter-summary-strip">
+            <span v-for="item in recipeFilterSummary" :key="item" class="filter-summary-chip">{{ item }}</span>
+          </div>
+          <div v-else class="toolbar-grid">
             <el-input v-model.trim="filters.keyword" placeholder="搜索菜名、描述、标签或来源" clearable @keyup.enter="applyFilters" />
             <el-select v-model="filters.status" clearable placeholder="筛选状态">
               <el-option label="草稿" value="draft" />
@@ -332,6 +340,7 @@ const recipes = ref<any[]>([]);
 const selectedRecipe = ref<any | null>(null);
 const selectedRecipeIds = ref<number[]>([]);
 const recipeLogs = ref<any[]>([]);
+const filtersExpanded = ref(false);
 const focusPreset = ref<RecipeFocusPreset>("all");
 const syncingRoute = ref(false);
 
@@ -392,6 +401,15 @@ const focusPresetLabel = computed(() => ({
 const filterHint = computed(() => {
   if (focusPreset.value === "all") return "先定位菜名、状态、审核结论和来源，再决定这批内容是否应继续发布。";
   return `当前聚焦：${focusPresetLabel.value}。先把这一批处理完，再回到全量视角。`;
+});
+const recipeFilterSummary = computed(() => {
+  const items = [];
+  if (focusPreset.value !== "all") items.push(`视角：${focusPresetLabel.value}`);
+  if (filters.keyword) items.push(`搜索：${filters.keyword}`);
+  if (filters.status) items.push(`状态：${statusLabel(filters.status)}`);
+  if (filters.auditStatus) items.push(`审核：${auditLabel(filters.auditStatus)}`);
+  if (filters.sourceType) items.push(`来源：${sourceLabel(filters.sourceType)}`);
+  return items.length ? items : ["当前无额外筛选"];
 });
 const displayRecipes = computed(() => {
   let items = [...recipes.value];
@@ -586,10 +604,12 @@ function resetFilters() {
   filters.auditStatus = "";
   filters.sourceType = "";
   focusPreset.value = "all";
+  filtersExpanded.value = false;
   void syncRouteFromState();
 }
 
 function applyFilters() {
+  filtersExpanded.value = false;
   void syncRouteFromState();
 }
 

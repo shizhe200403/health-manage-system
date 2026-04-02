@@ -50,9 +50,17 @@
               <h3>筛选与检索</h3>
               <p>{{ filterHint }}</p>
             </div>
-            <el-button v-if="focusPreset !== 'all'" text type="primary" @click="applyFocusPreset('all')">回到全部视角</el-button>
+            <div class="card-head-actions">
+              <el-button class="filter-toggle" plain @click="filtersExpanded = !filtersExpanded">
+                {{ filtersExpanded ? "收起筛选" : "展开筛选" }}
+              </el-button>
+              <el-button v-if="focusPreset !== 'all'" text type="primary" @click="applyFocusPreset('all')">回到全部视角</el-button>
+            </div>
           </div>
-          <div class="toolbar-grid">
+          <div v-if="!filtersExpanded" class="filter-summary-strip">
+            <span v-for="item in logFilterSummary" :key="item" class="filter-summary-chip">{{ item }}</span>
+          </div>
+          <div v-else class="toolbar-grid">
             <el-select v-model="filters.module" clearable placeholder="筛选模块">
               <el-option label="用户管理" value="users" />
               <el-option label="菜谱管理" value="recipes" />
@@ -151,6 +159,7 @@ const focusPresets: LogFocusPreset[] = ["all", "users", "recipes", "community", 
 const loading = ref(false);
 const logs = ref<any[]>([]);
 const total = ref(0);
+const filtersExpanded = ref(false);
 const focusPreset = ref<LogFocusPreset>("all");
 const syncingRoute = ref(false);
 const summary = ref({
@@ -216,6 +225,14 @@ const focusPresetLabel = computed(() => ({
 const filterHint = computed(() => {
   if (focusPreset.value === "all") return "先按模块或操作人收窄，再看具体字段前后变化，复盘会比从全量列表硬翻快很多。";
   return `当前聚焦：${focusPresetLabel.value}。先看这一批处理轨迹，再回到全量视角。`;
+});
+const logFilterSummary = computed(() => {
+  const items = [];
+  if (focusPreset.value !== "all") items.push(`视角：${focusPresetLabel.value}`);
+  if (filters.module) items.push(`模块：${moduleLabel(filters.module)}`);
+  if (filters.actor) items.push(`操作人：${filters.actor}`);
+  if (filters.keyword) items.push(`关键词：${filters.keyword}`);
+  return items.length ? items : ["当前无额外筛选"];
 });
 
 onMounted(() => {
@@ -305,6 +322,7 @@ function applyFilters() {
   } else if (focusPreset.value !== "all") {
     filters.module = focusPreset.value;
   }
+  filtersExpanded.value = false;
   void syncRouteFromState();
 }
 
@@ -313,6 +331,7 @@ function resetFilters() {
   filters.actor = "";
   filters.keyword = "";
   focusPreset.value = "all";
+  filtersExpanded.value = false;
   void syncRouteFromState();
 }
 

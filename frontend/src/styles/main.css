@@ -848,6 +848,45 @@ a[href]:active {
   background: linear-gradient(90deg, rgba(16, 34, 42, 0.12), rgba(16, 34, 42, 0.04), transparent 86%);
 }
 
+.admin-shell-root .page .card-head-actions,
+.admin-shell-root .dashboard .card-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-shell-root .page .filter-summary-strip,
+.admin-shell-root .dashboard .filter-summary-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(247, 251, 255, 0.92);
+  border: 1px dashed rgba(16, 34, 42, 0.12);
+}
+
+.admin-shell-root .page .filter-summary-chip,
+.admin-shell-root .dashboard .filter-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  color: #476072;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.admin-shell-root .page .filter-toggle,
+.admin-shell-root .dashboard .filter-toggle {
+  min-width: 104px;
+}
+
 .admin-shell-root .page .drawer-form,
 .admin-shell-root .dashboard .drawer-form {
   gap: 20px !important;

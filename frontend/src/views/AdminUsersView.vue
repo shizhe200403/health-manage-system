@@ -49,9 +49,17 @@
               <h3>筛选与搜索</h3>
               <p>{{ filterHint }}</p>
             </div>
-            <el-button v-if="focusPreset !== 'all'" text type="primary" @click="applyFocusPreset('all')">回到全部视角</el-button>
+            <div class="card-head-actions">
+              <el-button class="filter-toggle" plain @click="filtersExpanded = !filtersExpanded">
+                {{ filtersExpanded ? "收起筛选" : "展开筛选" }}
+              </el-button>
+              <el-button v-if="focusPreset !== 'all'" text type="primary" @click="applyFocusPreset('all')">回到全部视角</el-button>
+            </div>
           </div>
-          <div class="toolbar-grid">
+          <div v-if="!filtersExpanded" class="filter-summary-strip">
+            <span v-for="item in userFilterSummary" :key="item" class="filter-summary-chip">{{ item }}</span>
+          </div>
+          <div v-else class="toolbar-grid">
             <el-input v-model.trim="filters.keyword" placeholder="搜索用户名 / 昵称 / 邮箱 / 手机号" clearable @keyup.enter="applyFilters" />
             <el-select v-model="filters.role" clearable placeholder="筛选角色">
               <el-option label="普通用户" value="user" />
@@ -414,6 +422,7 @@ const users = ref<any[]>([]);
 const selectedUser = ref<any | null>(null);
 const selectedUserIds = ref<number[]>([]);
 const userLogs = ref<any[]>([]);
+const filtersExpanded = ref(false);
 const focusPreset = ref<UserFocusPreset>("all");
 const syncingRoute = ref(false);
 
@@ -505,6 +514,14 @@ const focusPresetLabel = computed(() => ({
 const filterHint = computed(() => {
   if (focusPreset.value === "all") return "先快速定位用户名、邮箱或手机号，再看角色和状态。";
   return `当前聚焦：${focusPresetLabel.value}。先把这一批处理掉，再回到全量视角。`;
+});
+const userFilterSummary = computed(() => {
+  const items = [];
+  if (focusPreset.value !== "all") items.push(`视角：${focusPresetLabel.value}`);
+  if (filters.keyword) items.push(`搜索：${filters.keyword}`);
+  if (filters.role) items.push(`角色：${roleLabel(filters.role)}`);
+  if (filters.status) items.push(`状态：${statusLabel(filters.status)}`);
+  return items.length ? items : ["当前无额外筛选"];
 });
 const displayUsers = computed(() => {
   switch (focusPreset.value) {
@@ -731,6 +748,7 @@ async function loadUsers() {
 
 function applyFilters() {
   pagination.page = 1;
+  filtersExpanded.value = false;
   void syncRouteFromState();
 }
 
@@ -740,6 +758,7 @@ function resetFilters() {
   filters.status = "";
   pagination.page = 1;
   focusPreset.value = "all";
+  filtersExpanded.value = false;
   void syncRouteFromState();
 }
 
