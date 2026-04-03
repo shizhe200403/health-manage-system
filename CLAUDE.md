@@ -15,7 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **GitHub 仓库**：`shizhe200403/health-manage-system`
 - **阿里云服务器**：华东1（杭州），Ubuntu 22.04，2核2GiB，公网IP `121.41.102.152`，开放 80/443/22 端口
 - **服务器项目目录**：`/root/health-manage-system`
-- **部署流程**：本地推送到 GitHub → 服务器拉取最新代码 → 重新部署
+- **部署流程**：本地推送到 GitHub → 服务器拉取最新代码 → 重新部署(代码做完更新之后即推送到github/服务器更新)（注意：由于服务器性能资源有限，尽量减少对服务器操作负载：1.服务器一条命令执行完成之后再执行下一条2.前端服务在本地构建，生成dist文件之后再推送到服务器更新）
 
 ## 常用命令
 
@@ -47,6 +47,7 @@ npm run build        # 生产构建
 **请求链路**：浏览器 → Nginx（80端口）→ `/api/*` 反向代理到 Gunicorn（8000端口）；其余路径由 Vue SPA 静态文件处理。
 
 **后端应用**（`backend/apps/`）：
+
 - `accounts` — 自定义用户模型、JWT 认证、健康档案
 - `recipes` — 菜谱与食材管理、营养摘要
 - `tracking` — 饮食/餐食记录
