@@ -262,6 +262,10 @@
           <el-button :disabled="!commentDrafts[post.id]?.trim()" :loading="commentSubmittingId === post.id" @click="submitComment(post.id)">评论</el-button>
           <el-button plain @click="report(post.id)">举报</el-button>
         </div>
+        <div v-if="replyTargetByPostId[post.id]" class="reply-target-strip">
+          <span>正在回复 {{ replyTargetByPostId[post.id]?.displayName }}</span>
+          <el-button text @click="clearReplyTarget(post.id)">取消回复</el-button>
+        </div>
         <div v-if="inlineMentionTarget === post.id" class="mention-inline-panel mention-inline-panel-comment">
           <button
             v-for="item in inlineMentionCandidates"
@@ -304,6 +308,7 @@
                 >
                   {{ comment.is_liked_by_me ? '❤️' : '🤍' }} {{ comment.like_count ?? 0 }}
                 </el-button>
+                <el-button text size="small" @click="setReplyTarget(post.id, comment)">回复</el-button>
                 <el-button v-if="isMyComment(comment)" text type="danger" size="small" :loading="deletingCommentId === comment.id" @click="removeComment(comment.id)">删除</el-button>
               </div>
             </div>
@@ -321,6 +326,49 @@
               </template>
             </p>
             <img v-if="comment.image_url" :src="comment.image_url" class="comment-img" @click="lightboxUrl = comment.image_url" />
+            <div v-if="comment.replies?.length" class="comment-replies">
+              <div v-for="reply in comment.replies" :id="`comment-${reply.id}`" :key="reply.id" class="comment-item reply-item">
+                <div class="comment-head">
+                  <div class="comment-author">
+                    <div class="user-avatar-xs">
+                      <button type="button" class="avatar-hit avatar-hit-small" @click="openUserProfile(Number(reply.user))">
+                        <img v-if="reply.user_info?.avatar_url" :src="reply.user_info.avatar_url" alt="" />
+                        <span v-else>{{ (reply.user_info?.display_name || '?').charAt(0).toUpperCase() }}</span>
+                      </button>
+                    </div>
+                    <strong><button type="button" class="author-link" @click="openUserProfile(Number(reply.user))">{{ reply.user_info?.display_name || "用户" }}</button></strong>
+                  </div>
+                  <span>{{ formatDateTime(reply.created_at) }}</span>
+                  <div class="comment-actions">
+                    <el-button
+                      text
+                      size="small"
+                      :loading="likingCommentId === reply.id"
+                      :class="['comment-like-btn', { 'is-liked': reply.is_liked_by_me }]"
+                      @click="toggleCommentLike(post, reply)"
+                    >
+                      {{ reply.is_liked_by_me ? '❤️' : '🤍' }} {{ reply.like_count ?? 0 }}
+                    </el-button>
+                    <el-button text size="small" @click="setReplyTarget(post.id, reply)">回复</el-button>
+                    <el-button v-if="isMyComment(reply)" text type="danger" size="small" :loading="deletingCommentId === reply.id" @click="removeComment(reply.id)">删除</el-button>
+                  </div>
+                </div>
+                <p>
+                  <template v-for="(segment, index) in parseMentionSegments(reply.content)" :key="`${reply.id}-reply-${index}`">
+                    <button
+                      v-if="segment.type === 'mention'"
+                      type="button"
+                      class="author-link mention-link"
+                      @click="openUserProfile(segment.userId)"
+                    >
+                      {{ segment.label }}
+                    </button>
+                    <span v-else>{{ segment.text }}</span>
+                  </template>
+                </p>
+                <img v-if="reply.image_url" :src="reply.image_url" class="comment-img" @click="lightboxUrl = reply.image_url" />
+              </div>
+            </div>
           </div>
         </div>
       </article>
@@ -424,6 +472,7 @@ const form = reactive({
   content: "",
   linked_recipe: null as number | null,
 });
+const replyTargetByPostId = reactive<Record<number, { id: number; displayName: string } | null>>({});
 const postSubmitDisabled = computed(() => !form.title.trim() || !form.content.trim());
 const postFormTone = computed(() => (postSubmitDisabled.value ? "warning" : "ready"));
 const postFormTitle = computed(() => {
@@ -502,6 +551,17 @@ function openUserProfile(userId: number) {
     return;
   }
   router.push(`/users/${userId}`);
+}
+
+function setReplyTarget(postId: number, comment: Record<string, any>) {
+  replyTargetByPostId[postId] = {
+    id: Number(comment.id),
+    displayName: comment.user_info?.display_name || comment.user_info?.username || "用户",
+  };
+}
+
+function clearReplyTarget(postId: number) {
+  replyTargetByPostId[postId] = null;
 }
 
 function clearAuthorFilter() {
@@ -738,7 +798,11 @@ async function submitComment(postId: number) {
       return;
     }
     commentSubmittingId.value = postId;
-    const res = await createComment(postId, { content });
+    const payload: Record<string, unknown> = { content };
+    if (replyTargetByPostId[postId]?.id) {
+      payload.parent_comment_id = replyTargetByPostId[postId]?.id;
+    }
+    const res = await createComment(postId, payload);
     const newCommentId = res.data?.id ?? res.id;
     if (commentImageFiles[postId] && newCommentId) {
       try {
@@ -747,6 +811,7 @@ async function submitComment(postId: number) {
     }
     commentDrafts[postId] = "";
     commentImageFiles[postId] = null;
+    clearReplyTarget(postId);
     notifyActionSuccess("评论已发布");
     await loadPosts();
   } catch (error) {
@@ -1537,4 +1602,57 @@ h2 {
     flex-direction: column;
   }
 }
-</style>
+
+.comment-replies {
+  margin-top: 8px;
+  padding-left: 16px;
+  border-left: 2px solid rgba(62, 109, 127, 0.15);
+}
+
+.reply-item {
+  background: rgba(245, 250, 253, 0.7);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-top: 6px;
+}
+
+.reply-target-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  margin-bottom: 4px;
+  background: rgba(62, 109, 127, 0.08);
+  border-radius: 8px;
+  font-size: 13px;
+  color: #3e6d7f;
+}
+
+.user-avatar-xs {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.avatar-hit-small {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #d0e8f5;
+  color: #2d6a8a;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.avatar-hit-small img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}</style>

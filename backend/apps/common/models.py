@@ -43,6 +43,9 @@ class UserNotification(TimeStampedModel):
     TYPE_CHOICES = [
         ("mention_post", "Mention Post"),
         ("mention_comment", "Mention Comment"),
+        ("reply_comment", "Reply Comment"),
+        ("like_post", "Like Post"),
+        ("like_comment", "Like Comment"),
     ]
 
     user = models.ForeignKey(

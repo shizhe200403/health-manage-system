@@ -42,6 +42,13 @@ class PostComment(TimeStampedModel):
 
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="comments")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="post_comments")
+    parent_comment = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="replies",
+    )
     content = models.TextField()
     image_url = models.TextField(blank=True, default="")
     status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="visible")
@@ -113,4 +120,3 @@ class CommentLike(TimeStampedModel):
         constraints = [
             models.UniqueConstraint(fields=["user", "comment"], name="uq_comment_like"),
         ]
-

@@ -92,6 +92,7 @@
                 @click="openNotification(item)"
               >
                 <div class="notification-item-head">
+                  <span class="notification-type-icon">{{ notificationIcon(item.notification_type) }}</span>
                   <strong>{{ item.title }}</strong>
                   <span>{{ formatNotificationTime(item.created_at) }}</span>
                 </div>
@@ -639,6 +640,17 @@ function formatNotificationTime(value?: string) {
   return value.replace("T", " ").slice(5, 16);
 }
 
+function notificationIcon(type?: string): string {
+  const map: Record<string, string> = {
+    like_post: "❤️",
+    like_comment: "🤍",
+    reply_comment: "💬",
+    mention_post: "📢",
+    mention_comment: "📢",
+  };
+  return map[type ?? ""] ?? "🔔";
+}
+
 async function markAllAsRead() {
   await markAllNotificationsRead().catch(() => undefined);
   notifications.value = notifications.value.map((item) => ({ ...item, read_at: item.read_at || new Date().toISOString() }));
@@ -1172,8 +1184,14 @@ h1,
 .notification-item-head {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   align-items: flex-start;
+}
+
+.notification-type-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .notification-item-head strong {

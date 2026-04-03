@@ -29,10 +29,18 @@ class PostCommentSerializer(serializers.ModelSerializer):
     user_info = UserBriefSerializer(source="user", read_only=True)
     like_count = serializers.SerializerMethodField()
     is_liked_by_me = serializers.SerializerMethodField()
+    replies = serializers.SerializerMethodField()
+    parent_comment_id = serializers.PrimaryKeyRelatedField(
+        source="parent_comment",
+        queryset=PostComment.objects.all(),
+        required=False,
+        allow_null=True,
+        write_only=True,
+    )
 
     class Meta:
         model = PostComment
-        fields = ["id", "user", "user_info", "content", "image_url", "status", "like_count", "is_liked_by_me", "created_at"]
+        fields = ["id", "user", "user_info", "content", "image_url", "status", "like_count", "is_liked_by_me", "created_at", "replies", "parent_comment_id"]
         read_only_fields = ["id", "status", "created_at", "user", "like_count", "is_liked_by_me"]
 
     def get_like_count(self, obj):
@@ -43,6 +51,10 @@ class PostCommentSerializer(serializers.ModelSerializer):
         if not request or not request.user.is_authenticated:
             return False
         return obj.likes.filter(user=request.user).exists()
+
+    def get_replies(self, obj):
+        replies = obj.replies.filter(status="visible").select_related("user").order_by("created_at", "id")
+        return PostCommentSerializer(replies, many=True, context=self.context).data
 
 
 class AdminPostCommentSerializer(serializers.ModelSerializer):
@@ -126,7 +138,7 @@ class PostSerializer(serializers.ModelSerializer):
         return obj.likes.filter(user=request.user).exists()
 
     def get_comments(self, obj):
-        comments = obj.comments.filter(status="visible").select_related("user")
+        comments = obj.comments.filter(status="visible", parent_comment__isnull=True).select_related("user").order_by("-created_at", "-id")
         return PostCommentSerializer(comments, many=True, context=self.context).data
 
     def create(self, validated_data):

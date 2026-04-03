@@ -79,6 +79,20 @@ def create_mention_notifications(*, actor, content, notification_type, title, bo
         UserNotification.objects.bulk_create(notifications)
 
 
+def create_single_notification(*, recipient, actor, notification_type, title, body, link_path, metadata=None):
+    if not recipient or recipient.id == actor.id:
+        return
+    UserNotification.objects.create(
+        user=recipient,
+        actor=actor,
+        notification_type=notification_type,
+        title=title,
+        body=body,
+        link_path=link_path,
+        metadata=metadata or {},
+    )
+
+
 def user_display(user):
     if not user:
         return None
@@ -258,6 +272,7 @@ class PostViewSet(EnvelopeModelViewSet):
             "user", "linked_recipe"
         ).prefetch_related(
             "comments", "comments__user", "comments__likes",
+            "comments__replies", "comments__replies__user", "comments__replies__likes",
             "likes",
             "linked_recipe__steps", "linked_recipe__recipe_ingredients", "linked_recipe__recipe_ingredients__ingredient",
         ).filter(
@@ -305,6 +320,16 @@ class PostViewSet(EnvelopeModelViewSet):
         serializer = PostCommentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         comment = PostComment.objects.create(post=post, user=request.user, **serializer.validated_data)
+        if comment.parent_comment_id:
+            create_single_notification(
+                recipient=comment.parent_comment.user,
+                actor=request.user,
+                notification_type="reply_comment",
+                title=f"{user_display(request.user) or request.user.username} 回复了你的评论",
+                body=f"帖子《{post.title}》下有一条新的回复",
+                link_path=f"/community?postId={post.id}&commentId={comment.id}",
+                metadata={"post_id": post.id, "comment_id": comment.id, "parent_comment_id": comment.parent_comment_id},
+            )
         create_mention_notifications(
             actor=request.user,
             content=comment.content,
@@ -354,6 +379,15 @@ class PostViewSet(EnvelopeModelViewSet):
             like_obj.delete()
             like_count = PostLike.objects.filter(post_id=post.pk).count()
             return Response({"code": 0, "message": "success", "data": {"liked": False, "like_count": like_count}})
+        create_single_notification(
+            recipient=post.user,
+            actor=request.user,
+            notification_type="like_post",
+            title=f"{user_display(request.user) or request.user.username} 点赞了你的帖子",
+            body=f"帖子《{post.title}》收到了新的点赞",
+            link_path=f"/community?postId={post.id}",
+            metadata={"post_id": post.id},
+        )
         like_count = PostLike.objects.filter(post_id=post.pk).count()
         return Response({"code": 0, "message": "success", "data": {"liked": True, "like_count": like_count}}, status=status.HTTP_201_CREATED)
 
@@ -368,6 +402,15 @@ class CommentLikeView(APIView):
             like_obj.delete()
             like_count = CommentLike.objects.filter(comment_id=comment.pk).count()
             return Response({"code": 0, "message": "success", "data": {"liked": False, "like_count": like_count}})
+        create_single_notification(
+            recipient=comment.user,
+            actor=request.user,
+            notification_type="like_comment",
+            title=f"{user_display(request.user) or request.user.username} 点赞了你的评论",
+            body="你在社区里的一条评论收到了新的点赞",
+            link_path=f"/community?postId={comment.post_id}&commentId={comment.id}",
+            metadata={"post_id": comment.post_id, "comment_id": comment.id},
+        )
         like_count = CommentLike.objects.filter(comment_id=comment.pk).count()
         return Response({"code": 0, "message": "success", "data": {"liked": True, "like_count": like_count}}, status=status.HTTP_201_CREATED)
 
