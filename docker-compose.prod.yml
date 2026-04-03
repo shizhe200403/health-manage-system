@@ -40,6 +40,7 @@ services:
     volumes:
       - media_data:/app/media
       - static_data:/app/staticfiles
+      - /root/alipay-keys:/run/alipay:ro
     command: ["sh", "/app/entrypoint.prod.sh"]
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/')\""]
@@ -63,6 +64,7 @@ services:
     volumes:
       - media_data:/app/media
       - static_data:/app/staticfiles
+      - /root/alipay-keys:/run/alipay:ro
     command: celery -A config worker -l info --concurrency=${CELERY_WORKER_CONCURRENCY:-1}
 
   beat:
