@@ -128,7 +128,9 @@ class CreateOrderView(APIView):
 
 
 class OrderDetailView(APIView):
-    """GET 查询订单状态（前端轮询用）"""
+    """GET 查询订单状态（前端轮询用）
+    可选参数 ?trade_no=<支付宝交易号>：若本地订单仍为 pending，主动向支付宝查询确认。
+    """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, order_no):
@@ -136,6 +138,22 @@ class OrderDetailView(APIView):
             order = Order.objects.get(order_no=order_no, user=request.user)
         except Order.DoesNotExist:
             return Response({"code": 1, "message": "订单不存在"}, status=status.HTTP_404_NOT_FOUND)
+
+        # 如果本地仍是 pending，且前端传来了支付宝 trade_no，主动查询支付宝确认
+        if order.status == "pending":
+            trade_no = request.query_params.get("trade_no", "").strip()
+            if trade_no:
+                try:
+                    client, _ = get_alipay_client()
+                    result = client.api_alipay_trade_query(out_trade_no=order_no)
+                    if result.get("trade_status") in ("TRADE_SUCCESS", "TRADE_FINISHED"):
+                        order.trade_no = result.get("trade_no", trade_no)
+                        _activate_plan(order)
+                        logger.info("Order %s confirmed via trade_query (trade_no=%s)", order_no, trade_no)
+                    else:
+                        logger.info("Order %s trade_query status: %s", order_no, result.get("trade_status"))
+                except Exception as e:
+                    logger.warning("Order %s trade_query failed: %s", order_no, e)
 
         return Response({
             "code": 0,

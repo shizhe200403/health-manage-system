@@ -52,6 +52,8 @@ const auth   = useAuthStore();
 
 // order_no 由我们自己拼入 return_url；out_trade_no 是支付宝追加的兜底字段
 const orderNo  = ref((route.query.order_no as string) || (route.query.out_trade_no as string) || "");
+// 支付宝 return_url 携带的交易号，用于主动查询确认
+const tradeNo  = (route.query.trade_no as string) || "";
 const statusParam = (route.query.status as string) || "";
 const isPaid   = ref(statusParam === "paid");
 const loading  = ref(false);
@@ -65,7 +67,7 @@ onMounted(async () => {
     loadPlanEnd();
     return;
   }
-  // 没有明确的 paid 参数时主动查询一次
+  // 没有明确的 paid 参数时主动查询一次（带 trade_no 让后端主动向支付宝确认）
   if (orderNo.value) {
     await checkNow();
   }
@@ -93,7 +95,7 @@ async function checkNow() {
   // 最多轮询 10 次，每次间隔 3s（共约 30s），等待异步 notify 到达
   for (let i = 0; i < 10; i++) {
     try {
-      const order = await getOrder(orderNo.value);
+      const order = await getOrder(orderNo.value, tradeNo || undefined);
       if (order.status === "paid") {
         isPaid.value = true;
         await auth.fetchMe().catch(() => {});
