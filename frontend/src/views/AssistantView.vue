@@ -799,12 +799,16 @@ h2 { margin: 0; font-size: 30px; }
     align-items: stretch;
   }
 
+  h2 {
+    font-size: 22px;
+  }
+
   .chat-layout {
     grid-template-columns: 1fr;
   }
 
   .sidebar {
-    max-height: 132px;
+    max-height: 200px;
     border-radius: 16px;
   }
 

@@ -93,14 +93,14 @@
 
     <div class="toolbar">
       <el-input v-model.trim="keyword" placeholder="搜索菜名、描述或餐次" clearable />
-      <el-select v-model="mealFilter" style="width: 160px">
+      <el-select v-model="mealFilter" class="toolbar-select">
         <el-option label="全部餐次" value="all" />
         <el-option label="早餐" value="breakfast" />
         <el-option label="午餐" value="lunch" />
         <el-option label="晚餐" value="dinner" />
         <el-option label="加餐" value="snack" />
       </el-select>
-      <el-select v-model="sortMode" style="width: 180px">
+      <el-select v-model="sortMode" class="toolbar-select">
         <el-option label="智能排序" value="smart" />
         <el-option label="最快出餐" value="time" />
         <el-option label="蛋白优先" value="protein" />
@@ -1482,6 +1482,10 @@ h2 {
   flex-wrap: wrap;
 }
 
+.toolbar-select {
+  width: 160px;
+}
+
 .section-kicker {
   margin: 0 0 8px;
   letter-spacing: 0.16em;
@@ -1664,7 +1668,7 @@ h2 {
 }
 
 .grid {
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
 }
 
 .meta,
@@ -1895,6 +1899,10 @@ h2 {
   .dialog-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .toolbar-select {
+    width: 100%;
   }
 
   .decision-copy strong {

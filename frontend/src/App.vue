@@ -977,7 +977,7 @@ h1,
 }
 
 .more-menu {
-  min-width: 280px;
+  min-width: min(280px, calc(100vw - 32px));
   display: grid;
   gap: 8px;
   padding: 10px;

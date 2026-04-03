@@ -1689,6 +1689,10 @@ h2 {
     flex-direction: column;
   }
 
+  .today-topline {
+    grid-template-columns: 1fr;
+  }
+
   .today-copy strong {
     font-size: 24px;
   }
