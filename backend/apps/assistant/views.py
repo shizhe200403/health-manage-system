@@ -1,5 +1,7 @@
 import json
 
+from django.db.models import F
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from django.http import StreamingHttpResponse
 from rest_framework import permissions, status
@@ -53,12 +55,36 @@ def chat(request, pk):
     except Conversation.DoesNotExist:
         return Response({"code": 1, "message": "not found"}, status=404)
 
+    # --- 配额检查 ---
+    FREE_MONTHLY_LIMIT = 30
+    user = request.user
+    now = timezone.now()
+    reset_needed = (
+        user.ai_usage_reset_at is None
+        or user.ai_usage_reset_at.year != now.year
+        or user.ai_usage_reset_at.month != now.month
+    )
+    if reset_needed:
+        user.ai_monthly_usage = 0
+        user.ai_usage_reset_at = now
+        user.save(update_fields=["ai_monthly_usage", "ai_usage_reset_at"])
+
+    if user.plan == "free" and user.ai_monthly_usage >= FREE_MONTHLY_LIMIT:
+        return Response(
+            {"code": 429, "message": f"本月免费对话次数（{FREE_MONTHLY_LIMIT}次）已用尽，升级 Pro 版继续使用"},
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+    # --- 配额检查结束 ---
+
     user_message = (request.data.get("message") or "").strip()
     if not user_message:
         return Response({"code": 1, "message": "message is required"}, status=400)
 
     # Save user message
     Message.objects.create(conversation=conv, role="user", content=user_message)
+
+    # 计数（用 F 表达式避免并发竞争）
+    type(user).objects.filter(pk=user.pk).update(ai_monthly_usage=F("ai_monthly_usage") + 1)
 
     # Auto-title from first message
     if conv.title == "新对话":

@@ -153,6 +153,15 @@ class RecipeViewSet(EnvelopeModelViewSet):
             return queryset.filter(public_filter | Q(created_by=user)).distinct()
         return queryset.filter(public_filter)
 
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.is_premium and getattr(request.user, "plan", "free") == "free":
+            return Response(
+                {"code": 403, "message": "Pro 专属菜谱，升级 Pro 版后可查看完整内容", "is_premium": True},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().retrieve(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         serializer.save(
             created_by=self.request.user if self.request.user.is_authenticated else None,

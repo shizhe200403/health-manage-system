@@ -1,7 +1,7 @@
 from django.urls import path
 
 from .token_views import ActiveStatusTokenRefreshView
-from .views import AdminUserBulkActionView, AdminUserDetailView, AdminUserListView, AvatarUploadView, ChangePasswordView, DeleteAccountView, FullProfileView, GetSecurityQuestionView, HealthConditionView, LoginView, MeView, ProfileView, PublicUserProfileView, PublicUserSearchView, RegisterView, ResetPasswordBySecurityView, SecurityQuestionListView, SetSecurityQuestionView
+from .views import AdminUserBulkActionView, AdminUserDetailView, AdminUserListView, AdminUserPlanView, AvatarUploadView, ChangePasswordView, DeleteAccountView, FullProfileView, GetSecurityQuestionView, HealthConditionView, LoginView, MeView, ProfileView, PublicUserProfileView, PublicUserSearchView, RegisterView, ResetPasswordBySecurityView, SecurityQuestionListView, SetSecurityQuestionView
 
 urlpatterns = [
     path("register/", RegisterView.as_view(), name="register"),
@@ -23,4 +23,5 @@ urlpatterns = [
     path("admin/users/", AdminUserListView.as_view(), name="admin-users"),
     path("admin/users/bulk/", AdminUserBulkActionView.as_view(), name="admin-user-bulk"),
     path("admin/users/<int:user_id>/", AdminUserDetailView.as_view(), name="admin-user-detail"),
+    path("admin/users/<int:pk>/plan/", AdminUserPlanView.as_view(), name="admin-user-plan"),
 ]

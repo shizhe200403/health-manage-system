@@ -24,6 +24,12 @@ class User(AbstractUser):
     avatar_url = models.TextField(blank=True, default="")
     security_question = models.CharField(max_length=128, blank=True, default="")
     security_answer_hash = models.CharField(max_length=255, blank=True, default="")
+    plan = models.CharField(
+        max_length=16, default="free",
+        choices=[("free", "免费版"), ("pro", "Pro 版")],
+    )
+    ai_monthly_usage = models.IntegerField(default=0)
+    ai_usage_reset_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "app_user"

@@ -46,6 +46,7 @@ class Recipe(TimeStampedModel):
     source_type = models.CharField(max_length=32, default="local")
     source_name = models.CharField(max_length=128, blank=True, default="")
     audit_status = models.CharField(max_length=32, choices=AUDIT_STATUS_CHOICES, default="pending")
+    is_premium = models.BooleanField(default=False)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,

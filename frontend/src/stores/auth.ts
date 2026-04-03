@@ -12,6 +12,11 @@ export const useAuthStore = defineStore("auth", {
   }),
   getters: {
     isAuthenticated: (state) => Boolean(state.accessToken),
+    isPro: (state) => state.user?.plan === "pro",
+    aiUsageRemaining: (state): number | null => {
+      if (state.user?.plan === "pro") return null;
+      return Math.max(0, 30 - (state.user?.ai_monthly_usage ?? 0));
+    },
   },
   actions: {
     setTokens(access: string, refresh: string) {

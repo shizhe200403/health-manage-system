@@ -23,6 +23,7 @@
         </nav>
         <div class="user-box">
           <RouterLink v-if="hasOpsUser" class="ghost admin-entry" :to="opsHomeRoute">后台</RouterLink>
+          <RouterLink v-if="auth.isAuthenticated && !auth.isPro" class="ghost upgrade-btn" to="/pricing">升级 Pro</RouterLink>
           <div ref="notificationWrapRef" class="notification-wrap">
             <button class="ghost notification-trigger" type="button" :aria-expanded="notificationOpen" @click="toggleNotifications">
               提醒
@@ -1073,6 +1074,17 @@ h1,
   background: rgba(255, 255, 255, 0.86);
   border-color: rgba(23, 48, 66, 0.24);
   box-shadow: 0 10px 22px rgba(15, 30, 39, 0.08);
+}
+
+.upgrade-btn {
+  border-color: #3e6d7f;
+  color: #3e6d7f;
+  font-weight: 600;
+}
+
+.upgrade-btn:hover {
+  background: rgba(62, 109, 127, 0.08);
+  border-color: #3e6d7f;
 }
 
 .shell.admin-shell-root .ghost:hover {

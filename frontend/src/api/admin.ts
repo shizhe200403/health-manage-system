@@ -19,3 +19,8 @@ export async function bulkUpdateAdminUsers(payload: { ids: number[]; status: "ac
   const { data } = await http.post("/accounts/admin/users/bulk/", payload);
   return data;
 }
+
+export async function setUserPlan(userId: number, plan: "free" | "pro") {
+  const { data } = await http.post(`/accounts/admin/users/${userId}/plan/`, { plan });
+  return data;
+}

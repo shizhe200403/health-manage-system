@@ -64,6 +64,9 @@ class UserSerializer(serializers.ModelSerializer):
             "avatar_url",
             "is_staff",
             "is_superuser",
+            "plan",
+            "ai_monthly_usage",
+            "ai_usage_reset_at",
             "profile",
             "health_condition",
         ]

@@ -601,6 +601,21 @@ class LoginView(APIView):
         )
 
 
+class AdminUserPlanView(APIView):
+    permission_classes = [IsAdminManager]
+
+    def post(self, request, pk):
+        user = get_object_or_404(User, pk=pk)
+        plan = request.data.get("plan", "").strip()
+        if plan not in ("free", "pro"):
+            return Response({"code": 1, "message": "plan 值无效，仅支持 free / pro"}, status=status.HTTP_400_BAD_REQUEST)
+        user.plan = plan
+        if plan == "pro":
+            user.ai_monthly_usage = 0
+        user.save(update_fields=["plan", "ai_monthly_usage"])
+        return Response({"code": 0, "message": "已更新", "data": {"plan": user.plan}})
+
+
 class AdminUserListView(APIView):
     permission_classes = [IsAdminManager]
     pagination_class = AdminUserPagination

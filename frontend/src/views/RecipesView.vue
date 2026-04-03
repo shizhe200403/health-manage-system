@@ -197,6 +197,8 @@
           <span v-if="isHighProtein(recipe)" class="feature-tag is-protein">高蛋白</span>
           <span v-if="isLightRecipe(recipe)" class="feature-tag is-light">轻负担</span>
           <span v-if="matchesGoal(recipe)" class="feature-tag is-goal">适合当前目标</span>
+          <span v-if="recipe.is_premium && !auth.isPro" class="feature-tag is-premium">🔒 Pro</span>
+          <span v-if="recipe.is_premium && auth.isPro"  class="feature-tag is-premium-ok">✦ Pro 专属</span>
         </div>
         <div class="decision-note">
           <strong>{{ recipeDecisionLabel(recipe) }}</strong>
@@ -232,6 +234,13 @@
       @favorite-change="handleFavoriteChange"
       @add-to-record="addToRecord"
     />
+    <el-dialog v-model="premiumLockedVisible" title="Pro 专属菜谱" width="420px">
+      <p>这是营养师精选的 Pro 专属菜谱，升级后即可查看完整食材和步骤。</p>
+      <template #footer>
+        <el-button @click="premiumLockedVisible = false">取消</el-button>
+        <el-button type="primary" @click="() => { premiumLockedVisible = false; router.push('/pricing'); }">升级 Pro</el-button>
+      </template>
+    </el-dialog>
     <el-dialog v-model="creatorVisible" width="760px" :title="editingRecipeId ? '编辑菜谱' : '上传菜谱'">
       <el-form label-position="top" class="creator-form">
         <div class="creator-section vision-section">
@@ -404,6 +413,7 @@ import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import { extractApiErrorMessage, notifyActionError, notifyActionSuccess, notifyErrorMessage, notifyLoadError, notifyWarning } from "../lib/feedback";
 import { useRouter } from "vue-router";
+import { useAuthStore } from "../stores/auth";
 import RecipeDetailDialog from "../components/RecipeDetailDialog.vue";
 import { createRecipe, explainRecommendation, favoriteRecipe, listFavoriteRecipes, listRecipes, unfavoriteRecipe, updateRecipe, deleteRecipe, uploadRecipeCover } from "../api/recipes";
 import { analyzeFoodImage } from "../api/assistant";
@@ -434,6 +444,7 @@ type FoodImageAnalysis = {
 };
 
 const router = useRouter();
+const auth = useAuthStore();
 const recipes = ref<any[]>([]);
 const favoriteIds = ref<number[]>([]);
 const favoriteLoadingId = ref<number | null>(null);
@@ -444,6 +455,7 @@ const sceneFilter = ref<"all" | "quick" | "high_protein" | "light" | "favorites"
 const sortMode = ref<"smart" | "time" | "protein" | "energy">("smart");
 const favoriteOnly = ref(false);
 const detailVisible = ref(false);
+const premiumLockedVisible = ref(false);
 const selectedRecipe = ref<Record<string, any> | null>(null);
 const selectedRecipeId = ref<number | null>(null);
 const selectedReasonText = ref("");
@@ -1291,6 +1303,10 @@ async function handleDelete(recipe: Record<string, any>) {
 }
 
 async function openDetail(recipe: Record<string, any>) {
+  if (recipe.is_premium && !auth.isPro) {
+    premiumLockedVisible.value = true;
+    return;
+  }
   selectedRecipeId.value = Number(recipe.id);
   detailVisible.value = true;
   try {
@@ -1694,6 +1710,16 @@ h2 {
 .feature-tag.is-goal {
   background: rgba(120, 64, 148, 0.14);
   color: #6b2f8e;
+}
+
+.feature-tag.is-premium {
+  background: #f0e6ff;
+  color: #7b3fe4;
+}
+
+.feature-tag.is-premium-ok {
+  background: #e6f0ff;
+  color: #3e6df4;
 }
 
 .creator-form {

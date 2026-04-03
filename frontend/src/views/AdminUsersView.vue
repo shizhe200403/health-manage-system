@@ -265,6 +265,12 @@
                   </el-form-item>
                 </el-col>
               </el-row>
+              <el-form-item label="账号套餐">
+                <el-select v-model="accountDraft.plan" style="width: 100%">
+                  <el-option label="免费版" value="free" />
+                  <el-option label="Pro 版" value="pro" />
+                </el-select>
+              </el-form-item>
               <el-form-item label="个性签名">
                 <el-input v-model.trim="accountDraft.signature" type="textarea" :rows="2" />
               </el-form-item>
@@ -402,7 +408,7 @@ import CollectionSkeleton from "../components/CollectionSkeleton.vue";
 import CompactHint from "../components/CompactHint.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
-import { bulkUpdateAdminUsers, getAdminUserDetail, listAdminUsers, updateAdminUser } from "../api/admin";
+import { bulkUpdateAdminUsers, getAdminUserDetail, listAdminUsers, setUserPlan, updateAdminUser } from "../api/admin";
 import { listAdminOperationLogs } from "../api/adminLogs";
 import { extractApiErrorMessage, notifyActionSuccess, notifyErrorMessage, notifyLoadError } from "../lib/feedback";
 import { useAuthStore } from "../stores/auth";
@@ -452,6 +458,7 @@ const accountDraft = reactive({
   signature: "",
   role: "user",
   status: "active",
+  plan: "free",
 });
 
 const profileDraft = reactive({
@@ -676,6 +683,7 @@ function resetDrafts() {
     signature: "",
     role: "user",
     status: "active",
+    plan: "free",
   });
   Object.assign(profileDraft, {
     height_cm: null,
@@ -707,6 +715,7 @@ function fillDrafts(user: Record<string, any>) {
     signature: user.signature || "",
     role: user.role || "user",
     status: user.status || "active",
+    plan: user.plan || "free",
   });
   Object.assign(profileDraft, {
     height_cm: user.profile?.height_cm ? Number(user.profile.height_cm) : null,
@@ -834,6 +843,9 @@ async function saveUser() {
       profile: { ...profileDraft },
       health_condition: { ...healthDraft },
     });
+    if (accountDraft.plan !== (selectedUser.value.plan ?? "free")) {
+      await setUserPlan(selectedUser.value.id, accountDraft.plan as "free" | "pro");
+    }
     selectedUser.value = response?.data ?? null;
     if (selectedUser.value) {
       fillDrafts(selectedUser.value);

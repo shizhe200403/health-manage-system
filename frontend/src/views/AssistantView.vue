@@ -105,6 +105,10 @@
           </div>
 
           <div class="input-area">
+            <div v-if="!auth.isPro && auth.aiUsageRemaining !== null" class="quota-bar">
+              本月剩余免费对话：<strong>{{ auth.aiUsageRemaining }} 次</strong>
+              <router-link to="/pricing" class="quota-upgrade">升级 Pro →</router-link>
+            </div>
             <el-input
               v-model="inputText"
               type="textarea"
@@ -125,6 +129,15 @@
       </div>
     </div>
   </section>
+
+  <el-dialog v-model="quotaExceededVisible" title="本月免费次数已用尽" width="420px" :close-on-click-modal="false">
+    <p>免费版每月 <strong>30 次</strong> AI 对话，本月已全部使用。</p>
+    <p style="margin-top: 8px; color: #5a7a8a; font-size: 14px;">升级 Pro 版后享受无限 AI 对话、PDF 报表导出、Pro 专属菜谱等全部高级功能。</p>
+    <template #footer>
+      <el-button @click="quotaExceededVisible = false">下月再用</el-button>
+      <el-button type="primary" @click="() => { quotaExceededVisible = false; router.push('/pricing'); }">了解 Pro 版</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
@@ -132,6 +145,7 @@ import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { chatSSE, createConversation, deleteConversation, getConversation, listConversations } from "../api/assistant";
 import { notifyActionError, notifyActionSuccess } from "../lib/feedback";
+import { useAuthStore } from "../stores/auth";
 import { ElMessageBox } from "element-plus";
 
 interface Conversation { id: number; title: string; created_at: string; updated_at: string }
@@ -147,6 +161,8 @@ type AssistantTask = {
 
 const route = useRoute();
 const router = useRouter();
+const auth = useAuthStore();
+const quotaExceededVisible = ref(false);
 const conversations = ref<Conversation[]>([]);
 const currentConvId = ref<number | null>(null);
 const messages = ref<Message[]>([]);
@@ -398,13 +414,23 @@ function sendPrompt(text: string) {
       messages.value.push({ id: Date.now() + 1, role: "assistant", content: streamingContent.value, created_at: new Date().toISOString() });
       streamingContent.value = "";
       streaming.value = false;
+      // 乐观递增本地计数
+      if (auth.user && auth.user.plan === "free") {
+        auth.user.ai_monthly_usage = (auth.user.ai_monthly_usage ?? 0) + 1;
+      }
       loadConversations();
       scrollToBottom();
     },
     (err) => {
       streamingContent.value = "";
       streaming.value = false;
-      notifyActionError(err || "AI 助手");
+      // 移除乐观插入的用户消息
+      messages.value = messages.value.filter((m) => m.role !== "user" || m.content !== prompt);
+      if (err === "QUOTA_EXCEEDED") {
+        quotaExceededVisible.value = true;
+      } else {
+        notifyActionError(err || "AI 助手");
+      }
     },
   );
 }
@@ -818,5 +844,29 @@ h2 { margin: 0; font-size: 30px; }
   .input-area {
     padding: 12px;
   }
+}
+
+.quota-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  margin-bottom: 8px;
+  background: rgba(62, 109, 127, 0.06);
+  border-radius: 8px;
+  font-size: 13px;
+  color: #476072;
+}
+
+.quota-upgrade {
+  margin-left: auto;
+  color: #3e6d7f;
+  font-weight: 600;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.quota-upgrade:hover {
+  text-decoration: underline;
 }
 </style>

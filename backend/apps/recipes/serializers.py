@@ -80,6 +80,7 @@ class RecipeSerializer(serializers.ModelSerializer):
             "source_type",
             "source_name",
             "audit_status",
+            "is_premium",
             "created_by",
             "created_at",
             "updated_at",

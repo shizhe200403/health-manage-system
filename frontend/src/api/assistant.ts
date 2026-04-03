@@ -57,7 +57,11 @@ export async function chatSSE(
   }
 
   if (!response.ok) {
-    onError(`请求失败 (${response.status})`);
+    if (response.status === 429) {
+      onError("QUOTA_EXCEEDED");
+    } else {
+      onError(`请求失败 (${response.status})`);
+    }
     return;
   }
 
