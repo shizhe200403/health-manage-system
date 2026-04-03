@@ -189,9 +189,11 @@ LLM_VISION_MODEL = os.getenv("LLM_VISION_MODEL", "")
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
 
 # 支付宝支付配置
-ALIPAY_APP_ID      = os.getenv("ALIPAY_APP_ID", "")
-ALIPAY_PRIVATE_KEY = os.getenv("ALIPAY_PRIVATE_KEY", "")   # 应用私钥（PKCS8，裸串）
-ALIPAY_PUBLIC_KEY  = os.getenv("ALIPAY_PUBLIC_KEY", "")    # 支付宝公钥（裸串）
-ALIPAY_NOTIFY_URL  = os.getenv("ALIPAY_NOTIFY_URL", "")    # 异步通知地址（公网可达）
-ALIPAY_RETURN_URL  = os.getenv("ALIPAY_RETURN_URL", "")    # 同步跳转地址（前端支付结果页）
-ALIPAY_SANDBOX     = get_bool_env("ALIPAY_SANDBOX", False)  # True=沙箱环境
+ALIPAY_APP_ID           = os.getenv("ALIPAY_APP_ID", "")
+ALIPAY_PRIVATE_KEY_FILE = os.getenv("ALIPAY_PRIVATE_KEY_FILE", "")  # 优先：pem 文件路径（容器内绝对路径）
+ALIPAY_PUBLIC_KEY_FILE  = os.getenv("ALIPAY_PUBLIC_KEY_FILE", "")   # 优先：pem 文件路径
+ALIPAY_PRIVATE_KEY      = os.getenv("ALIPAY_PRIVATE_KEY", "")       # 备用：裸私钥字符串
+ALIPAY_PUBLIC_KEY       = os.getenv("ALIPAY_PUBLIC_KEY", "")        # 备用：裸公钥字符串
+ALIPAY_NOTIFY_URL       = os.getenv("ALIPAY_NOTIFY_URL", "")        # 异步通知地址（公网可达）
+ALIPAY_RETURN_URL       = os.getenv("ALIPAY_RETURN_URL", "")        # 同步跳转地址（前端支付结果页）
+ALIPAY_SANDBOX          = get_bool_env("ALIPAY_SANDBOX", False)      # True=沙箱环境
