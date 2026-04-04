@@ -903,6 +903,10 @@ function resetFilters() {
 }
 
 function addToRecord(recipe: Record<string, any>) {
+  if (recipe.is_premium && !auth.isPro) {
+    premiumLockedVisible.value = true;
+    return;
+  }
   router.push({
     path: "/records",
     query: {
