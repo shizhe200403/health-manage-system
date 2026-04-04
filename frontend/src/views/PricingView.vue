@@ -154,7 +154,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { useAuthStore } from "../stores/auth";
@@ -181,7 +181,20 @@ onMounted(async () => {
       // 静默忽略
     }
   }
+  // 用户从支付宝标签切回时立即主动查询
+  document.addEventListener("visibilitychange", onVisibilityChange);
 });
+
+onUnmounted(() => {
+  document.removeEventListener("visibilitychange", onVisibilityChange);
+  stopPolling();
+});
+
+function onVisibilityChange() {
+  if (document.visibilityState === "visible" && waitingVisible.value && currentOrderNo.value) {
+    silentCheck();
+  }
+}
 
 async function startPayment() {
   if (!auth.isAuthenticated) {
@@ -222,7 +235,7 @@ function stopPolling() {
 async function silentCheck() {
   if (!currentOrderNo.value) return;
   try {
-    const order = await getOrder(currentOrderNo.value);
+    const order = await getOrder(currentOrderNo.value, undefined, true);
     if (order.status === "paid") {
       stopPolling();
       onPaymentSuccess();
@@ -236,7 +249,7 @@ async function checkPayment() {
   if (checking.value || !currentOrderNo.value) return;
   checking.value = true;
   try {
-    const order = await getOrder(currentOrderNo.value);
+    const order = await getOrder(currentOrderNo.value, undefined, true);
     if (order.status === "paid") {
       stopPolling();
       onPaymentSuccess();

@@ -139,10 +139,11 @@ class OrderDetailView(APIView):
         except Order.DoesNotExist:
             return Response({"code": 1, "message": "订单不存在"}, status=status.HTTP_404_NOT_FOUND)
 
-        # 如果本地仍是 pending，且前端传来了支付宝 trade_no，主动查询支付宝确认
+        # 如果本地仍是 pending，且前端传来了 trade_no 或 check=1，主动查询支付宝确认
         if order.status == "pending":
             trade_no = request.query_params.get("trade_no", "").strip()
-            if trade_no:
+            force_check = request.query_params.get("check", "").strip() == "1"
+            if trade_no or force_check:
                 try:
                     client, _ = get_alipay_client()
                     result = client.api_alipay_trade_query(out_trade_no=order_no)

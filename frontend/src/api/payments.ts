@@ -15,8 +15,10 @@ export async function createOrder(planType: "monthly" | "annual"): Promise<Order
   return data.data as OrderData;
 }
 
-export async function getOrder(orderNo: string, tradeNo?: string): Promise<OrderData> {
-  const params = tradeNo ? { trade_no: tradeNo } : {};
+export async function getOrder(orderNo: string, tradeNo?: string, forceCheck?: boolean): Promise<OrderData> {
+  const params: Record<string, string> = {};
+  if (tradeNo) params.trade_no = tradeNo;
+  if (forceCheck) params.check = "1";
   const { data } = await http.get(`/payments/orders/${orderNo}/`, { params });
   return data.data as OrderData;
 }
