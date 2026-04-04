@@ -276,6 +276,13 @@ class ReportTaskView(APIView):
             }
         )
 
+    def delete(self, request, task_id):
+        task = ReportTask.objects.filter(id=task_id, user=request.user).first()
+        if task is None:
+            return Response({"code": 404, "message": "not found", "data": None}, status=404)
+        task.delete()
+        return Response({"code": 0, "message": "deleted", "data": None}, status=200)
+
 
 class ReportTaskListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
