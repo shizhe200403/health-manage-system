@@ -60,6 +60,7 @@ class PostCommentSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         attrs = super().validate(attrs)
         result = sanitize_sensitive_fields(attrs, ("content",))
+        self._moderation_feedback = result
         if result["blocked"]:
             raise serializers.ValidationError({
                 field: "内容包含禁止发布的敏感信息，请修改后再提交。"
@@ -155,6 +156,7 @@ class PostSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         attrs = super().validate(attrs)
         result = sanitize_sensitive_fields(attrs, ("title", "content"))
+        self._moderation_feedback = result
         if result["blocked"]:
             raise serializers.ValidationError({
                 field: "内容包含禁止发布的敏感信息，请修改后再提交。"
@@ -240,6 +242,7 @@ class AdminPostUpdateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         attrs = super().validate(attrs)
         result = sanitize_sensitive_fields(attrs, ("title", "content"))
+        self._moderation_feedback = result
         if result["blocked"]:
             raise serializers.ValidationError({
                 field: "内容包含禁止发布的敏感信息，请修改后再提交。"

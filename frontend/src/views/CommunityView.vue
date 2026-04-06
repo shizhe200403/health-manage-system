@@ -431,7 +431,7 @@ import FormActionBar from "../components/FormActionBar.vue";
 import CollectionSkeleton from "../components/CollectionSkeleton.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
-import { ElMessageBox, notifyActionError, notifyActionSuccess, notifyLoadError, notifyWarning } from "../lib/feedback";
+import { ElMessageBox, extractApiErrorMessage, notifyActionError, notifyActionSuccess, notifyErrorMessage, notifyLoadError, notifyWarning } from "../lib/feedback";
 import { createComment, createPost, deleteComment, deletePost, likeComment, likePost, listPosts, reportPost, updatePost, uploadCommentImage, uploadPostCover } from "../api/community";
 import { searchPublicUsers } from "../api/auth";
 import { listRecipes } from "../api/recipes";
@@ -599,6 +599,32 @@ function statusClass(value?: string) {
   return value === "archived" ? "is-archived" : "is-published";
 }
 
+function buildModerationNotice(action: "publish_post" | "update_post" | "publish_comment", moderation?: { masked?: boolean; masked_fields?: string[] }) {
+  if (!moderation?.masked) {
+    return "";
+  }
+  if (action === "publish_post") {
+    return "帖子里的敏感表达已自动替换后发布。";
+  }
+  if (action === "update_post") {
+    return "帖子里的敏感表达已自动替换后保存。";
+  }
+  return "评论里的敏感表达已自动替换后发布。";
+}
+
+function isBlockedModerationMessage(message: string) {
+  return message.includes("禁止发布的敏感信息");
+}
+
+function handleCommunitySubmitError(error: unknown, action: string) {
+  const message = extractApiErrorMessage(error, "");
+  if (message && isBlockedModerationMessage(message)) {
+    notifyErrorMessage(message);
+    return;
+  }
+  notifyActionError(action);
+}
+
 function resetForm() {
   editingPostId.value = null;
   form.title = "";
@@ -764,13 +790,18 @@ async function submitPost() {
 
     posting.value = true;
     if (editingPostId.value) {
-      await updatePost(editingPostId.value, form);
+      const res = await updatePost(editingPostId.value, form);
       if (coverFile.value) {
         try {
           await uploadPostCover(editingPostId.value, coverFile.value);
         } catch { /* 封面上传失败不阻断主流程 */ }
       }
-      notifyActionSuccess("帖子已更新");
+      const moderationNotice = buildModerationNotice("update_post", res.moderation);
+      if (moderationNotice) {
+        notifyWarning(moderationNotice);
+      } else {
+        notifyActionSuccess("帖子已更新");
+      }
     } else {
       const res = await createPost(form);
       const newPostId = res.data?.id ?? res.id;
@@ -779,12 +810,17 @@ async function submitPost() {
           await uploadPostCover(Number(newPostId), coverFile.value);
         } catch { /* 封面上传失败不阻断主流程 */ }
       }
-      notifyActionSuccess("发布成功");
+      const moderationNotice = buildModerationNotice("publish_post", res.moderation);
+      if (moderationNotice) {
+        notifyWarning(moderationNotice);
+      } else {
+        notifyActionSuccess("发布成功");
+      }
     }
     resetForm();
     await loadPosts();
   } catch (error) {
-    notifyActionError(editingPostId.value ? "更新帖子" : "发布帖子");
+    handleCommunitySubmitError(error, editingPostId.value ? "更新帖子" : "发布帖子");
   } finally {
     posting.value = false;
   }
@@ -812,10 +848,15 @@ async function submitComment(postId: number) {
     commentDrafts[postId] = "";
     commentImageFiles[postId] = null;
     clearReplyTarget(postId);
-    notifyActionSuccess("评论已发布");
+    const moderationNotice = buildModerationNotice("publish_comment", res.moderation);
+    if (moderationNotice) {
+      notifyWarning(moderationNotice);
+    } else {
+      notifyActionSuccess("评论已发布");
+    }
     await loadPosts();
   } catch (error) {
-    notifyActionError("发表评论");
+    handleCommunitySubmitError(error, "发表评论");
   } finally {
     commentSubmittingId.value = null;
   }

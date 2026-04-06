@@ -113,6 +113,17 @@ def snapshot_report_fields(report):
     }
 
 
+def moderation_feedback_from_serializer(serializer):
+    feedback = getattr(serializer, "_moderation_feedback", {}) or {}
+    masked = feedback.get("masked", {})
+    if not masked:
+        return None
+    return {
+        "masked": True,
+        "masked_fields": sorted(masked.keys()),
+    }
+
+
 class IsAdminModerator(permissions.BasePermission):
     def has_permission(self, request, view):
         return IsAdminOperatorPermission().has_permission(request, view)
@@ -293,6 +304,17 @@ class PostViewSet(EnvelopeModelViewSet):
             metadata={"post_id": post.id},
         )
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        payload = {"code": 0, "message": "success", "data": serializer.data}
+        moderation = moderation_feedback_from_serializer(serializer)
+        if moderation:
+            payload["moderation"] = moderation
+        return Response(payload, status=status.HTTP_201_CREATED, headers=headers)
+
     def perform_update(self, serializer):
         post = serializer.instance
         if post.user_id != self.request.user.id and not is_admin_operator(self.request.user):
@@ -307,6 +329,22 @@ class PostViewSet(EnvelopeModelViewSet):
             link_path=f"/community?postId={updated_post.id}",
             metadata={"post_id": updated_post.id},
         )
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, "_prefetched_objects_cache", None):
+            instance._prefetched_objects_cache = {}
+
+        payload = {"code": 0, "message": "success", "data": serializer.data}
+        moderation = moderation_feedback_from_serializer(serializer)
+        if moderation:
+            payload["moderation"] = moderation
+        return Response(payload, status=status.HTTP_200_OK)
 
     def destroy(self, request, *args, **kwargs):
         post = self.get_object()
@@ -341,7 +379,11 @@ class PostViewSet(EnvelopeModelViewSet):
             link_path=f"/community?postId={post.id}&commentId={comment.id}",
             metadata={"post_id": post.id, "comment_id": comment.id},
         )
-        return Response({"code": 0, "message": "success", "data": PostCommentSerializer(comment).data}, status=status.HTTP_201_CREATED)
+        payload = {"code": 0, "message": "success", "data": PostCommentSerializer(comment).data}
+        moderation = moderation_feedback_from_serializer(serializer)
+        if moderation:
+            payload["moderation"] = moderation
+        return Response(payload, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
     def report(self, request, pk=None):

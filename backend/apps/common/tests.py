@@ -819,6 +819,8 @@ class ProductApiSmokeTests(APITestCase):
         self.assertEqual(post.content, "这里有人在**，还夹带*-*信息。")
         self.assertEqual(post_response.data["data"]["title"], "远离* *套路")
         self.assertEqual(post_response.data["data"]["content"], "这里有人在**，还夹带*-*信息。")
+        self.assertTrue(post_response.data["moderation"]["masked"])
+        self.assertEqual(post_response.data["moderation"]["masked_fields"], ["content", "title"])
 
         comment_response = self.client.post(
             f"/api/v1/posts/{post_id}/comments/",
@@ -829,6 +831,8 @@ class ProductApiSmokeTests(APITestCase):
         comment = PostComment.objects.get(post_id=post_id)
         self.assertEqual(comment.content, "这种* *留言应该直接处理。")
         self.assertEqual(comment_response.data["data"]["content"], "这种* *留言应该直接处理。")
+        self.assertTrue(comment_response.data["moderation"]["masked"])
+        self.assertEqual(comment_response.data["moderation"]["masked_fields"], ["content"])
 
     @override_settings(COMMUNITY_SENSITIVE_WORDS=[], COMMUNITY_BLOCKED_WORDS=["毒品"])
     def test_community_blocked_words_are_rejected_even_with_separators(self):
