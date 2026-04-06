@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from rest_framework import serializers
 
-from .models import ContentReport, Post, PostComment
+from .models import ContentReport, Post, PostComment, SensitiveWordRule
 from .safety import sanitize_sensitive_fields
 
 User = get_user_model()
@@ -331,3 +331,28 @@ class AdminContentReportUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContentReport
         fields = ["status", "priority", "assigned_to", "internal_note", "follow_up_at"]
+
+
+class AdminSensitiveWordRuleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SensitiveWordRule
+        fields = ["id", "word", "action", "is_active", "note", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class AdminSensitiveWordRuleWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SensitiveWordRule
+        fields = ["word", "action", "is_active", "note"]
+
+    def validate_word(self, value):
+        cleaned = str(value or "").strip()
+        if not cleaned:
+            raise serializers.ValidationError("敏感词不能为空")
+
+        queryset = SensitiveWordRule.objects.filter(word__iexact=cleaned)
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError("该敏感词规则已存在")
+        return cleaned

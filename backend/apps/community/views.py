@@ -21,11 +21,13 @@ from apps.common.operation_logs import (
 )
 from apps.common.models import UserNotification
 from apps.common.views import EnvelopeModelViewSet
-from .models import ContentReport, Post, PostComment, PostLike, CommentLike
+from .models import ContentReport, Post, PostComment, PostLike, CommentLike, SensitiveWordRule
 from .serializers import (
     AdminContentReportDetailSerializer,
     AdminContentReportListSerializer,
     AdminContentReportUpdateSerializer,
+    AdminSensitiveWordRuleSerializer,
+    AdminSensitiveWordRuleWriteSerializer,
     AdminPostDetailSerializer,
     AdminPostListSerializer,
     AdminPostUpdateSerializer,
@@ -740,3 +742,92 @@ class AdminContentReportDetailView(APIView):
         )
         detail = AdminContentReportDetailSerializer(report)
         return Response({"code": 0, "message": "success", "data": detail.data}, status=status.HTTP_200_OK)
+
+
+class AdminSensitiveWordRuleListView(APIView):
+    permission_classes = [IsAdminModerator]
+
+    def get(self, request):
+        queryset = SensitiveWordRule.objects.order_by("action", "word", "-id")
+
+        keyword = request.query_params.get("keyword", "").strip()
+        action_value = request.query_params.get("action", "").strip()
+        is_active = request.query_params.get("is_active", "").strip()
+
+        if keyword:
+            queryset = queryset.filter(models.Q(word__icontains=keyword) | models.Q(note__icontains=keyword))
+        if action_value:
+            queryset = queryset.filter(action=action_value)
+        if is_active in {"true", "false"}:
+            queryset = queryset.filter(is_active=(is_active == "true"))
+
+        serializer = AdminSensitiveWordRuleSerializer(queryset, many=True)
+        return Response({"code": 0, "message": "success", "data": {"items": serializer.data}})
+
+    def post(self, request):
+        serializer = AdminSensitiveWordRuleWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        rule = serializer.save()
+        create_admin_operation_log(
+            actor=request.user,
+            module="community",
+            action="create_sensitive_word_rule",
+            target_type="community_sensitive_word_rule",
+            target_id=rule.id,
+            target_label=rule.word,
+            summary=f"新增敏感词规则「{rule.word}」",
+            metadata={"action_type": rule.action, "is_active": rule.is_active},
+        )
+        detail = AdminSensitiveWordRuleSerializer(rule)
+        return Response({"code": 0, "message": "success", "data": detail.data}, status=status.HTTP_201_CREATED)
+
+
+class AdminSensitiveWordRuleDetailView(APIView):
+    permission_classes = [IsAdminModerator]
+
+    def get_object(self, rule_id):
+        return get_object_or_404(SensitiveWordRule, pk=rule_id)
+
+    def patch(self, request, rule_id):
+        rule = self.get_object(rule_id)
+        before = snapshot_model_fields(rule, ["word", "action", "is_active", "note"])
+        serializer = AdminSensitiveWordRuleWriteSerializer(rule, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        rule = serializer.save()
+        create_admin_operation_log(
+            actor=request.user,
+            module="community",
+            action="update_sensitive_word_rule",
+            target_type="community_sensitive_word_rule",
+            target_id=rule.id,
+            target_label=rule.word,
+            summary=f"更新了敏感词规则「{rule.word}」",
+            changes=build_change_entries(
+                before,
+                snapshot_model_fields(rule, ["word", "action", "is_active", "note"]),
+                {
+                    "word": "敏感词",
+                    "action": "处理动作",
+                    "is_active": "启用状态",
+                    "note": "备注",
+                },
+                section="敏感词规则",
+            ),
+        )
+        detail = AdminSensitiveWordRuleSerializer(rule)
+        return Response({"code": 0, "message": "success", "data": detail.data}, status=status.HTTP_200_OK)
+
+    def delete(self, request, rule_id):
+        rule = self.get_object(rule_id)
+        label = rule.word
+        rule.delete()
+        create_admin_operation_log(
+            actor=request.user,
+            module="community",
+            action="delete_sensitive_word_rule",
+            target_type="community_sensitive_word_rule",
+            target_id=rule_id,
+            target_label=label,
+            summary=f"删除了敏感词规则「{label}」",
+        )
+        return Response({"code": 0, "message": "success", "data": {"deleted": True, "id": rule_id}}, status=status.HTTP_200_OK)

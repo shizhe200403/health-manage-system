@@ -39,3 +39,33 @@ export async function bulkUpdateAdminCommunityReports(payload: { ids: number[]; 
   const { data } = await http.post("/community/admin/reports/bulk/", payload);
   return data;
 }
+
+export interface AdminSensitiveWordRule {
+  id: number;
+  word: string;
+  action: "mask" | "block";
+  is_active: boolean;
+  note: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function listAdminSensitiveWordRules(params?: Record<string, unknown>) {
+  const { data } = await http.get("/community/admin/sensitive-words/", { params });
+  return data as { data?: { items?: AdminSensitiveWordRule[] } };
+}
+
+export async function createAdminSensitiveWordRule(payload: Record<string, unknown>) {
+  const { data } = await http.post("/community/admin/sensitive-words/", payload);
+  return data as { data?: AdminSensitiveWordRule };
+}
+
+export async function updateAdminSensitiveWordRule(ruleId: number, payload: Record<string, unknown>) {
+  const { data } = await http.patch(`/community/admin/sensitive-words/${ruleId}/`, payload);
+  return data as { data?: AdminSensitiveWordRule };
+}
+
+export async function deleteAdminSensitiveWordRule(ruleId: number) {
+  const { data } = await http.delete(`/community/admin/sensitive-words/${ruleId}/`);
+  return data as { data?: { deleted?: boolean; id?: number } };
+}

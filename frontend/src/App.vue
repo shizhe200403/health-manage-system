@@ -375,6 +375,7 @@ const adminNavItems = [
   { to: "/ops/logs", label: "操作日志", icon: "迹", copy: "回看是谁改了什么、改完是否把后台主线拉稳", scope: "operator" as const },
   { to: "/ops/reports", label: "运营复核", icon: "报", copy: "集中看后台运营指标、报表任务和记录覆盖情况", scope: "operator" as const },
   { to: "/ops/community", label: "社区审核", icon: "社", copy: "集中处理帖子审核、举报和评论隐藏", scope: "operator" as const },
+  { to: "/ops/community/rules", label: "敏感词管理", icon: "词", copy: "集中维护社区屏蔽词和拦截词规则", scope: "operator" as const },
   { to: "/ops/recipes", label: "菜谱管理", icon: "谱", copy: "集中处理菜谱状态、审核结论和内容质量", scope: "operator" as const },
   { to: "/ops/users", label: "用户管理", icon: "户", copy: "集中管理账号状态、角色边界和资料质量", scope: "manager" as const },
 ];
@@ -396,6 +397,7 @@ const adminRouteMoments = [
   { path: "/ops/logs", label: "操作日志", badge: "Action Trail", title: "先把最近到底改了什么看清楚", copy: "操作日志不是为了堆记录，而是为了让后台动作可回看、可追责、可复盘。", hint: "先看动作轨迹，再判断问题出在哪一步", cta: "回后台总览", to: "/ops", scope: "operator" as const },
   { path: "/ops/reports", label: "运营复核", badge: "Operations Review", title: "先把运营指标和报表任务看清楚", copy: "这页更适合从整体活跃度、内容处理节奏和报表任务状态判断后台下一步。", hint: "先看指标，再判断要补数据、补内容还是补处理节奏", cta: "回后台总览", to: "/ops", scope: "operator" as const },
   { path: "/ops/community", label: "社区审核", badge: "Community Moderation", title: "先把帖子审核和举报处理收紧", copy: "社区后台先看待审核内容、待处理举报和评论隐藏动作，别让风险内容继续外露。", hint: "优先看待审核帖子和待处理举报", cta: "回后台总览", to: "/ops", scope: "operator" as const },
+  { path: "/ops/community/rules", label: "敏感词管理", badge: "Safety Rules", title: "先把社区规则边界维护清楚", copy: "敏感词页不是为了堆词库，而是为了把屏蔽替换和直接拦截的口径维护清楚。", hint: "先分清屏蔽词和拦截词，再处理启停", cta: "回社区审核", to: "/ops/community", scope: "operator" as const },
   { path: "/ops/recipes", label: "菜谱管理", badge: "Recipe Operations", title: "先把菜谱状态和审核结论收紧", copy: "菜谱管理先盯状态、审核和信息质量，别让无效内容混进用户决策链路。", hint: "优先看待审核和信息不完整的菜谱", cta: "回后台总览", to: "/ops", scope: "operator" as const },
   { path: "/ops/users", label: "用户管理", badge: "User Operations", title: "先把账号、角色和资料边界看清楚", copy: "用户管理是后台最核心的第一块，先把角色边界、状态和资料质量稳住。", hint: "优先检查权限、停用状态和资料完整度", cta: "回后台总览", to: "/ops", scope: "manager" as const },
 ];
@@ -822,6 +824,11 @@ function buildAdminRouteTickerTip(summary: AdminOperationsSummary, topQueue: Adm
     return communityBacklog > 0
       ? `社区审核当前还有 ${communityBacklog} 项帖子或举报待处理，先判断风险暴露，再决定通过、驳回还是隐藏。`
       : "社区审核当前没有明显积压，适合把注意力放到判断口径和处理质量上。";
+  }
+  if (routePath === "/ops/community/rules") {
+    return topQueue
+      ? `敏感词规则页适合先校准口径，再回头看「${topQueue.label}」这类积压是不是需要补新规则。`
+      : "敏感词规则页当前更适合复核哪些词该屏蔽替换，哪些词应该直接拦截。";
   }
   if (routePath === "/ops/recipes") {
     return summary.recipes_pending > 0

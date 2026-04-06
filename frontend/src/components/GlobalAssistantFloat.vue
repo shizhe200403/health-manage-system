@@ -326,6 +326,17 @@ const contexts: AssistantContext[] = [
     ],
   },
   {
+    path: "/ops/community/rules",
+    label: "敏感词管理",
+    badge: "Admin Safety Rules",
+    summary: "适合问哪些词该屏蔽、哪些该拦截、规则启停和误伤风险怎么判断。",
+    prompts: [
+      { label: "先看哪块", prompt: "我当前在敏感词管理页。请告诉我先看哪几个规则最值得优先处理，以及为什么。" },
+      { label: "屏蔽和拦截怎么分", prompt: "我当前在敏感词管理页。请直接解释屏蔽替换和直接拦截分别适合什么场景。" },
+      { label: "最容易误伤什么", prompt: "我当前在敏感词管理页。请只告诉我这页最容易误伤的 3 类规则，以及怎么避免。" },
+    ],
+  },
+  {
     path: "/ops/community",
     label: "社区审核",
     badge: "Admin Community",
@@ -469,6 +480,7 @@ const currentContext = computed(() => {
 const pageContext = computed(() => {
   const p = route.path;
   if (p.startsWith("/ops/users")) return "ops:users";
+  if (p.startsWith("/ops/community/rules")) return "ops:community_rules";
   if (p.startsWith("/ops/community")) return "ops:community";
   if (p.startsWith("/ops/reports")) return "ops:reports";
   if (p.startsWith("/ops/logs")) return "ops:logs";

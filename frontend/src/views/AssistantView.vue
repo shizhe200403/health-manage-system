@@ -485,6 +485,11 @@ function taskContextFromPageContext(pageContext: string): AssistantTaskContext |
       title: "社区审核协助",
       description: "当前已锁定社区审核场景。更适合直接问帖子审核、举报处理、评论隐藏和协作字段该怎么用。",
     },
+    "ops:community_rules": {
+      badge: "敏感词管理",
+      title: "敏感词管理协助",
+      description: "当前已锁定敏感词管理场景。更适合直接问哪些词该屏蔽、哪些该拦截、规则启停和误伤风险怎么判断。",
+    },
     "ops:reports": {
       badge: "运营复核",
       title: "运营复核协助",

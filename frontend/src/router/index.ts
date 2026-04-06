@@ -23,6 +23,7 @@ const router = createRouter({
     { path: "/payment/result", component: () => import("../views/PaymentResultView.vue") },
     { path: "/ops", component: () => import("../views/AdminDashboardView.vue"), meta: { opsScope: "manager" } },
     { path: "/ops/community", component: () => import("../views/AdminCommunityView.vue"), meta: { opsScope: "operator" } },
+    { path: "/ops/community/rules", component: () => import("../views/AdminSensitiveWordRulesView.vue"), meta: { opsScope: "operator" } },
     { path: "/ops/logs", component: () => import("../views/AdminOperationLogsView.vue"), meta: { opsScope: "operator" } },
     { path: "/ops/reports", component: () => import("../views/AdminOpsReportsView.vue"), meta: { opsScope: "operator" } },
     { path: "/ops/recipes", component: () => import("../views/AdminRecipesView.vue"), meta: { opsScope: "operator" } },

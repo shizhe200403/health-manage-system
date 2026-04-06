@@ -10,7 +10,7 @@ from rest_framework.test import APITestCase
 from apps.accounts.models import UserHealthCondition, UserProfile
 from apps.common.models import AdminOperationLog
 from apps.common.models import UserNotification
-from apps.community.models import ContentReport, Post, PostComment
+from apps.community.models import ContentReport, Post, PostComment, SensitiveWordRule
 from apps.recipes.models import Ingredient, Recipe, RecipeNutritionSummary, RecipeStep, UserFavoriteRecipe
 from apps.reports.models import ReportTask
 from apps.tracking.models import HealthGoal, HealthGoalProgress, MealRecord, MealRecordItem, UserBehavior
@@ -291,6 +291,41 @@ class ProductApiSmokeTests(APITestCase):
         self.assertEqual(report.status, "processed")
         self.assertEqual(report.processed_by_id, admin_user.id)
         self.assertIsNotNone(report.processed_at)
+
+    def test_admin_can_manage_sensitive_word_rules(self):
+        admin_user = self._create_user(username="opsrule", email="opsrule@example.com", phone="13800000020")
+        admin_user.role = "admin"
+        admin_user.is_staff = True
+        admin_user.save(update_fields=["role", "is_staff"])
+
+        self._login("opsrule@example.com")
+
+        create_response = self.client.post(
+            "/api/v1/community/admin/sensitive-words/",
+            {"word": "违禁词", "action": "block", "is_active": True, "note": "高风险内容"},
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, 201)
+        rule_id = create_response.data["data"]["id"]
+        self.assertTrue(SensitiveWordRule.objects.filter(id=rule_id, word="违禁词", action="block").exists())
+
+        list_response = self.client.get("/api/v1/community/admin/sensitive-words/?action=block")
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(list_response.data["data"]["items"][0]["word"], "违禁词")
+
+        update_response = self.client.patch(
+            f"/api/v1/community/admin/sensitive-words/{rule_id}/",
+            {"action": "mask", "is_active": False, "note": "先改成屏蔽"},
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, 200)
+        rule = SensitiveWordRule.objects.get(id=rule_id)
+        self.assertEqual(rule.action, "mask")
+        self.assertFalse(rule.is_active)
+
+        delete_response = self.client.delete(f"/api/v1/community/admin/sensitive-words/{rule_id}/")
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertFalse(SensitiveWordRule.objects.filter(id=rule_id).exists())
 
     def test_regular_user_cannot_access_admin_community_endpoints(self):
         self._create_user()

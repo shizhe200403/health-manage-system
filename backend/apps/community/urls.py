@@ -8,6 +8,8 @@ from .views import (
     AdminCommunityReportBulkActionView,
     AdminContentReportDetailView,
     AdminContentReportListView,
+    AdminSensitiveWordRuleDetailView,
+    AdminSensitiveWordRuleListView,
     CommentImageUploadView,
     CommentLikeView,
     CommentModerationViewSet,
@@ -29,4 +31,6 @@ urlpatterns = router.urls + [
     path("community/admin/reports/", AdminContentReportListView.as_view(), name="admin-community-reports"),
     path("community/admin/reports/bulk/", AdminCommunityReportBulkActionView.as_view(), name="admin-community-report-bulk"),
     path("community/admin/reports/<int:report_id>/", AdminContentReportDetailView.as_view(), name="admin-community-report-detail"),
+    path("community/admin/sensitive-words/", AdminSensitiveWordRuleListView.as_view(), name="admin-community-sensitive-word-list"),
+    path("community/admin/sensitive-words/<int:rule_id>/", AdminSensitiveWordRuleDetailView.as_view(), name="admin-community-sensitive-word-detail"),
 ]
