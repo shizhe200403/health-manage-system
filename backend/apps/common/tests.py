@@ -807,6 +807,31 @@ class ProductApiSmokeTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("link_path", response.data)
 
+    def test_user_can_delete_own_announcement_notification(self):
+        manager = self._create_user(username="deletemanager", email="deletemanager@example.com", phone="13800000023")
+        manager.role = "admin"
+        manager.is_staff = True
+        manager.save(update_fields=["role", "is_staff"])
+        audience = self._create_user(username="deleteaudience", email="deleteaudience@example.com", phone="13800000026")
+
+        self._login("deletemanager@example.com")
+        self.client.post(
+            "/api/v1/admin/announcements/",
+            {
+                "title": "可删除公告",
+                "body": "这条公告应该允许用户从提醒里删除。",
+                "link_path": "/community",
+            },
+            format="json",
+        )
+
+        self.client.credentials()
+        self._login("deleteaudience@example.com")
+        notification = UserNotification.objects.get(user=audience, notification_type="announcement", title="可删除公告")
+        delete_response = self.client.delete(f"/api/v1/notifications/{notification.id}/read/")
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertFalse(UserNotification.objects.filter(id=notification.id).exists())
+
     def test_health_goal_progress_flow(self):
         self._create_user()
         self._login("alice")

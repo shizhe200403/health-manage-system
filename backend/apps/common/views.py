@@ -159,6 +159,15 @@ class UserNotificationReadView(APIView):
             notification.save(update_fields=["read_at", "updated_at"])
         return Response({"code": 0, "message": "success", "data": {"read": True}})
 
+    def delete(self, request, notification_id):
+        notification = UserNotification.objects.filter(id=notification_id, user=request.user).first()
+        if notification is None:
+            return Response({"code": 404, "message": "not found", "data": None}, status=404)
+        if notification.notification_type != "announcement":
+            return Response({"code": 1, "message": "只有公告提醒可以删除", "data": None}, status=status.HTTP_400_BAD_REQUEST)
+        notification.delete()
+        return Response({"code": 0, "message": "success", "data": {"deleted": True}})
+
 
 class UserNotificationReadAllView(APIView):
     def post(self, request):

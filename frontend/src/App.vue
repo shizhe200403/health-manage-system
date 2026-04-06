@@ -85,21 +85,28 @@
               </div>
             </div>
             <div v-if="notifications.length" class="notification-list">
-              <button
+              <div
                 v-for="item in notifications"
                 :key="item.id"
-                type="button"
                 class="notification-item"
                 :class="{ unread: !item.read_at }"
-                @click="openNotification(item)"
               >
+                <button
+                  type="button"
+                  class="notification-open"
+                  @click="openNotification(item)"
+                >
                 <div class="notification-item-head">
                   <span class="notification-type-icon">{{ notificationIcon(item.notification_type) }}</span>
                   <strong>{{ item.title }}</strong>
                   <span>{{ formatNotificationTime(item.created_at) }}</span>
                 </div>
                 <p>{{ item.body || "有一条新的站内提醒。" }}</p>
-              </button>
+                </button>
+                <div v-if="item.notification_type === 'announcement'" class="notification-item-actions">
+                  <button type="button" class="notification-delete" @click="removeAnnouncementNotification(item)">删除公告</button>
+                </div>
+              </div>
             </div>
             <div v-else class="notification-empty">当前还没有新的站内提醒</div>
           </div>
@@ -332,7 +339,7 @@ import { useRoute, useRouter } from "vue-router";
 import { getAdminOperationsOverview, type AdminOperationsOverviewData, type AdminOperationsSummary, type AdminQueueSummary, type AdminRecentWorkItem } from "./api/adminReports";
 import GlobalAssistantFloat from "./components/GlobalAssistantFloat.vue";
 import { listHealthGoals } from "./api/goals";
-import { listNotifications, markAllNotificationsRead, markNotificationRead } from "./api/notifications";
+import { deleteNotification, listNotifications, markAllNotificationsRead, markNotificationRead } from "./api/notifications";
 import { listMealRecords } from "./api/tracking";
 import { useAuthStore } from "./stores/auth";
 import { canAccessOpsScope, hasOpsAccess, isOpsManager, resolveOpsHome } from "./lib/opsAccess";
@@ -653,6 +660,15 @@ async function openNotification(item: any) {
       return;
     }
     router.push(item.link_path);
+  }
+}
+
+async function removeAnnouncementNotification(item: any) {
+  try {
+    await deleteNotification(item.id);
+    notifications.value = notifications.value.filter((entry) => entry.id !== item.id);
+  } catch {
+    // keep current panel state; deletion failure should not break reminder usage
   }
 }
 
@@ -1336,6 +1352,16 @@ h1,
   text-align: left;
 }
 
+.notification-open {
+  display: grid;
+  gap: 6px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+}
+
 .notification-item.unread {
   border-color: rgba(255, 138, 28, 0.2);
   background: linear-gradient(135deg, rgba(255, 248, 239, 0.98), rgba(247, 251, 255, 0.94));
@@ -1370,6 +1396,20 @@ h1,
 .notification-item p {
   margin: 0;
   line-height: 1.55;
+}
+
+.notification-item-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.notification-delete {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #8a4f36;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .notification-empty {
