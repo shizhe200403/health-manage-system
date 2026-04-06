@@ -114,7 +114,10 @@
                     <strong>{{ item.title }}</strong>
                     <span>{{ formatDateTime(item.published_at) }} · {{ item.created_by?.display_name || item.created_by?.username || "管理员" }}</span>
                   </div>
-                  <el-tag type="success" effect="light">已发布</el-tag>
+                  <div class="announcement-head-actions">
+                    <el-tag type="success" effect="light">已发布</el-tag>
+                    <el-button text type="danger" :loading="deletingAnnouncementId === item.id" @click="removeAnnouncement(item)">删除公告</el-button>
+                  </div>
                 </div>
                 <p>{{ item.body }}</p>
                 <div class="announcement-meta">
@@ -146,7 +149,7 @@ import CompactHint from "../components/CompactHint.vue";
 import FormActionBar from "../components/FormActionBar.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
-import { createAdminAnnouncement, listAdminAnnouncements, type AdminAnnouncementItem } from "../api/adminAnnouncements";
+import { createAdminAnnouncement, deleteAdminAnnouncement, listAdminAnnouncements, type AdminAnnouncementItem } from "../api/adminAnnouncements";
 import { extractApiErrorMessage, notifyActionSuccess, notifyErrorMessage, notifyLoadError } from "../lib/feedback";
 import { isOpsManager } from "../lib/opsAccess";
 import { useAuthStore } from "../stores/auth";
@@ -156,6 +159,7 @@ const auth = useAuthStore();
 
 const loading = ref(false);
 const publishing = ref(false);
+const deletingAnnouncementId = ref<number | null>(null);
 const announcements = ref<AdminAnnouncementItem[]>([]);
 
 const draft = reactive({
@@ -266,6 +270,19 @@ async function publishAnnouncement() {
   }
 }
 
+async function removeAnnouncement(item: AdminAnnouncementItem) {
+  deletingAnnouncementId.value = item.id;
+  try {
+    await deleteAdminAnnouncement(item.id);
+    notifyActionSuccess("公告已删除，并已从用户提醒中同步移除");
+    await loadAnnouncements();
+  } catch (error) {
+    notifyErrorMessage(extractApiErrorMessage(error, "删除公告失败"));
+  } finally {
+    deletingAnnouncementId.value = null;
+  }
+}
+
 function formatDateTime(value?: string) {
   if (!value) return "刚刚";
   const date = new Date(value);
@@ -310,6 +327,12 @@ function describeLink(linkPath?: string) {
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
+}
+
+.announcement-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .announcement-head strong {

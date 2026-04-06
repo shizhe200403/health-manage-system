@@ -15,8 +15,8 @@ export async function updatePost(postId: number, payload: Record<string, unknown
   return data;
 }
 
-export async function deletePost(postId: number) {
-  const { data } = await http.delete(`/posts/${postId}/`);
+export async function deletePost(postId: number, mode: "archive" | "delete" = "archive") {
+  const { data } = await http.delete(`/posts/${postId}/`, { params: { mode } });
   return data;
 }
 

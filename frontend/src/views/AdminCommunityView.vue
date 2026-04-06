@@ -364,6 +364,7 @@
 
           <div class="drawer-actions">
             <el-button plain @click="postDrawerOpen = false">取消</el-button>
+            <el-button type="danger" plain :loading="deletingPostActionId === selectedPost.id" @click="removePostPermanently(selectedPost.id)">彻底删除</el-button>
             <el-button type="primary" :loading="savingPost" @click="savePost">保存修改</el-button>
           </div>
         </template>
@@ -516,7 +517,7 @@ import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import { bulkUpdateAdminCommunityPosts, bulkUpdateAdminCommunityReports, getAdminCommunityPostDetail, getAdminCommunityReportDetail, listAdminCommunityPosts, listAdminCommunityReports, updateAdminCommunityPost, updateAdminCommunityReport } from "../api/adminContent";
 import { listAdminOperationLogs } from "../api/adminLogs";
-import { deleteComment } from "../api/community";
+import { deleteComment, deletePost } from "../api/community";
 import { hasOpsAccess } from "../lib/opsAccess";
 import { extractApiErrorMessage, notifyActionSuccess, notifyErrorMessage, notifyLoadError } from "../lib/feedback";
 import { useAuthStore } from "../stores/auth";
@@ -547,6 +548,7 @@ const reportLogsLoading = ref(false);
 const commentActionId = ref<number | null>(null);
 const reportActionId = ref<number | null>(null);
 const reportAction = ref<"" | "processed" | "rejected">("");
+const deletingPostActionId = ref<number | null>(null);
 const postDrawerOpen = ref(false);
 const reportDrawerOpen = ref(false);
 const postTableRef = ref<any>();
@@ -998,6 +1000,32 @@ async function savePost() {
     notifyErrorMessage(extractApiErrorMessage(error, "这次没有成功更新帖子"));
   } finally {
     savingPost.value = false;
+  }
+}
+
+async function removePostPermanently(postId: number) {
+  try {
+    await ElMessageBox.confirm("彻底删除后帖子、评论和相关互动记录都会被移除，且无法恢复。确认继续吗？", "彻底删除帖子", {
+      type: "warning",
+      confirmButtonText: "彻底删除",
+      cancelButtonText: "取消",
+    });
+  } catch {
+    return;
+  }
+
+  deletingPostActionId.value = postId;
+  try {
+    await deletePost(postId, "delete");
+    notifyActionSuccess("帖子已彻底删除");
+    postDrawerOpen.value = false;
+    selectedPost.value = null;
+    postLogs.value = [];
+    await refreshAll();
+  } catch (error) {
+    notifyErrorMessage(extractApiErrorMessage(error, "彻底删除帖子失败"));
+  } finally {
+    deletingPostActionId.value = null;
   }
 }
 

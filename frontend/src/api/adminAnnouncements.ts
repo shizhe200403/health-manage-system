@@ -24,3 +24,8 @@ export async function createAdminAnnouncement(payload: Record<string, unknown>) 
   const { data } = await http.post("/admin/announcements/", payload);
   return data as { data?: { items?: AdminAnnouncementItem[] } };
 }
+
+export async function deleteAdminAnnouncement(announcementId: number) {
+  const { data } = await http.delete(`/admin/announcements/${announcementId}/`);
+  return data as { data?: { deleted?: boolean; id?: number } };
+}

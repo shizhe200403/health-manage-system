@@ -172,7 +172,8 @@
           </div>
           <div class="post-actions" v-if="isMine(post)">
             <el-button text @click="startEdit(post)">编辑</el-button>
-            <el-button text type="danger" :loading="deletingPostId === post.id" @click="removePost(post.id)">删除</el-button>
+            <el-button text :loading="deletingPostId === post.id" @click="archivePost(post.id)">归档</el-button>
+            <el-button text type="danger" :loading="deletingPostId === post.id" @click="removePost(post.id)">彻底删除</el-button>
           </div>
         </div>
         <div class="post-secondary-actions">
@@ -875,11 +876,11 @@ async function removeComment(commentId: number) {
   }
 }
 
-async function removePost(postId: number) {
+async function archivePost(postId: number) {
   try {
-    await ElMessageBox.confirm("删除后帖子将进入归档状态，不再作为公开内容展示。确认继续吗？", "删除帖子", {
+    await ElMessageBox.confirm("归档后帖子将不再作为公开内容展示，但你仍然可以在“已归档”筛选里看到它。确认继续吗？", "归档帖子", {
       type: "warning",
-      confirmButtonText: "删除",
+      confirmButtonText: "归档",
       cancelButtonText: "取消",
     });
   } catch {
@@ -888,7 +889,7 @@ async function removePost(postId: number) {
 
   try {
     deletingPostId.value = postId;
-    await deletePost(postId);
+    await deletePost(postId, "archive");
     notifyActionSuccess("帖子已归档");
     if (editingPostId.value === postId) {
       resetForm();
@@ -896,6 +897,32 @@ async function removePost(postId: number) {
     await loadPosts();
   } catch (error) {
     notifyActionError("归档帖子");
+  } finally {
+    deletingPostId.value = null;
+  }
+}
+
+async function removePost(postId: number) {
+  try {
+    await ElMessageBox.confirm("彻底删除后帖子、评论和相关互动记录都会被移除，且无法恢复。确认继续吗？", "彻底删除帖子", {
+      type: "warning",
+      confirmButtonText: "彻底删除",
+      cancelButtonText: "取消",
+    });
+  } catch {
+    return;
+  }
+
+  try {
+    deletingPostId.value = postId;
+    await deletePost(postId, "delete");
+    notifyActionSuccess("帖子已彻底删除");
+    if (editingPostId.value === postId) {
+      resetForm();
+    }
+    await loadPosts();
+  } catch (error) {
+    notifyActionError("彻底删除帖子");
   } finally {
     deletingPostId.value = null;
   }

@@ -163,8 +163,6 @@ class UserNotificationReadView(APIView):
         notification = UserNotification.objects.filter(id=notification_id, user=request.user).first()
         if notification is None:
             return Response({"code": 404, "message": "not found", "data": None}, status=404)
-        if notification.notification_type != "announcement":
-            return Response({"code": 1, "message": "只有公告提醒可以删除", "data": None}, status=status.HTTP_400_BAD_REQUEST)
         notification.delete()
         return Response({"code": 0, "message": "success", "data": {"deleted": True}})
 
@@ -212,9 +210,7 @@ class AdminAnnouncementListView(APIView):
         serializer.is_valid(raise_exception=True)
         announcement = serializer.save(created_by=request.user)
 
-        recipients = list(
-            request.user.__class__.objects.filter(status="active", role="user").only("id")
-        )
+        recipients = list(request.user.__class__.objects.filter(status="active").only("id"))
         notifications = [
             UserNotification(
                 user_id=user.id,
@@ -258,6 +254,41 @@ class AdminAnnouncementListView(APIView):
             },
         }
         return Response({"code": 0, "message": "success", "data": {"items": [item]}}, status=status.HTTP_201_CREATED)
+
+
+class AdminAnnouncementDetailView(APIView):
+    permission_classes = [IsAdminManagerPermission]
+
+    def get_object(self, announcement_id):
+        return Announcement.objects.filter(id=announcement_id).first()
+
+    def delete(self, request, announcement_id):
+        announcement = self.get_object(announcement_id)
+        if announcement is None:
+            return Response({"code": 404, "message": "not found", "data": None}, status=404)
+
+        deleted_notifications = UserNotification.objects.filter(
+            notification_type="announcement",
+            metadata__announcement_id=announcement.id,
+        ).count()
+        UserNotification.objects.filter(
+            notification_type="announcement",
+            metadata__announcement_id=announcement.id,
+        ).delete()
+        title = announcement.title
+        announcement.delete()
+
+        create_admin_operation_log(
+            actor=request.user,
+            module="announcements",
+            action="delete_announcement",
+            target_type="announcement",
+            target_id=announcement_id,
+            target_label=title,
+            summary=f"删除了公告《{title}》",
+            metadata={"deleted_notification_count": deleted_notifications},
+        )
+        return Response({"code": 0, "message": "success", "data": {"deleted": True, "id": announcement_id}})
 
 
 class AdminOperationLogActorSerializer(serializers.Serializer):

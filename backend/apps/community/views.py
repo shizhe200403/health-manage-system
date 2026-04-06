@@ -350,6 +350,25 @@ class PostViewSet(EnvelopeModelViewSet):
         post = self.get_object()
         if post.user_id != request.user.id and not is_admin_operator(request.user):
             return Response({"code": 403, "message": "forbidden", "data": None}, status=403)
+        mode = (request.query_params.get("mode") or "archive").strip().lower()
+        if mode == "delete":
+            post_id = post.id
+            post_title = post.title
+            author_id = post.user_id
+            post.delete()
+            if is_admin_operator(request.user):
+                create_admin_operation_log(
+                    actor=request.user,
+                    module="community",
+                    action="delete_post",
+                    target_type="post",
+                    target_id=post_id,
+                    target_label=post_title,
+                    summary=f"彻底删除了帖子《{post_title}》",
+                    metadata={"author_id": author_id, "related_target_type": "post", "related_target_id": post_id},
+                )
+            return Response({"code": 0, "message": "success", "data": {"deleted": True}})
+
         post.status = "archived"
         post.save(update_fields=["status", "updated_at"])
         return Response({"code": 0, "message": "success", "data": {"archived": True}})

@@ -103,8 +103,8 @@
                 </div>
                 <p>{{ item.body || "有一条新的站内提醒。" }}</p>
                 </button>
-                <div v-if="item.notification_type === 'announcement'" class="notification-item-actions">
-                  <button type="button" class="notification-delete" @click="removeAnnouncementNotification(item)">删除公告</button>
+                <div class="notification-item-actions">
+                  <button type="button" class="notification-delete" @click="removeNotification(item)">删除提醒</button>
                 </div>
               </div>
             </div>
@@ -663,7 +663,7 @@ async function openNotification(item: any) {
   }
 }
 
-async function removeAnnouncementNotification(item: any) {
+async function removeNotification(item: any) {
   try {
     await deleteNotification(item.id);
     notifications.value = notifications.value.filter((entry) => entry.id !== item.id);

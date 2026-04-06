@@ -751,7 +751,8 @@ class ProductApiSmokeTests(APITestCase):
         )
         self.assertEqual(create_response.status_code, 201)
         announcement = Announcement.objects.get(title="系统维护通知")
-        self.assertEqual(announcement.notification_count, 1)
+        self.assertEqual(announcement.notification_count, 2)
+        self.assertTrue(UserNotification.objects.filter(user=manager, notification_type="announcement", title="系统维护通知").exists())
 
         list_response = self.client.get("/api/v1/admin/announcements/")
         self.assertEqual(list_response.status_code, 200)
@@ -767,6 +768,32 @@ class ProductApiSmokeTests(APITestCase):
                 for item in notification_response.data["data"]["items"]
             )
         )
+
+    def test_manager_can_delete_announcement_and_related_notifications(self):
+        manager = self._create_user(username="announcer", email="announcer@example.com", phone="13800000027")
+        manager.role = "admin"
+        manager.is_staff = True
+        manager.save(update_fields=["role", "is_staff"])
+        audience = self._create_user(username="annreader", email="annreader@example.com", phone="13800000028")
+
+        self._login("announcer@example.com")
+        create_response = self.client.post(
+            "/api/v1/admin/announcements/",
+            {
+                "title": "待删除公告",
+                "body": "这条公告会被后台删除。",
+                "link_path": "/community",
+            },
+            format="json",
+        )
+        self.assertEqual(create_response.status_code, 201)
+        announcement = Announcement.objects.get(title="待删除公告")
+        self.assertGreaterEqual(UserNotification.objects.filter(notification_type="announcement", metadata__announcement_id=announcement.id).count(), 2)
+
+        delete_response = self.client.delete(f"/api/v1/admin/announcements/{announcement.id}/")
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertFalse(Announcement.objects.filter(id=announcement.id).exists())
+        self.assertFalse(UserNotification.objects.filter(notification_type="announcement", metadata__announcement_id=announcement.id).exists())
 
     def test_manager_can_publish_announcement_with_external_url(self):
         manager = self._create_user(username="extmanager", email="extmanager@example.com", phone="13800000021")
@@ -807,7 +834,7 @@ class ProductApiSmokeTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("link_path", response.data)
 
-    def test_user_can_delete_own_announcement_notification(self):
+    def test_user_can_delete_any_notification(self):
         manager = self._create_user(username="deletemanager", email="deletemanager@example.com", phone="13800000023")
         manager.role = "admin"
         manager.is_staff = True
@@ -831,6 +858,25 @@ class ProductApiSmokeTests(APITestCase):
         delete_response = self.client.delete(f"/api/v1/notifications/{notification.id}/read/")
         self.assertEqual(delete_response.status_code, 200)
         self.assertFalse(UserNotification.objects.filter(id=notification.id).exists())
+
+        self.client.credentials()
+        mention_author = self._create_user(username="notifauthor", email="notifauthor@example.com", phone="13800000029")
+        self._login("notifauthor@example.com")
+        self.client.post(
+            "/api/v1/posts/",
+            {
+                "title": "提及提醒",
+                "content": f"请 @[deleteaudience](user:{audience.id}) 看一下这条帖子",
+            },
+            format="json",
+        )
+
+        self.client.credentials()
+        self._login("deleteaudience@example.com")
+        mention_notification = UserNotification.objects.get(user=audience, notification_type="mention_post")
+        mention_delete_response = self.client.delete(f"/api/v1/notifications/{mention_notification.id}/read/")
+        self.assertEqual(mention_delete_response.status_code, 200)
+        self.assertFalse(UserNotification.objects.filter(id=mention_notification.id).exists())
 
     def test_health_goal_progress_flow(self):
         self._create_user()
@@ -900,6 +946,48 @@ class ProductApiSmokeTests(APITestCase):
         listed_post = (post_list_response.data["data"].get("items") or post_list_response.data["data"])[0]
         self.assertEqual(listed_post["user_info"]["display_name"], "alice")
         self.assertEqual(listed_post["comments"], [])
+
+    def test_post_can_be_archived_or_permanently_deleted(self):
+        author = self._create_user()
+        self._login("alice")
+
+        post_response = self.client.post(
+            "/api/v1/posts/",
+            {"title": "Archive Me", "content": "先归档"},
+            format="json",
+        )
+        self.assertEqual(post_response.status_code, 201)
+        archived_post_id = post_response.data["data"]["id"]
+
+        archive_response = self.client.delete(f"/api/v1/posts/{archived_post_id}/")
+        self.assertEqual(archive_response.status_code, 200)
+        archived_post = Post.objects.get(id=archived_post_id)
+        self.assertEqual(archived_post.status, "archived")
+
+        hard_delete_response = self.client.post(
+            "/api/v1/posts/",
+            {"title": "Delete Me", "content": "再彻底删除"},
+            format="json",
+        )
+        self.assertEqual(hard_delete_response.status_code, 201)
+        delete_post_id = hard_delete_response.data["data"]["id"]
+
+        delete_response = self.client.delete(f"/api/v1/posts/{delete_post_id}/?mode=delete")
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertFalse(Post.objects.filter(id=delete_post_id).exists())
+
+    def test_admin_can_permanently_delete_other_users_post(self):
+        admin_user = self._create_user(username="communityadmin", email="communityadmin@example.com", phone="13800000030")
+        admin_user.role = "admin"
+        admin_user.is_staff = True
+        admin_user.save(update_fields=["role", "is_staff"])
+        author = self._create_user(username="postowner", email="postowner@example.com", phone="13800000031")
+        post = Post.objects.create(user=author, title="Admin Delete", content="管理员删除测试", status="published", audit_status="approved")
+
+        self._login("communityadmin@example.com")
+        response = self.client.delete(f"/api/v1/posts/{post.id}/?mode=delete")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Post.objects.filter(id=post.id).exists())
 
     @override_settings(COMMUNITY_SENSITIVE_WORDS=["赌博", "约炮"], COMMUNITY_BLOCKED_WORDS=[])
     def test_community_sensitive_words_are_masked_in_posts_and_comments(self):
