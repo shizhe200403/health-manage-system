@@ -648,6 +648,10 @@ async function openNotification(item: any) {
   }
   notificationOpen.value = false;
   if (item.link_path) {
+    if (/^https?:\/\//i.test(item.link_path)) {
+      window.open(item.link_path, "_blank", "noopener,noreferrer");
+      return;
+    }
     router.push(item.link_path);
   }
 }

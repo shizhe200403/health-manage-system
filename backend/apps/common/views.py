@@ -5,6 +5,7 @@ from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from urllib.parse import urlparse
 
 from apps.common.operation_logs import create_admin_operation_log
 from .models import AdminOperationLog, Announcement, UserNotification
@@ -59,6 +60,18 @@ class AnnouncementSerializer(serializers.Serializer):
 
 
 class AnnouncementWriteSerializer(serializers.ModelSerializer):
+    def validate_link_path(self, value):
+        link = str(value or "").strip()
+        if not link:
+            return ""
+        if link.startswith("/"):
+            return link
+
+        parsed = urlparse(link)
+        if parsed.scheme in {"http", "https"} and parsed.netloc:
+            return link
+        raise serializers.ValidationError("跳转链接只支持站内路径（/reports）或完整站外网址（https://example.com）")
+
     class Meta:
         model = Announcement
         fields = ["title", "body", "link_path"]

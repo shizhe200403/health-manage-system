@@ -768,6 +768,45 @@ class ProductApiSmokeTests(APITestCase):
             )
         )
 
+    def test_manager_can_publish_announcement_with_external_url(self):
+        manager = self._create_user(username="extmanager", email="extmanager@example.com", phone="13800000021")
+        manager.role = "admin"
+        manager.is_staff = True
+        manager.save(update_fields=["role", "is_staff"])
+
+        self._login("extmanager@example.com")
+        response = self.client.post(
+            "/api/v1/admin/announcements/",
+            {
+                "title": "外部公告",
+                "body": "请查看外部文档说明。",
+                "link_path": "https://example.com/docs",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        announcement = Announcement.objects.get(title="外部公告")
+        self.assertEqual(announcement.link_path, "https://example.com/docs")
+
+    def test_manager_cannot_publish_announcement_with_invalid_link(self):
+        manager = self._create_user(username="badlink", email="badlink@example.com", phone="13800000022")
+        manager.role = "admin"
+        manager.is_staff = True
+        manager.save(update_fields=["role", "is_staff"])
+
+        self._login("badlink@example.com")
+        response = self.client.post(
+            "/api/v1/admin/announcements/",
+            {
+                "title": "错误链接公告",
+                "body": "这个链接不合法。",
+                "link_path": "javascript:alert(1)",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("link_path", response.data)
+
     def test_health_goal_progress_flow(self):
         self._create_user()
         self._login("alice")
