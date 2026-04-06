@@ -3,19 +3,37 @@
     <CollectionSkeleton v-if="showDashboardSkeleton" variant="dashboard" :card-count="4" />
     <RefreshFrame v-else :active="loadingDashboard" label="正在更新首页数据">
     <div class="hero">
-      <article class="hero-copy">
-        <p class="tag">Today</p>
-        <h2>{{ greetingTitle }}</h2>
-        <CompactHint tone="accent" title="首页说明" description="先看今天还差什么，再决定下一步怎么做。推荐和记录都在旁边，不用每个模块都点进去看。" />
-        <article v-spotlight class="hero-pulse-card">
-          <span>今日一句话</span>
-          <strong>{{ todayWorkbenchHeadline }}</strong>
-          <p>{{ todayProgressSummary }}</p>
-        </article>
-        <div class="hero-status-strip" :class="{ 'is-refresh-pulse': dashboardRefreshPulse }">
+      <article class="hero-copy hero-card hero-card-intro">
+        <div class="hero-copy-head">
+          <p class="tag">Today</p>
+          <h2>{{ greetingTitle }}</h2>
+        </div>
+        <CompactHint tone="accent" title="首页说明" description="先看今天最该补哪一餐，再决定下一步怎么做。推荐、记录和目标都围着这一件事展开。" />
+      </article>
+
+      <article v-spotlight class="hero-pulse-card hero-card hero-card-pulse">
+        <span>今日一句话</span>
+        <strong>{{ todayWorkbenchHeadline }}</strong>
+        <p>{{ todayProgressSummary }}</p>
+      </article>
+
+      <article class="hero-card hero-status-card" :class="{ 'is-refresh-pulse': dashboardRefreshPulse }">
+        <div class="hero-status-card-header">
+          <span>今日状态</span>
+          <strong>{{ heroStatusHeadline }}</strong>
+        </div>
+        <div class="hero-status-strip">
           <span>{{ profileReady ? "档案已完善" : "先补档案" }}</span>
           <span>{{ activeGoal ? `${goalTypeLabel(activeGoal.goal_type)}进行中` : "还没有重点目标" }}</span>
           <span>{{ hasTodayRecord ? `${animatedTodayCompletedMealCount} 餐已记录` : "今天还没开记" }}</span>
+        </div>
+      </article>
+
+      <article class="hero-card hero-actions-card">
+        <div class="hero-actions-copy">
+          <span>现在就做</span>
+          <strong>{{ primaryRecordButtonLabel }}</strong>
+          <p>{{ todayWorkbenchDescription }}</p>
         </div>
         <div class="cta-row mobile-scroll-row">
           <el-button type="primary" @click="goToNextMealRecord">{{ primaryRecordButtonLabel }}</el-button>
@@ -24,7 +42,7 @@
         </div>
       </article>
 
-      <article class="panel today-workbench">
+      <article class="panel today-workbench hero-card hero-card-workbench">
         <div class="panel-header">
           <div>
             <div class="section-title-row">
@@ -363,7 +381,7 @@ const profileReady = computed(() => {
 });
 const greetingTitle = computed(() => {
   const name = auth.user?.nickname || auth.user?.username || "你";
-  return `${name}，先看进度，再做动作。`;
+  return `${name}，吃对每一餐，健康每一天`;
 });
 const activeGoal = computed(() => goals.value.find((item) => item.status === "active") ?? null);
 const latestReport = computed(() => reportTasks.value[0] ?? null);
@@ -467,6 +485,15 @@ const todayMetricCards = computed(() => {
 });
 const focusMetricCards = computed(() => todayMetricCards.value.slice(0, 2));
 const heroNextActions = computed(() => nextActions.value.slice(0, 3));
+const heroStatusHeadline = computed(() => {
+  if (!hasTodayRecord.value) {
+    return "今天还没开始推进";
+  }
+  if (todayMealChecklist.value.every((item) => item.done)) {
+    return "四餐节奏已经补齐";
+  }
+  return `已推进 ${todayCompletedMealCount.value} / 4 餐`;
+});
 const todaySuggestedRecipe = computed<Record<string, any> | null>(() => {
   const favoriteMatch = favoriteItems.value.find((item) => item.meal_type === nextMealFocusType.value) ?? favoriteItems.value[0];
   if (favoriteMatch) {
@@ -1107,26 +1134,80 @@ onBeforeUnmount(() => {
 <style scoped>
 .dashboard {
   display: grid;
-  gap: 20px;
+  gap: 18px;
 }
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 0.92fr) minmax(360px, 1.08fr);
-  gap: 20px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-flow: dense;
+  gap: 16px;
+  align-items: start;
 }
 
-.hero-copy,
+.hero-card,
 .panel {
-  padding: 28px;
-  border-radius: 28px;
   background: rgba(255, 255, 255, 0.86);
   border: 1px solid rgba(16, 34, 42, 0.08);
   box-shadow: 0 18px 50px rgba(15, 30, 39, 0.08);
 }
 
+.hero-card {
+  padding: 20px;
+  border-radius: 24px;
+}
+
+.panel {
+  padding: 28px;
+  border-radius: 28px;
+}
+
+.hero-card-intro {
+  grid-column: span 5;
+  display: grid;
+  gap: 14px;
+  padding: 22px 24px 20px;
+}
+
+.hero-card-pulse {
+  grid-column: span 3;
+  margin-top: 20px;
+}
+
+.hero-status-card {
+  grid-column: span 4;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  margin-top: 8px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 244, 222, 0.54), transparent 42%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(244, 249, 252, 0.95));
+}
+
+.hero-actions-card {
+  grid-column: span 4;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  margin-top: -10px;
+  background:
+    radial-gradient(circle at bottom left, rgba(87, 181, 231, 0.15), transparent 48%),
+    linear-gradient(145deg, rgba(249, 252, 255, 0.96), rgba(241, 248, 252, 0.96));
+}
+
+.hero-card-workbench.panel {
+  grid-column: span 8;
+  padding: 24px;
+}
+
+.hero-copy-head {
+  display: grid;
+  gap: 10px;
+}
+
 .tag {
-  margin: 0 0 10px;
+  margin: 0;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   font-size: 12px;
@@ -1135,8 +1216,8 @@ onBeforeUnmount(() => {
 
 h2 {
   margin: 0;
-  font-size: clamp(32px, 4vw, 52px);
-  line-height: 1.05;
+  font-size: clamp(30px, 3.7vw, 44px);
+  line-height: 1.08;
 }
 
 .desc {
@@ -1181,8 +1262,7 @@ h2 {
 .hero-pulse-card {
   display: grid;
   gap: 6px;
-  margin-top: 14px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border-radius: 16px;
   background:
     radial-gradient(circle at top right, rgba(255, 244, 222, 0.72), transparent 36%),
@@ -1234,11 +1314,42 @@ h2 {
 .hero-meta-grid {
   display: grid;
   gap: 10px;
-  margin-top: 14px;
 }
 
 .hero-status-strip {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.hero-status-card-header,
+.hero-actions-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.hero-status-card-header span,
+.hero-actions-copy span {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #5a7a8a;
+}
+
+.hero-status-card-header strong,
+.hero-actions-copy strong {
+  font-size: 22px;
+  line-height: 1.3;
+  color: #173042;
+}
+
+.hero-actions-copy p {
+  margin: 0;
+  color: #476072;
+  line-height: 1.55;
+  font-size: 13px;
+}
+
+.hero-actions-card .cta-row {
+  margin-top: 0;
 }
 
 .hero-status-strip span {
@@ -1253,7 +1364,7 @@ h2 {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.64);
 }
 
-.hero-status-strip.is-refresh-pulse span,
+.hero-status-card.is-refresh-pulse .hero-status-strip span,
 .metric-card.is-refresh-pulse {
   animation: dashboard-card-pulse 0.86s cubic-bezier(0.22, 1.2, 0.36, 1);
 }
@@ -1292,7 +1403,7 @@ h2 {
 .today-lower-grid {
   display: grid;
   gap: 14px;
-  margin-top: 18px;
+  margin-top: 14px;
 }
 
 .today-topline {
@@ -1309,12 +1420,12 @@ h2 {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
-  margin-top: 16px;
+  margin-top: 14px;
 }
 
 .meal-progress-card,
 .today-suggest-card {
-  padding: 16px;
+  padding: 14px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.84);
   border: 1px solid rgba(16, 34, 42, 0.08);
@@ -1398,7 +1509,7 @@ h2 {
 .record-list,
 .onboarding-list {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .extension-panel {
@@ -1562,11 +1673,11 @@ h2 {
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
 .metric-card {
-  padding: 16px;
+  padding: 14px;
   border-radius: 18px;
   background: rgba(247, 251, 255, 0.92);
   border: 1px solid rgba(16, 34, 42, 0.06);
@@ -1637,8 +1748,25 @@ h2 {
   text-decoration: none;
 }
 
+@media (max-width: 1240px) {
+  .hero {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .hero-card-intro,
+  .hero-card-pulse,
+  .hero-status-card,
+  .hero-actions-card {
+    grid-column: span 3;
+    margin-top: 0;
+  }
+
+  .hero-card-workbench.panel {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 1080px) {
-  .hero,
   .today-topline,
   .today-lower-grid,
   .meal-progress-grid,
@@ -1648,6 +1776,11 @@ h2 {
 }
 
 @media (max-width: 768px) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-card,
   .hero-copy,
   .panel,
   .summary-grid article,
@@ -1659,6 +1792,15 @@ h2 {
   .onboarding-item {
     padding: 16px;
     border-radius: 18px;
+  }
+
+  .hero-card-intro,
+  .hero-card-pulse,
+  .hero-status-card,
+  .hero-actions-card,
+  .hero-card-workbench.panel {
+    grid-column: 1 / -1;
+    margin-top: 0;
   }
 
   .cta-row {
