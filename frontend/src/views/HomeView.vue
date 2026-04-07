@@ -2,320 +2,282 @@
   <section class="dashboard">
     <CollectionSkeleton v-if="showDashboardSkeleton" variant="dashboard" :card-count="4" />
     <RefreshFrame v-else :active="loadingDashboard" label="正在更新首页数据">
-    <div class="hero">
-      <article class="hero-copy hero-card hero-card-intro">
-        <div class="hero-copy-head">
-          <p class="tag">Today</p>
-          <h2>{{ greetingTitle }}</h2>
-        </div>
-        <CompactHint tone="accent" title="首页说明" description="先看今天最该补哪一餐，再决定下一步怎么做。推荐、记录和目标都围着这一件事展开。" />
-      </article>
 
-      <article v-spotlight class="hero-pulse-card hero-card hero-card-pulse">
-        <span>今日一句话</span>
-        <strong>{{ todayWorkbenchHeadline }}</strong>
-        <p>{{ todayProgressSummary }}</p>
-      </article>
-
-      <article class="hero-card hero-status-card" :class="{ 'is-refresh-pulse': dashboardRefreshPulse }">
-        <div class="hero-status-card-header">
-          <span>今日状态</span>
-          <strong>{{ heroStatusHeadline }}</strong>
+      <!-- 顶部问候栏 -->
+      <div class="greeting-bar">
+        <div class="greeting-left">
+          <h2 class="greeting-name">{{ greetingTitle }}</h2>
+          <p class="greeting-sub">{{ todayProgressSummary }}</p>
         </div>
-        <div class="hero-status-strip">
-          <span>{{ profileReady ? "档案已完善" : "先补档案" }}</span>
-          <span>{{ activeGoal ? `${goalTypeLabel(activeGoal.goal_type)}进行中` : "还没有重点目标" }}</span>
-          <span>{{ hasTodayRecord ? `${animatedTodayCompletedMealCount} 餐已记录` : "今天还没开记" }}</span>
-        </div>
-      </article>
-
-      <article class="hero-card hero-actions-card">
-        <div class="hero-actions-copy">
-          <span>现在就做</span>
-          <strong>{{ primaryRecordButtonLabel }}</strong>
-          <p>{{ todayWorkbenchDescription }}</p>
-        </div>
-        <div class="cta-row mobile-scroll-row">
+        <div class="greeting-right">
           <el-button type="primary" @click="goToNextMealRecord">{{ primaryRecordButtonLabel }}</el-button>
-          <el-button @click="router.push('/favorites')">从收藏选餐</el-button>
-          <el-button plain @click="router.push('/recipes')">看看推荐菜谱</el-button>
+          <el-button plain @click="router.push('/favorites')">从收藏选餐</el-button>
+          <el-button plain @click="openAssistantForTodayPlan">AI 建议</el-button>
         </div>
-      </article>
+      </div>
 
-      <article class="panel today-workbench hero-card hero-card-workbench">
-        <div class="panel-header">
-          <div>
-            <div class="section-title-row">
-              <h3>今天工作台</h3>
-              <CompactHint description="今天该做什么，这里直接告诉你。其他信息在下面按需翻看就好。" />
+      <!-- 双栏主体 -->
+      <div class="main-layout">
+
+        <!-- 左栏：状态聚合 -->
+        <aside class="sidebar">
+
+          <!-- 今日状态卡 -->
+          <div class="sidebar-card status-card" :class="{ 'is-refresh-pulse': dashboardRefreshPulse }">
+            <div class="sidebar-card-header">
+              <span class="card-label">今日状态</span>
+              <span class="status-badge" :class="hasTodayRecord ? 'badge-active' : 'badge-muted'">
+                {{ heroStatusHeadline }}
+              </span>
             </div>
-          </div>
-        </div>
 
-        <div class="today-topline">
-          <div class="today-copy">
-            <span class="workbench-kicker">Today Flow</span>
-            <strong>{{ todayWorkbenchHeadline }}</strong>
-            <p>{{ todayWorkbenchDescription }}</p>
-          </div>
-          <div class="today-primary-actions">
-            <el-button type="primary" @click="goToNextMealRecord">{{ primaryRecordButtonLabel }}</el-button>
-            <el-button v-if="todaySuggestedRecipe" plain @click="addToRecord(todaySuggestedRecipe)">一键带入推荐菜</el-button>
-            <el-button plain @click="openAssistantForTodayPlan">让 AI 解释今天下一步</el-button>
-          </div>
-        </div>
-
-        <div class="meal-progress-grid">
-          <article v-for="item in todayMealChecklist" :key="item.value" v-spotlight class="meal-progress-card" :class="{ done: item.done, active: item.value === nextMealFocusType }">
-            <span>{{ item.label }}</span>
-            <strong>{{ item.done ? "已记录" : item.value === nextMealFocusType ? "建议优先" : "待补" }}</strong>
-            <p>{{ item.done ? "今天这餐已经落下记录。" : `下一步可先补${item.label}。` }}</p>
-          </article>
-        </div>
-
-        <div class="metric-grid">
-          <article
-            v-for="item in focusMetricCards"
-            :key="item.key"
-            v-spotlight
-            class="metric-card"
-            :class="[`is-${item.tone}`, dashboardRefreshPulse ? 'is-refresh-pulse' : '']"
-          >
-            <div class="metric-top">
-              <span>{{ item.label }}</span>
-              <em>{{ item.badge }}</em>
-            </div>
-            <strong>{{ item.value }}</strong>
-            <p>{{ item.copy }}</p>
-          </article>
-        </div>
-
-        <div class="today-lower-grid">
-          <article v-spotlight class="today-suggest-card">
-            <span>下一餐更省事</span>
-            <strong>{{ todaySuggestedRecipe?.title || "先去挑一顿合适的菜" }}</strong>
-            <p>{{ todaySuggestedRecipeCopy }}</p>
-            <div class="footer-actions">
-              <el-button v-if="todaySuggestedRecipe" text @click="openFavoriteDetail(todaySuggestedRecipe)">查看详情</el-button>
-              <el-button v-if="todaySuggestedRecipe" type="primary" plain @click="addToRecord(todaySuggestedRecipe)">加入记录</el-button>
-              <el-button v-else plain @click="router.push('/recipes')">去菜谱库</el-button>
-            </div>
-          </article>
-
-          <div v-if="heroNextActions.length" class="action-list compact-action-list">
-            <article v-for="item in heroNextActions" :key="item.title" v-spotlight class="action-item">
-              <div>
-                <strong>{{ item.title }}</strong>
-                <p>{{ item.copy }}</p>
+            <!-- 营养进度 -->
+            <div class="nutrition-rows">
+              <div v-for="item in focusMetricCards" :key="item.key" class="nutrition-row" :class="`tone-${item.tone}`">
+                <div class="nutrition-row-head">
+                  <span>{{ item.label }}</span>
+                  <strong>{{ item.value }}</strong>
+                  <em class="nutrition-badge">{{ item.badge }}</em>
+                </div>
+                <div class="nutrition-bar-track">
+                  <div
+                    class="nutrition-bar-fill"
+                    :style="{
+                      width: item.tone === 'success' ? '100%'
+                        : item.tone === 'steady' ? '70%'
+                        : item.tone === 'warning' ? '40%'
+                        : '10%'
+                    }"
+                  />
+                </div>
+                <p class="nutrition-copy">{{ item.copy }}</p>
               </div>
-              <el-button plain @click="router.push(item.to)">{{ item.cta }}</el-button>
+            </div>
+
+            <!-- 四餐打卡 -->
+            <div class="meal-checklist">
+              <div
+                v-for="item in todayMealChecklist"
+                :key="item.value"
+                class="meal-check-item"
+                :class="{ done: item.done, focus: item.value === nextMealFocusType }"
+              >
+                <span class="meal-dot" />
+                <span class="meal-label">{{ item.label }}</span>
+                <span class="meal-status">{{ item.done ? "✓" : item.value === nextMealFocusType ? "优先" : "—" }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 目标卡 -->
+          <div class="sidebar-card goal-card">
+            <div class="sidebar-card-header">
+              <span class="card-label">当前目标</span>
+              <el-button text size="small" @click="router.push('/goals')">查看</el-button>
+            </div>
+            <template v-if="activeGoal">
+              <strong class="goal-name">{{ goalTypeLabel(activeGoal.goal_type) }}</strong>
+              <p class="goal-desc">{{ activeGoal.description || "继续推进中" }}</p>
+              <div class="goal-progress-row">
+                <span>{{ formatDecimal(activeGoal.current_value) }}</span>
+                <span>/ {{ formatDecimal(activeGoal.target_value) }}</span>
+                <span class="focus-badge goal-progress-badge">{{ goalProgressLabel }}</span>
+              </div>
+              <el-progress :percentage="goalProgressPercent" :stroke-width="8" :show-text="false" />
+            </template>
+            <p v-else class="goal-empty">还没有进行中的目标，<el-button text @click="router.push('/goals')">去创建</el-button></p>
+          </div>
+
+          <!-- 快捷操作 -->
+          <div class="sidebar-card quick-actions-card">
+            <span class="card-label">快捷操作</span>
+            <div class="quick-btn-list">
+              <el-button class="quick-btn" @click="goToNextMealRecord">{{ primaryRecordButtonLabel }}</el-button>
+              <el-button class="quick-btn" plain @click="router.push('/favorites')">去收藏中心</el-button>
+              <el-button class="quick-btn" plain @click="router.push('/recipes')">浏览菜谱库</el-button>
+              <el-button class="quick-btn" plain @click="router.push('/records')">查看记录</el-button>
+            </div>
+          </div>
+
+          <!-- 起步引导（仅在需要时显示） -->
+          <div v-if="onboardingSteps.length" class="sidebar-card onboarding-card">
+            <span class="card-label">起步引导</span>
+            <div class="onboarding-steps">
+              <div v-for="item in onboardingSteps" :key="item.title" class="onboarding-step">
+                <div>
+                  <strong>{{ item.title }}</strong>
+                  <p>{{ item.copy }}</p>
+                </div>
+                <el-button size="small" plain @click="router.push(item.to)">{{ item.cta }}</el-button>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <!-- 右栏：主工作区 -->
+        <main class="main-content">
+
+          <!-- 工作台标题区 -->
+          <div class="workbench-header">
+            <div class="workbench-headline">
+              <span class="workbench-kicker">Today Flow</span>
+              <strong>{{ todayWorkbenchHeadline }}</strong>
+              <p>{{ todayWorkbenchDescription }}</p>
+            </div>
+            <div class="workbench-actions">
+              <el-button v-if="todaySuggestedRecipe" plain @click="addToRecord(todaySuggestedRecipe)">一键带入推荐菜</el-button>
+              <el-button plain @click="openAssistantForTodayPlan">AI 解释下一步</el-button>
+            </div>
+          </div>
+
+          <!-- 四餐进度横排 -->
+          <div class="meal-progress-row">
+            <article
+              v-for="item in todayMealChecklist"
+              :key="item.value"
+              v-spotlight
+              class="meal-progress-card"
+              :class="{ done: item.done, active: item.value === nextMealFocusType }"
+              @click="goToNextMealRecord"
+            >
+              <span class="meal-card-label">{{ item.label }}</span>
+              <strong>{{ item.done ? "已记录" : item.value === nextMealFocusType ? "建议优先" : "待补" }}</strong>
+              <p>{{ item.done ? "今天这餐已落下记录" : `下一步可先补${item.label}` }}</p>
             </article>
           </div>
-        </div>
-      </article>
-    </div>
 
-    <div class="panel">
-      <div class="panel-header">
-        <div>
-          <div class="section-title-row">
-            <h3>推荐菜谱</h3>
-            <CompactHint description="这里只是给下一餐决策捷径，不需要在首页把完整菜谱库说明铺开。" />
+          <!-- 推荐菜谱横排 -->
+          <div class="section-block">
+            <div class="section-block-header">
+              <h3>推荐菜谱</h3>
+              <div class="section-block-actions">
+                <el-button text @click="loadDashboard">刷新</el-button>
+                <el-button text @click="router.push('/recipes')">去菜谱库</el-button>
+              </div>
+            </div>
+            <div v-if="recommendations.length" class="recommend-row">
+              <article v-for="item in featuredRecommendations" :key="item.recipe_id" v-spotlight class="recommend-card-h">
+                <strong>{{ item.title }}</strong>
+                <p>{{ item.reason_text }}</p>
+                <div class="recommend-card-actions">
+                  <el-button text size="small" @click="openRecipeDetail(item)">查看详情</el-button>
+                  <el-button text size="small" @click="showReason(item.recipe_id)">推荐原因</el-button>
+                </div>
+              </article>
+            </div>
+            <PageStateBlock
+              v-else
+              tone="empty"
+              title="当前还没有可展示的推荐"
+              description="把健康档案补一补，再记几餐，推荐就会越来越懂你。"
+              action-label="去完善资料"
+              compact
+              @action="router.push('/profile')"
+            />
           </div>
-        </div>
-        <div class="head-actions">
-          <el-button plain @click="loadDashboard">刷新推荐</el-button>
-          <el-button plain @click="router.push('/recipes')">去菜谱库</el-button>
-        </div>
-      </div>
 
-        <div v-if="recommendations.length" class="recommend-list">
-        <article v-for="item in featuredRecommendations" :key="item.recipe_id" v-spotlight class="recommend-card">
-          <div class="row">
-            <strong>{{ item.title }}</strong>
-            <div class="recommend-actions">
-              <el-button text @click="openRecipeDetail(item)">查看详情</el-button>
-              <el-button text @click="showReason(item.recipe_id)">为什么推荐</el-button>
+          <!-- 下一餐推荐 + 延展工作区 -->
+          <div class="lower-grid">
+            <!-- 下一餐推荐 -->
+            <div class="next-meal-card" v-spotlight>
+              <span class="card-label">下一餐更省事</span>
+              <strong>{{ todaySuggestedRecipe?.title || "先去挑一顿合适的菜" }}</strong>
+              <p>{{ todaySuggestedRecipeCopy }}</p>
+              <div class="next-meal-actions">
+                <el-button v-if="todaySuggestedRecipe" text @click="openFavoriteDetail(todaySuggestedRecipe)">查看详情</el-button>
+                <el-button v-if="todaySuggestedRecipe" type="primary" plain size="small" @click="addToRecord(todaySuggestedRecipe)">加入记录</el-button>
+                <el-button v-else plain @click="router.push('/recipes')">去菜谱库</el-button>
+              </div>
+            </div>
+
+            <!-- 延展工作区 -->
+            <div class="extension-panel">
+              <div class="extension-tab-strip" role="tablist">
+                <button
+                  v-for="item in extensionTabs"
+                  :key="item.key"
+                  class="extension-tab"
+                  :class="{ active: extensionTab === item.key }"
+                  type="button"
+                  role="tab"
+                  @click="setExtensionTab(item.key)"
+                >
+                  <span>{{ item.label }}</span>
+                  <strong>{{ item.status }}</strong>
+                </button>
+              </div>
+
+              <div class="extension-body">
+                <div v-if="extensionTab === 'favorites'" class="shortcut-list">
+                  <article v-for="item in favoriteShortcuts" :key="item.id" v-spotlight class="shortcut-item interactive-shortcut-item">
+                    <div>
+                      <strong>{{ item.title }}</strong>
+                      <p>{{ item.description || "已收藏，可直接加入记录。" }}</p>
+                    </div>
+                    <div class="shortcut-actions">
+                      <el-button text @click="openFavoriteDetail(item)">详情</el-button>
+                      <el-button type="primary" plain size="small" @click="addToRecord(item)">加入记录</el-button>
+                    </div>
+                  </article>
+                  <PageStateBlock v-if="!favoriteShortcuts.length" tone="empty" title="还没有收藏" description="遇到合适的菜谱先收藏，后续记录会快很多。" action-label="去菜谱库" compact @action="router.push('/recipes')" />
+                </div>
+
+                <div v-else-if="extensionTab === 'records'" class="record-list">
+                  <article v-for="record in recentRecords.slice(0, 4)" :key="record.id" v-spotlight class="record-item interactive-record-item">
+                    <div>
+                      <strong>{{ record.record_date }} · {{ mealTypeLabel(record.meal_type) }}</strong>
+                      <p>{{ record.items?.[0]?.recipe_title || record.note || "已记录一餐" }}</p>
+                    </div>
+                    <span>{{ record.items?.length || 0 }} 条目</span>
+                  </article>
+                  <PageStateBlock v-if="!recentRecords.length" tone="empty" title="最近还没有记录" description="先记一餐，趋势和推荐就有素材了。" action-label="去记录" compact @action="router.push('/records')" />
+                </div>
+
+                <div v-else-if="extensionTab === 'trend'">
+                  <TrendMiniBars v-if="weekEnergyBars.length" title="最近7天热量节奏" description="看一眼最近几天的整体摄入强弱，判断今天是不是明显偏高或偏低。" badge="近7天" tone="energy" compact :items="weekEnergyBars" />
+                  <PageStateBlock v-else tone="empty" title="最近还没有趋势数据" description="先记录几餐，热量节奏才会出现。" compact />
+                </div>
+
+                <div v-else-if="extensionTab === 'goals'">
+                  <div v-if="activeGoal" class="focus-box">
+                    <div class="focus-topline">
+                      <strong>{{ goalTypeLabel(activeGoal.goal_type) }}</strong>
+                      <span class="focus-badge">{{ goalProgressLabel }}</span>
+                    </div>
+                    <p>{{ activeGoal.description || "已创建目标，建议继续补录进展。" }}</p>
+                    <div class="progress-line">
+                      <span>当前 {{ formatDecimal(activeGoal.current_value) }}</span>
+                      <span>目标 {{ formatDecimal(activeGoal.target_value) }}</span>
+                    </div>
+                    <el-progress :percentage="goalProgressPercent" :stroke-width="8" :show-text="false" />
+                  </div>
+                  <PageStateBlock v-else tone="empty" title="你还没有正在进行的目标" description="先创建一个最明确的健康目标。" action-label="去创建目标" compact @action="router.push('/goals')" />
+                </div>
+
+                <div v-else>
+                  <div v-if="latestReport" class="focus-box">
+                    <strong>{{ reportTypeLabel(latestReport.report_type) }} · {{ reportStatusLabel(latestReport.status) }}</strong>
+                    <p>{{ formatDateRange(latestReport.start_date, latestReport.end_date) }}</p>
+                    <a v-if="latestReport.file_url" :href="latestReport.file_url" target="_blank" rel="noreferrer">打开最新报表</a>
+                  </div>
+                  <PageStateBlock v-else tone="empty" title="还没有生成过报表" description="当记录累计起来后，再做周报和月报才有复盘价值。" action-label="去报表页" compact @action="router.push('/reports')" />
+                </div>
+              </div>
             </div>
           </div>
-          <p>{{ item.reason_text }}</p>
-        </article>
-      </div>
-      <PageStateBlock
-        v-else
-        tone="empty"
-        title="当前还没有可展示的推荐"
-        description="把健康档案补一补，再记几餐，推荐就会越来越懂你的口味和习惯。"
-        action-label="去完善资料"
-        @action="router.push('/profile')"
-        />
-    </div>
 
-    <article class="panel extension-panel">
-      <div class="panel-header">
-        <div>
-          <div class="section-title-row">
-            <h3>延展工作区</h3>
-            <CompactHint description="想看收藏、记录、趋势或报表，点标签页切换就好，不用来回跳页面。" />
-          </div>
-        </div>
-        <el-button text @click="router.push(activeExtensionMeta.to)">{{ activeExtensionMeta.cta }}</el-button>
+        </main>
       </div>
 
-      <div class="extension-tab-strip mobile-scroll-row" role="tablist" aria-label="首页延展工作区">
-        <button
-          v-for="item in extensionTabs"
-          :key="item.key"
-          class="extension-tab"
-          :class="{ active: extensionTab === item.key }"
-          type="button"
-          role="tab"
-          :aria-selected="extensionTab === item.key"
-          @click="setExtensionTab(item.key)"
-        >
-          <span>{{ item.label }}</span>
-          <strong>{{ item.status }}</strong>
-        </button>
-      </div>
-
-      <article v-spotlight class="extension-spotlight">
-        <div>
-          <span>{{ activeExtensionMeta.kicker }}</span>
-          <strong>{{ activeExtensionMeta.title }}</strong>
-          <p>{{ activeExtensionMeta.copy }}</p>
-        </div>
-        <el-button plain @click="router.push(activeExtensionMeta.to)">{{ activeExtensionMeta.cta }}</el-button>
-      </article>
-
-      <div v-if="extensionTab === 'favorites'" class="extension-body shortcut-list">
-        <article v-for="item in favoriteShortcuts" :key="item.id" v-spotlight class="shortcut-item interactive-shortcut-item">
-          <div>
-            <strong>{{ item.title }}</strong>
-            <p>{{ item.description || "已收藏，可直接加入记录。" }}</p>
-          </div>
-          <div class="shortcut-actions">
-            <el-button text @click="openFavoriteDetail(item)">查看详情</el-button>
-            <el-button type="primary" plain @click="addToRecord(item)">加入记录</el-button>
-          </div>
-        </article>
-        <PageStateBlock
-          v-if="!favoriteShortcuts.length"
-          tone="empty"
-          title="还没有收藏沉淀"
-          description="遇到合适的菜谱先收藏，后续记录会快很多。"
-          action-label="去菜谱库"
-          compact
-          @action="router.push('/recipes')"
-        />
-      </div>
-
-      <div v-else-if="extensionTab === 'records'" class="extension-body record-list">
-        <article v-for="record in recentRecords.slice(0, 4)" :key="record.id" v-spotlight class="record-item interactive-record-item">
-          <div>
-            <strong>{{ record.record_date }} · {{ mealTypeLabel(record.meal_type) }}</strong>
-            <p>{{ record.items?.[0]?.recipe_title || record.note || "已记录一餐" }}</p>
-          </div>
-          <span>{{ record.items?.length || 0 }} 条目</span>
-        </article>
-        <PageStateBlock
-          v-if="!recentRecords.length"
-          tone="empty"
-          title="最近还没有记录"
-          description="先记一餐，趋势和推荐就有素材可以跑了。"
-          action-label="去记录"
-          compact
-          @action="router.push('/records')"
-        />
-      </div>
-
-      <div v-else-if="extensionTab === 'trend'" class="extension-body">
-        <TrendMiniBars
-          v-if="weekEnergyBars.length"
-          title="最近7天热量节奏"
-          description="看一眼最近几天的整体摄入强弱，判断今天是不是明显偏高或偏低。"
-          badge="近7天"
-          tone="energy"
-          compact
-          :items="weekEnergyBars"
-        />
-        <PageStateBlock
-          v-else
-          tone="empty"
-          title="最近还没有趋势数据"
-          description="先记录几餐，热量节奏和趋势判断才会开始出现。"
-          compact
-        />
-      </div>
-
-      <div v-else-if="extensionTab === 'goals'" class="extension-body">
-        <div v-if="activeGoal" class="focus-box">
-          <div class="focus-topline">
-            <strong>{{ goalTypeLabel(activeGoal.goal_type) }}</strong>
-            <span class="focus-badge">{{ goalProgressLabel }}</span>
-          </div>
-          <p>{{ activeGoal.description || "已创建目标，建议继续补录进展。" }}</p>
-          <div class="progress-line">
-            <span>当前 {{ formatDecimal(activeGoal.current_value) }}</span>
-            <span>目标 {{ formatDecimal(activeGoal.target_value) }}</span>
-          </div>
-          <el-progress :percentage="goalProgressPercent" :stroke-width="10" :show-text="false" />
-        </div>
-        <PageStateBlock
-          v-else
-          tone="empty"
-          title="你还没有正在进行的目标"
-          description="先创建一个最明确的健康目标，首页才会形成真正的工作台。"
-          action-label="去创建目标"
-          compact
-          @action="router.push('/goals')"
-        />
-      </div>
-
-      <div v-else class="extension-body">
-        <div v-if="latestReport" class="focus-box">
-          <strong>{{ reportTypeLabel(latestReport.report_type) }} · {{ reportStatusLabel(latestReport.status) }}</strong>
-          <p>{{ formatDateRange(latestReport.start_date, latestReport.end_date) }}</p>
-          <a v-if="latestReport.file_url" :href="latestReport.file_url" target="_blank" rel="noreferrer">打开最新报表</a>
-        </div>
-        <PageStateBlock
-          v-else
-          tone="empty"
-          title="还没有生成过报表"
-          description="当记录累计起来后，再做周报和月报才有复盘价值。"
-          action-label="去报表页"
-          compact
-          @action="router.push('/reports')"
-        />
-      </div>
-    </article>
-
-    <div v-if="onboardingSteps.length" class="panel onboarding-panel">
-      <div class="panel-header">
-        <div>
-          <h3>起步引导</h3>
-          <p>只有在关键基础还没铺开时才显示，把资料、记录和报表先走通一遍就够了。</p>
-        </div>
-      </div>
-      <div class="onboarding-list">
-        <article v-for="item in onboardingSteps" :key="item.title" v-spotlight class="onboarding-item interactive-onboarding-item">
-          <div>
-            <strong>{{ item.title }}</strong>
-            <p>{{ item.copy }}</p>
-          </div>
-          <el-button plain @click="router.push(item.to)">{{ item.cta }}</el-button>
-        </article>
-      </div>
-    </div>
-
-    <RecipeDetailDialog
-      v-model="detailVisible"
-      :recipe-id="selectedRecipeId"
-      :recipe="selectedRecipe"
-      :favorited="selectedRecipeId ? favoriteIds.includes(selectedRecipeId) : false"
-      :reason-text="selectedReasonText"
-      @favorite-change="handleFavoriteChange"
-      @add-to-record="addToRecord"
-    />
+      <RecipeDetailDialog
+        v-model="detailVisible"
+        :recipe-id="selectedRecipeId"
+        :recipe="selectedRecipe"
+        :favorited="selectedRecipeId ? favoriteIds.includes(selectedRecipeId) : false"
+        :reason-text="selectedReasonText"
+        @favorite-change="handleFavoriteChange"
+        @add-to-record="addToRecord"
+      />
     </RefreshFrame>
   </section>
 </template>
@@ -323,7 +285,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import CollectionSkeleton from "../components/CollectionSkeleton.vue";
-import CompactHint from "../components/CompactHint.vue";
 import PageStateBlock from "../components/PageStateBlock.vue";
 import RefreshFrame from "../components/RefreshFrame.vue";
 import TrendMiniBars from "../components/TrendMiniBars.vue";
@@ -1132,711 +1093,848 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* ── 全局容器 ─────────────────────────────────── */
 .dashboard {
-  display: grid;
-  gap: 18px;
-}
-
-.hero {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-auto-flow: dense;
-  gap: 16px;
-  align-items: start;
-}
-
-.hero-card,
-.panel {
-  background: rgba(255, 255, 255, 0.86);
-  border: 1px solid rgba(16, 34, 42, 0.08);
-  box-shadow: 0 18px 50px rgba(15, 30, 39, 0.08);
-}
-
-.hero-card {
-  padding: 20px;
-  border-radius: 24px;
-}
-
-.panel {
-  padding: 28px;
-  border-radius: 28px;
-}
-
-.hero-card-intro {
-  grid-column: span 5;
-  display: grid;
-  gap: 14px;
-  padding: 22px 24px 20px;
-}
-
-.hero-card-pulse {
-  grid-column: span 3;
-  margin-top: 20px;
-}
-
-.hero-status-card {
-  grid-column: span 4;
-  display: grid;
-  gap: 14px;
-  padding: 18px;
-  margin-top: 8px;
-  background:
-    radial-gradient(circle at top right, rgba(255, 244, 222, 0.54), transparent 42%),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(244, 249, 252, 0.95));
-}
-
-.hero-actions-card {
-  grid-column: span 4;
-  display: grid;
-  gap: 14px;
-  padding: 18px;
-  margin-top: -10px;
-  background:
-    radial-gradient(circle at bottom left, rgba(87, 181, 231, 0.15), transparent 48%),
-    linear-gradient(145deg, rgba(249, 252, 255, 0.96), rgba(241, 248, 252, 0.96));
-}
-
-.hero-card-workbench.panel {
-  grid-column: span 8;
-  padding: 24px;
-}
-
-.hero-copy-head {
-  display: grid;
-  gap: 10px;
-}
-
-.tag {
-  margin: 0;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  font-size: 12px;
-  color: #3e6d7f;
-}
-
-h2 {
-  margin: 0;
-  font-size: clamp(30px, 3.7vw, 44px);
-  line-height: 1.08;
-}
-
-.desc {
-  margin: 14px 0 0;
-  color: #476072;
-  line-height: 1.8;
-}
-
-.cta-row,
-.head-actions,
-.recommend-actions,
-.shortcut-actions,
-.today-topline,
-.today-primary-actions {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── 顶部问候栏 ───────────────────────────────── */
+.greeting-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 28px;
+  background: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid rgba(16, 34, 42, 0.07);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
   flex-wrap: wrap;
 }
 
-.hero-pulse-card,
-.recommend-card,
-.interactive-shortcut-item,
-.interactive-record-item,
-.interactive-onboarding-item,
-.meal-progress-card,
-.metric-card,
-.today-suggest-card,
-.extension-spotlight,
-.extension-tab,
-.summary-grid article {
-  transition:
-    transform 0.34s cubic-bezier(0.22, 1.2, 0.36, 1),
-    box-shadow 0.34s cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 0.28s ease,
-    background 0.28s ease;
+.greeting-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.cta-row {
-  margin-top: 24px;
-}
-
-.hero-pulse-card {
-  display: grid;
-  gap: 6px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  background:
-    radial-gradient(circle at top right, rgba(255, 244, 222, 0.72), transparent 36%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(247, 251, 255, 0.94));
-  border: 1px solid rgba(16, 34, 42, 0.08);
-  box-shadow: 0 16px 34px rgba(15, 30, 39, 0.08);
-  animation: pop-in-bounce 0.56s cubic-bezier(0.22, 1.2, 0.36, 1);
-}
-
-.hero-pulse-card span {
-  font-size: 12px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #627f8e;
-}
-
-.hero-pulse-card strong {
-  font-size: 18px;
-  line-height: 1.35;
-  color: #173042;
-}
-
-.hero-pulse-card p {
+.greeting-name {
   margin: 0;
-  color: #476072;
-  line-height: 1.5;
+  font-size: clamp(18px, 2vw, 24px);
+  font-weight: 700;
+  color: #173042;
+  line-height: 1.2;
+}
+
+.greeting-sub {
+  margin: 0;
   font-size: 13px;
+  color: #5a7a8a;
+  line-height: 1.5;
+  max-width: 540px;
   display: -webkit-box;
-  overflow: hidden;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.hero-pulse-card:hover,
-.recommend-card:hover,
-.interactive-shortcut-item:hover,
-.interactive-record-item:hover,
-.interactive-onboarding-item:hover,
-.meal-progress-card:hover,
-.metric-card:hover,
-.today-suggest-card:hover,
-.extension-spotlight:hover,
-.summary-grid article:hover {
-  transform: translateY(-4px) scale(1.01);
-  box-shadow: 0 26px 48px rgba(15, 30, 39, 0.12);
-}
-
-.hero-status-strip,
-.hero-meta-grid {
-  display: grid;
+.greeting-right {
+  display: flex;
   gap: 10px;
+  align-items: center;
+  flex-shrink: 0;
 }
 
-.hero-status-strip {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.hero-status-card-header,
-.hero-actions-copy {
+/* ── 双栏主体布局 ─────────────────────────────── */
+.main-layout {
   display: grid;
-  gap: 6px;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 0;
+  min-height: calc(100vh - 110px);
+  align-items: start;
 }
 
-.hero-status-card-header span,
-.hero-actions-copy span {
-  font-size: 12px;
+/* ── 左侧栏 ───────────────────────────────────── */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 16px 20px 20px;
+  border-right: 1px solid rgba(16, 34, 42, 0.07);
+  position: sticky;
+  top: 60px;
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(16, 34, 42, 0.1) transparent;
+}
+
+.sidebar-card {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  border-radius: 20px;
+  padding: 16px;
+  box-shadow: 0 4px 16px rgba(15, 30, 39, 0.05);
+}
+
+.sidebar-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.card-label {
+  font-size: 11px;
+  font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: #5a7a8a;
 }
 
-.hero-status-card-header strong,
-.hero-actions-copy strong {
-  font-size: 22px;
-  line-height: 1.3;
-  color: #173042;
-}
-
-.hero-actions-copy p {
-  margin: 0;
-  color: #476072;
-  line-height: 1.55;
-  font-size: 13px;
-}
-
-.hero-actions-card .cta-row {
-  margin-top: 0;
-}
-
-.hero-status-strip span {
-  padding: 8px 10px;
-  border-radius: 14px;
-  background: rgba(247, 251, 255, 0.92);
-  border: 1px solid rgba(16, 34, 42, 0.06);
-  color: #24566a;
+/* 今日状态卡 */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
-  line-height: 1.35;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.64);
 }
 
-.hero-status-card.is-refresh-pulse .hero-status-strip span,
-.metric-card.is-refresh-pulse {
-  animation: dashboard-card-pulse 0.86s cubic-bezier(0.22, 1.2, 0.36, 1);
+.badge-active {
+  background: rgba(224, 247, 238, 0.9);
+  color: #1d6f5f;
 }
 
-.hero-meta-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.badge-muted {
+  background: rgba(232, 241, 247, 0.9);
+  color: #5a7a8a;
 }
 
-.today-workbench {
-  background:
-    radial-gradient(circle at top right, rgba(123, 173, 204, 0.18), transparent 30%),
-    linear-gradient(135deg, rgba(250, 252, 255, 0.98), rgba(242, 248, 251, 0.96));
+/* 营养进度行 */
+.nutrition-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.nutrition-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nutrition-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.nutrition-row-head span {
+  font-size: 11px;
+  color: #5a7a8a;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.nutrition-row-head strong {
+  font-size: 16px;
+  font-weight: 700;
+  color: #173042;
+  flex: 1;
+}
+
+.nutrition-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-style: normal;
+  background: #e8f1f7;
+  color: #24566a;
+  flex-shrink: 0;
+}
+
+.nutrition-row.tone-success .nutrition-badge { background: rgba(224, 247, 238, 0.9); color: #1d6f5f; }
+.nutrition-row.tone-warning .nutrition-badge { background: rgba(255, 237, 218, 0.9); color: #b97326; }
+.nutrition-row.tone-steady .nutrition-badge { background: rgba(222, 235, 248, 0.9); color: #2a5f8a; }
+
+.nutrition-bar-track {
+  height: 5px;
+  background: rgba(16, 34, 42, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.nutrition-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #3e9bd4;
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.nutrition-row.tone-success .nutrition-bar-fill { background: #30b57a; }
+.nutrition-row.tone-warning .nutrition-bar-fill { background: #e6914a; }
+.nutrition-row.tone-muted .nutrition-bar-fill { background: rgba(16, 34, 42, 0.15); }
+
+.nutrition-copy {
+  margin: 0;
+  font-size: 11px;
+  color: #7a96a4;
+  line-height: 1.4;
+}
+
+/* 四餐打卡 */
+.meal-checklist {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.meal-check-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  background: rgba(247, 251, 255, 0.9);
+  border: 1px solid rgba(16, 34, 42, 0.07);
+  font-size: 12px;
+}
+
+.meal-check-item.done {
+  background: rgba(224, 247, 238, 0.8);
+  border-color: rgba(31, 120, 89, 0.14);
+}
+
+.meal-check-item.focus {
+  background: rgba(255, 245, 231, 0.9);
+  border-color: rgba(185, 115, 38, 0.2);
+}
+
+.meal-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(16, 34, 42, 0.2);
+  flex-shrink: 0;
+}
+
+.meal-check-item.done .meal-dot { background: #30b57a; }
+.meal-check-item.focus .meal-dot { background: #e6914a; }
+
+.meal-label {
+  flex: 1;
+  color: #24566a;
+  font-weight: 600;
+}
+
+.meal-status {
+  font-size: 11px;
+  color: #7a96a4;
+  font-weight: 700;
+}
+
+.meal-check-item.done .meal-status { color: #1d6f5f; }
+.meal-check-item.focus .meal-status { color: #b97326; }
+
+/* 目标卡 */
+.goal-name {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  color: #173042;
+  margin-bottom: 4px;
+}
+
+.goal-desc {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #5a7a8a;
+  line-height: 1.5;
+}
+
+.goal-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #5a7a8a;
+}
+
+.goal-progress-badge {
+  margin-left: auto;
+}
+
+.goal-empty {
+  margin: 0;
+  font-size: 13px;
+  color: #7a96a4;
+}
+
+/* 快捷操作 */
+.quick-btn-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.quick-btn {
+  width: 100%;
+  font-size: 12px !important;
+}
+
+/* 起步引导 */
+.onboarding-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.onboarding-step {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(247, 251, 255, 0.9);
+  border: 1px solid rgba(16, 34, 42, 0.06);
+  border-radius: 14px;
+}
+
+.onboarding-step strong {
+  display: block;
+  font-size: 13px;
+  color: #173042;
+  margin-bottom: 2px;
+}
+
+.onboarding-step p {
+  margin: 0;
+  font-size: 11px;
+  color: #7a96a4;
+  line-height: 1.4;
+}
+
+/* ── 右侧主内容区 ─────────────────────────────── */
+.main-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px 24px 28px;
+  min-height: 0;
+}
+
+/* 工作台标题区 */
+.workbench-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.workbench-headline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .workbench-kicker {
-  margin: 0 0 8px;
-  letter-spacing: 0.16em;
+  font-size: 11px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  font-size: 12px;
   color: #2f6672;
+  font-weight: 700;
 }
 
-.today-copy strong {
-  display: block;
-  font-size: 30px;
-  line-height: 1.25;
+.workbench-headline strong {
+  font-size: clamp(22px, 2.4vw, 30px);
+  font-weight: 700;
+  color: #173042;
+  line-height: 1.2;
 }
 
-.today-copy p {
-  margin: 10px 0 0;
-  color: #476072;
-  line-height: 1.75;
+.workbench-headline p {
+  margin: 0;
+  font-size: 13px;
+  color: #5a7a8a;
+  line-height: 1.6;
+  max-width: 480px;
 }
 
-.today-topline,
-.today-lower-grid {
-  display: grid;
-  gap: 14px;
-  margin-top: 14px;
+.workbench-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+  padding-top: 4px;
 }
 
-.today-topline {
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-}
-
-.today-primary-actions {
-  justify-content: flex-end;
-  align-items: flex-start;
-}
-
-.meal-progress-grid {
+/* 四餐横排 */
+.meal-progress-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
-  margin-top: 14px;
 }
 
-.meal-progress-card,
-.today-suggest-card {
-  padding: 14px;
+.meal-progress-card {
+  padding: 14px 16px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.84);
+  background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(16, 34, 42, 0.08);
+  cursor: pointer;
+  transition:
+    transform 0.3s cubic-bezier(0.22, 1.2, 0.36, 1),
+    box-shadow 0.3s ease,
+    border-color 0.25s ease,
+    background 0.25s ease;
 }
 
-.meal-progress-card span {
-  font-size: 12px;
-  letter-spacing: 0.1em;
+.meal-progress-card:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 16px 32px rgba(15, 30, 39, 0.1);
+}
+
+.meal-card-label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: #5a7a8a;
+  font-weight: 700;
 }
 
 .meal-progress-card strong {
   display: block;
   margin-top: 8px;
-  font-size: 18px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #173042;
 }
 
-.meal-progress-card p,
-.today-suggest-card p {
-  margin: 8px 0 0;
-  color: #476072;
-  line-height: 1.6;
+.meal-progress-card p {
+  margin: 5px 0 0;
+  font-size: 12px;
+  color: #7a96a4;
+  line-height: 1.5;
 }
 
 .meal-progress-card.done {
-  background: rgba(224, 247, 238, 0.9);
+  background: rgba(224, 247, 238, 0.85);
   border-color: rgba(31, 120, 89, 0.16);
 }
 
+.meal-progress-card.done strong { color: #1d6f5f; }
+
 .meal-progress-card.active {
-  background: rgba(255, 245, 231, 0.92);
-  border-color: rgba(185, 115, 38, 0.16);
-  box-shadow: 0 18px 34px rgba(185, 115, 38, 0.1);
+  background: rgba(255, 245, 231, 0.9);
+  border-color: rgba(185, 115, 38, 0.22);
+  box-shadow: 0 10px 28px rgba(185, 115, 38, 0.1);
 }
 
-.today-lower-grid {
-  grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.1fr);
+.meal-progress-card.active strong { color: #b97326; }
+
+/* 推荐菜谱区 */
+.section-block {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  border-radius: 22px;
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(15, 30, 39, 0.05);
 }
 
-.today-suggest-card span {
-  font-size: 12px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #5a7a8a;
-}
-
-.today-suggest-card strong {
-  display: block;
-  margin-top: 8px;
-  font-size: 22px;
-}
-
-.compact-action-list {
-  margin-top: 0;
-}
-
-.hero-meta-grid article {
-  padding: 16px;
-  border-radius: 18px;
-  background: rgba(247, 251, 255, 0.92);
-  border: 1px solid rgba(16, 34, 42, 0.06);
-}
-
-.hero-meta-grid strong {
-  display: block;
-  margin-top: 8px;
-  font-size: 22px;
-}
-
-.hero-meta-grid p {
-  margin: 8px 0 0;
-  color: #476072;
-  line-height: 1.6;
-}
-
-.summary-grid,
-.action-list,
-.recommend-list,
-.shortcut-list,
-.record-list,
-.onboarding-list {
-  display: grid;
+.section-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
+  margin-bottom: 14px;
 }
 
-.extension-panel {
-  display: grid;
-  gap: 16px;
+.section-block-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #173042;
 }
 
-.extension-tab-strip {
+.section-block-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.recommend-row {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
-.extension-tab {
-  display: grid;
-  gap: 6px;
+.recommend-card-h {
   padding: 14px 16px;
-  border-radius: 18px;
+  border-radius: 16px;
+  background: rgba(247, 251, 255, 0.92);
+  border: 1px solid rgba(16, 34, 42, 0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition:
+    transform 0.3s cubic-bezier(0.22, 1.2, 0.36, 1),
+    box-shadow 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.recommend-card-h::after {
+  content: "";
+  position: absolute;
+  inset: auto -24% -56% auto;
+  width: 130px;
+  height: 130px;
+  border-radius: 999px;
+  background: rgba(87, 181, 231, 0.08);
+  pointer-events: none;
+}
+
+.recommend-card-h:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 28px rgba(15, 30, 39, 0.1);
+}
+
+.recommend-card-h strong {
+  font-size: 15px;
+  font-weight: 700;
+  color: #173042;
+  line-height: 1.3;
+}
+
+.recommend-card-h p {
+  margin: 0;
+  font-size: 12px;
+  color: #5a7a8a;
+  line-height: 1.5;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.recommend-card-actions {
+  display: flex;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+/* 下方双列 */
+.lower-grid {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+/* 下一餐推荐 */
+.next-meal-card {
+  padding: 18px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at top right, rgba(87, 181, 231, 0.12), transparent 40%),
+    rgba(247, 251, 255, 0.94);
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  box-shadow: 0 4px 16px rgba(15, 30, 39, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: transform 0.3s cubic-bezier(0.22, 1.2, 0.36, 1), box-shadow 0.3s ease;
+}
+
+.next-meal-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 28px rgba(15, 30, 39, 0.1);
+}
+
+.next-meal-card strong {
+  font-size: 18px;
+  font-weight: 700;
+  color: #173042;
+  line-height: 1.3;
+}
+
+.next-meal-card p {
+  margin: 0;
+  font-size: 12px;
+  color: #5a7a8a;
+  line-height: 1.6;
+  flex: 1;
+}
+
+.next-meal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+/* 延展工作区 */
+.extension-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(16, 34, 42, 0.08);
+  border-radius: 22px;
+  padding: 18px;
+  box-shadow: 0 4px 16px rgba(15, 30, 39, 0.05);
+}
+
+.extension-tab-strip {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.extension-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 12px;
   border: 1px solid rgba(16, 34, 42, 0.08);
   background: rgba(247, 251, 255, 0.88);
   color: #234;
   text-align: left;
   cursor: pointer;
+  flex-shrink: 0;
   transition:
-    transform 0.28s cubic-bezier(0.22, 1.2, 0.36, 1),
-    border-color 0.22s ease,
-    box-shadow 0.28s ease,
-    background 0.24s ease;
+    transform 0.25s cubic-bezier(0.22, 1.2, 0.36, 1),
+    border-color 0.2s ease,
+    box-shadow 0.25s ease,
+    background 0.2s ease;
 }
 
 .extension-tab:hover {
-  transform: translateY(-3px) scale(1.01);
+  transform: translateY(-2px);
   border-color: rgba(23, 48, 66, 0.16);
-  box-shadow: 0 20px 34px rgba(15, 30, 39, 0.1);
+  box-shadow: 0 8px 20px rgba(15, 30, 39, 0.08);
 }
 
-.extension-tab span,
-.extension-spotlight span {
-  font-size: 12px;
-  letter-spacing: 0.12em;
+.extension-tab span {
+  font-size: 10px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #5a7a8a;
 }
 
 .extension-tab strong {
-  font-size: 16px;
-  line-height: 1.45;
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 600;
 }
 
 .extension-tab.active {
   background: #173042;
   color: #fff;
   border-color: #173042;
-  box-shadow: 0 18px 40px rgba(23, 48, 66, 0.18);
+  box-shadow: 0 8px 24px rgba(23, 48, 66, 0.22);
 }
 
 .extension-tab.active span {
-  color: rgba(255, 255, 255, 0.72);
-}
-
-.extension-spotlight {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: flex-start;
-  padding: 14px 16px;
-  border-radius: 18px;
-  background:
-    radial-gradient(circle at top right, rgba(87, 181, 231, 0.16), transparent 34%),
-    rgba(247, 251, 255, 0.92);
-  border: 1px solid rgba(16, 34, 42, 0.07);
-}
-
-.extension-spotlight strong {
-  display: block;
-  margin-top: 6px;
-  font-size: 18px;
-}
-
-.extension-spotlight p {
-  margin: 6px 0 0;
-  color: #476072;
-  line-height: 1.5;
-  font-size: 13px;
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  color: rgba(255, 255, 255, 0.65);
 }
 
 .extension-body {
-  min-height: 180px;
+  min-height: 140px;
 }
 
-.summary-grid article,
-.recommend-list article,
-.empty-state,
-.focus-box,
-.action-item,
+/* 延展列表项 */
+.shortcut-list,
+.record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .shortcut-item,
-.record-item,
-.onboarding-item {
-  padding: 18px;
-  border-radius: 20px;
+.record-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
   background: rgba(247, 251, 255, 0.92);
   border: 1px solid rgba(16, 34, 42, 0.06);
+  transition: transform 0.25s cubic-bezier(0.22, 1.2, 0.36, 1), box-shadow 0.25s ease;
 }
 
-.summary-grid span,
-.metric-grid span,
-.progress-line span,
-.record-item span {
-  font-size: 12px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #5a7a8a;
+.interactive-shortcut-item:hover,
+.interactive-record-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(15, 30, 39, 0.08);
 }
 
-.summary-grid strong,
-.metric-grid strong,
-.focus-box strong,
-.action-item strong,
 .shortcut-item strong,
 .record-item strong {
   display: block;
-  margin-top: 8px;
-  font-size: 22px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #173042;
+  margin-bottom: 2px;
 }
 
-.summary-grid p,
-.panel-header p,
-.recommend-list p,
-.empty-state p,
-.focus-box p,
-.action-item p,
 .shortcut-item p,
-.record-item p,
-.onboarding-item p {
-  margin: 8px 0 0;
-  color: #476072;
-  line-height: 1.65;
-}
-
-.panel-header,
-.row,
-.action-item,
-.shortcut-item,
-.record-item,
-.onboarding-item {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
-}
-
-.panel-header h3 {
+.record-item p {
   margin: 0;
-  font-size: 22px;
+  font-size: 12px;
+  color: #7a96a4;
+  line-height: 1.4;
 }
 
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+.shortcut-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
-.metric-card {
-  padding: 14px;
-  border-radius: 18px;
+.record-item > span {
+  font-size: 11px;
+  color: #7a96a4;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+/* 目标/报表 focus box */
+.focus-box {
+  padding: 14px 16px;
+  border-radius: 16px;
   background: rgba(247, 251, 255, 0.92);
   border: 1px solid rgba(16, 34, 42, 0.06);
-  position: relative;
-  overflow: hidden;
 }
 
-.metric-card::after,
-.today-suggest-card::after,
-.recommend-card::after {
-  content: "";
-  position: absolute;
-  inset: auto -18% -48% auto;
-  width: 140px;
-  height: 140px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.2);
-  pointer-events: none;
-}
-
-.metric-top,
 .focus-topline {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 6px;
 }
 
-.metric-top em,
+.focus-topline strong {
+  font-size: 16px;
+  font-weight: 700;
+  color: #173042;
+}
+
 .focus-badge {
   display: inline-flex;
   align-items: center;
-  padding: 6px 10px;
+  padding: 4px 10px;
   border-radius: 999px;
-  font-size: 12px;
-  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
   color: #24566a;
   background: #e8f1f7;
 }
 
-.metric-card.is-success .metric-top em {
-  background: rgba(224, 247, 238, 0.95);
+.goal-progress-badge {
+  background: rgba(224, 247, 238, 0.9);
   color: #1d6f5f;
 }
 
-.metric-card.is-warning .metric-top em {
-  background: rgba(255, 237, 218, 0.95);
-  color: #b97326;
-}
-
-.metric-card.is-muted .metric-top em {
-  background: rgba(232, 241, 247, 0.95);
+.focus-box p {
+  margin: 0 0 10px;
+  font-size: 13px;
   color: #5a7a8a;
+  line-height: 1.55;
 }
 
 .progress-line {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 14px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #5a7a8a;
 }
 
 .focus-box a {
   display: inline-block;
-  margin-top: 14px;
+  margin-top: 10px;
   color: #173042;
   font-weight: 700;
   text-decoration: none;
 }
 
-@media (max-width: 1240px) {
-  .hero {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+.status-card.is-refresh-pulse .meal-check-item {
+  animation: dashboard-card-pulse 0.86s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+/* ── 响应式 ───────────────────────────────────── */
+@media (max-width: 1200px) {
+  .main-layout {
+    grid-template-columns: 260px minmax(0, 1fr);
   }
 
-  .hero-card-intro,
-  .hero-card-pulse,
-  .hero-status-card,
-  .hero-actions-card {
-    grid-column: span 3;
-    margin-top: 0;
-  }
-
-  .hero-card-workbench.panel {
-    grid-column: 1 / -1;
+  .recommend-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 1080px) {
-  .today-topline,
-  .today-lower-grid,
-  .meal-progress-grid,
-  .extension-tab-strip {
+@media (max-width: 1024px) {
+  .lower-grid {
     grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 768px) {
-  .hero {
+@media (max-width: 900px) {
+  .main-layout {
     grid-template-columns: 1fr;
   }
 
-  .hero-card,
-  .hero-copy,
-  .panel,
-  .summary-grid article,
-  .recommend-list article,
-  .focus-box,
-  .action-item,
-  .shortcut-item,
-  .record-item,
-  .onboarding-item {
+  .sidebar {
+    position: static;
+    max-height: none;
     padding: 16px;
-    border-radius: 18px;
+    border-right: none;
+    border-bottom: 1px solid rgba(16, 34, 42, 0.07);
   }
 
-  .hero-card-intro,
-  .hero-card-pulse,
-  .hero-status-card,
-  .hero-actions-card,
-  .hero-card-workbench.panel {
-    grid-column: 1 / -1;
-    margin-top: 0;
+  .meal-progress-row,
+  .recommend-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
 
-  .cta-row {
-    margin-top: 16px;
-  }
-
-  .summary-grid,
-  .metric-grid,
-  .hero-status-strip,
-  .hero-meta-grid,
-  .meal-progress-grid,
-  .today-lower-grid,
-  .extension-tab-strip {
-    grid-template-columns: 1fr;
-  }
-
-  .panel-header,
-  .row,
-  .action-item,
-  .shortcut-item,
-  .record-item,
-  .onboarding-item,
-  .metric-top,
-  .focus-topline,
-  .today-topline,
-  .today-primary-actions,
-  .extension-spotlight {
+@media (max-width: 640px) {
+  .greeting-bar {
+    padding: 14px 16px;
     flex-direction: column;
+    align-items: flex-start;
   }
 
-  .today-topline {
-    grid-template-columns: 1fr;
+  .main-content {
+    padding: 14px 16px 20px;
   }
 
-  .today-copy strong {
-    font-size: 24px;
+  .meal-progress-row,
+  .recommend-row,
+  .meal-checklist {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .workbench-header {
+    flex-direction: column;
   }
 }
 
